@@ -1,3 +1,6 @@
+
+'use client';
+
 import type { Supplier } from '@/lib/types';
 import {
   Table,

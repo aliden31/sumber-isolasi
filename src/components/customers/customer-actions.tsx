@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Plus, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -61,7 +61,6 @@ export function CustomerRowActions({ customer }: { customer: Customer }) {
 
   return (
      <>
-      <CustomerFormDialog customer={customer}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -70,18 +69,20 @@ export function CustomerRowActions({ customer }: { customer: Customer }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              Edit
-            </DropdownMenuItem>
+             <CustomerFormDialog customer={customer}>
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <Edit className="mr-2 h-4 w-4" /> Edit
+                </DropdownMenuItem>
+            </CustomerFormDialog>
             <DropdownMenuItem
               className="text-destructive"
               onSelect={() => setIsDeleteDialogOpen(true)}
             >
-              Hapus
+              <Trash2 className="mr-2 h-4 w-4" /> Hapus
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </CustomerFormDialog>
+      
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
@@ -107,7 +108,6 @@ export function CustomerRowActions({ customer }: { customer: Customer }) {
   );
 }
 
-
 function CustomerFormDialog({ children, customer }: { children: React.ReactNode, customer?: Customer }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -118,6 +118,8 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
   const [phone, setPhone] = useState(customer?.phone || '');
   
   const isEditing = !!customer;
+  const isDropdownItem = React.isValidElement(children) && (children.type as any).displayName === 'DropdownMenuItem';
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,35 +157,29 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogTrigger asChild>
+        {isDropdownItem ? <div className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><Edit className="mr-2 h-4 w-4" /> Edit</div> : children}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-headline">{isEditing ? 'Edit Pelanggan' : 'Tambah Pelanggan Baru'}</DialogTitle>
           <DialogDescription>
             {isEditing ? 'Perbarui detail pelanggan di bawah ini.' : 'Isi detail untuk pelanggan baru.'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Nama
-              </Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required disabled={isPending} />
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nama Pelanggan</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isPending} />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                Email
-              </Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" required disabled={isPending} />
+             <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isPending} />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">
-                No. Telepon
-              </Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" required disabled={isPending} />
+            <div className="space-y-2">
+              <Label htmlFor="phone">No. Telepon</Label>
+              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required disabled={isPending} />
             </div>
-          </div>
           <DialogFooter>
              <Button type="submit" disabled={isPending}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

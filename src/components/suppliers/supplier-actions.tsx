@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Plus, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -72,14 +72,14 @@ export function SupplierRowActions({ supplier }: { supplier: Supplier }) {
         <DropdownMenuContent align="end">
           <SupplierFormDialog supplier={supplier}>
             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              Edit
+              <Edit className="mr-2 h-4 w-4" /> Edit
             </DropdownMenuItem>
           </SupplierFormDialog>
           <DropdownMenuItem
             className="text-destructive"
             onSelect={() => setIsDeleteDialogOpen(true)}
           >
-            Hapus
+           <Trash2 className="mr-2 h-4 w-4" /> Hapus
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -119,6 +119,7 @@ function SupplierFormDialog({ children, supplier }: { children: React.ReactNode,
   const [address, setAddress] = useState(supplier?.address || '');
 
   const isEditing = !!supplier;
+  const isDropdownItem = React.isValidElement(children) && (children.type as any).displayName === 'DropdownMenuItem';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,15 +155,11 @@ function SupplierFormDialog({ children, supplier }: { children: React.ReactNode,
     }
     setOpen(isOpen);
   };
-  
-  // The 'children' prop can be a DropdownMenuItem which needs to be wrapped in a DialogTrigger
-  // or it can be a Button which also can be a trigger.
-  const isDropdownItem = React.isValidElement(children) && (children.type as any).displayName === 'DropdownMenuItem';
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        { isDropdownItem ? <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">Edit</div> : children }
+        { isDropdownItem ? <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><Edit className="mr-2 h-4 w-4" /> Edit</div> : children }
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -172,21 +169,21 @@ function SupplierFormDialog({ children, supplier }: { children: React.ReactNode,
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="name">Nama Supplier</Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isPending} />
             </div>
-             <div>
+             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={isPending} />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isPending} />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="phone">No. Telepon</Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required disabled={isPending} />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="address">Alamat</Label>
-              <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} required disabled={isPending} />
+              <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={isPending} />
             </div>
           <DialogFooter>
              <Button type="submit" disabled={isPending}>

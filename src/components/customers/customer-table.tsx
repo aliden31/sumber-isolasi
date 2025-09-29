@@ -1,3 +1,6 @@
+
+'use client';
+
 import type { Customer } from '@/lib/types';
 import {
   Table,
