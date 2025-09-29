@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/genkit/:path*",
+      "destination": "http://127.0.0.1:3400/:path*"
+    }
+  ]
+}
