@@ -166,7 +166,7 @@ export function EstimationForm({ products, transactions }: EstimationFormProps) 
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isPending} className="w-full">
+              <Button type="submit" disabled={isPending || !selectedProductId} className="w-full">
                 {isPending ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
                 Dapatkan Estimasi AI
               </Button>
@@ -185,7 +185,7 @@ export function EstimationForm({ products, transactions }: EstimationFormProps) 
           </CardHeader>
           <CardContent>
             {isPending && (
-              <div className="flex flex-col items-center justify-center gap-4 text-center">
+              <div className="flex flex-col items-center justify-center gap-4 text-center p-8">
                 <Loader className="h-12 w-12 animate-spin text-primary" />
                 <p className="font-semibold">AI sedang menganalisis data...</p>
                 <p className="text-sm text-muted-foreground">Mohon tunggu sebentar.</p>
@@ -199,13 +199,13 @@ export function EstimationForm({ products, transactions }: EstimationFormProps) 
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Alasan</p>
-                  <p className="text-md font-body whitespace-pre-wrap">{result.reasoning}</p>
+                  <p className="text-md font-body whitespace-pre-wrap leading-relaxed">{result.reasoning}</p>
                 </div>
               </div>
             )}
             {!isPending && !result && (
-              <div className="text-center text-muted-foreground">
-                <p>Hasil estimasi akan muncul di sini.</p>
+              <div className="text-center text-muted-foreground p-8">
+                <p>Hasil estimasi akan muncul di sini setelah Anda mengisi form dan menekan tombol.</p>
               </div>
             )}
           </CardContent>
