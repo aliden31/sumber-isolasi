@@ -6,6 +6,8 @@ export type Product = {
   category: string;
 };
 
+export type NewProduct = Omit<Product, 'id'>;
+
 export type TransactionItem = {
   productId: string;
   quantity: number;

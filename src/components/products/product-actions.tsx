@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import React, { useState, useTransition } from 'react';
+import { Plus, MoreHorizontal, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { addProduct, updateProduct, deleteProduct } from '@/app/(app)/products/actions';
 
 export function ProductActions() {
   return (
@@ -35,23 +36,76 @@ export function ProductActions() {
 }
 
 export function ProductRowActions({ product }: { product: Product }) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleDelete = () => {
+    startTransition(async () => {
+      const result = await deleteProduct(product.id);
+      if (result.error) {
+        toast({
+          title: 'Gagal Menghapus',
+          description: result.error,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Produk Dihapus',
+          description: `${product.name} telah berhasil dihapus.`,
+        });
+        setIsDeleteDialogOpen(false);
+      }
+    });
+  }
+
   return (
-    <ProductFormDialog product={product}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Buka menu</span>
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive">Hapus</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </ProductFormDialog>
+    <>
+      <ProductFormDialog product={product}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Buka menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onSelect={() => setIsDeleteDialogOpen(true)}
+            >
+              Hapus
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </ProductFormDialog>
+      {/* Implement simple alert dialog for deletion */}
+      {isDeleteDialogOpen && (
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Anda yakin?</DialogTitle>
+              <DialogDescription>
+                Tindakan ini tidak dapat diurungkan. Ini akan menghapus produk
+                secara permanen.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} disabled={isPending}>
+                Batal
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Hapus
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 
@@ -59,24 +113,41 @@ export function ProductRowActions({ product }: { product: Product }) {
 function ProductFormDialog({ children, product }: { children: React.ReactNode, product?: Product }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+
   const [name, setName] = useState(product?.name || '');
   const [category, setCategory] = useState(product?.category || '');
   const [price, setPrice] = useState(product?.price || 0);
   const [stock, setStock] = useState(product?.stock || 0);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real app, you'd call a server action here to save the product.
-    toast({
-      title: `Produk ${product ? 'diperbarui' : 'ditambahkan'}`,
-      description: `${name} telah berhasil disimpan.`,
-    });
-    setOpen(false);
-  };
   
   const isEditing = !!product;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      const productData = { name, category, price, stock };
+      const result = isEditing 
+        ? await updateProduct(product.id, productData)
+        : await addProduct(productData);
+
+      if (result.error) {
+        toast({
+          title: `Gagal ${isEditing ? 'memperbarui' : 'menambahkan'} produk`,
+          description: result.error,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: `Produk ${isEditing ? 'diperbarui' : 'ditambahkan'}`,
+          description: `${name} telah berhasil disimpan.`,
+        });
+        setOpen(false);
+      }
+    });
+  };
+
   const handleOpenChange = (isOpen: boolean) => {
+    if (isPending) return;
     if (!isOpen) {
       // Reset form on close
       setName(product?.name || '');
@@ -103,29 +174,32 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
               <Label htmlFor="name" className="text-right">
                 Nama
               </Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required disabled={isPending}/>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right">
                 Kategori
               </Label>
-              <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="col-span-3" required />
+              <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="col-span-3" required disabled={isPending}/>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="price" className="text-right">
                 Harga
               </Label>
-              <Input id="price" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="col-span-3" required />
+              <Input id="price" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="col-span-3" required disabled={isPending}/>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="stock" className="text-right">
                 Stok
               </Label>
-              <Input id="stock" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} className="col-span-3" required />
+              <Input id="stock" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} className="col-span-3" required disabled={isPending}/>
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Simpan</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
