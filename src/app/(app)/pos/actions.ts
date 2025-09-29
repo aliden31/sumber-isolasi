@@ -106,10 +106,10 @@ export async function createTransaction(transactionData: NewTransaction) {
       description,
       refNumber: newTransactionRef.ref.id,
       entries: journalEntries.filter(entry => entry.debit > 0 || entry.credit > 0), // Filter out zero entries if cost is 0
-      total: total + totalCost,
+      total: total, // For accounting purpose, the total of journal is the main transaction amount, not including COGS
     };
 
-    if (newJournal.total > 0) {
+    if (newJournal.entries.length > 0) {
        await addJournalEntry(newJournal);
     }
 

@@ -37,7 +37,7 @@ export function ProductTable({ data }: ProductTableProps) {
                 <Badge variant="outline">{product.category}</Badge>
               </TableCell>
               <TableCell>Rp {product.price.toLocaleString('id-ID')}</TableCell>
-              <TableCell>Rp {product.cost.toLocaleString('id-ID')}</TableCell>
+              <TableCell>Rp {(product.cost || 0).toLocaleString('id-ID')}</TableCell>
               <TableCell className="text-center">
                 <Badge variant={product.stock < 10 ? 'destructive' : 'secondary'}>
                   {product.stock}

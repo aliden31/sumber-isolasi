@@ -12,7 +12,7 @@ const createResponse = (error: string | null = null) => ({ error });
 export async function addProduct(productData: NewProduct) {
   try {
     const productsCol = collection(db, "products");
-    await addDoc(productsCol, productData);
+    await addDoc(productsCol, { ...productData, cost: productData.cost || 0 });
     revalidatePath("/(app)/products");
     revalidatePath("/(app)/pos");
     return createResponse();
