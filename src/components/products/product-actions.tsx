@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -118,6 +119,7 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
   const [name, setName] = useState(product?.name || '');
   const [category, setCategory] = useState(product?.category || '');
   const [price, setPrice] = useState(product?.price || 0);
+  const [cost, setCost] = useState(product?.cost || 0);
   const [stock, setStock] = useState(product?.stock || 0);
   
   const isEditing = !!product;
@@ -125,7 +127,7 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
-      const productData = { name, category, price, stock };
+      const productData = { name, category, price, cost, stock };
       const result = isEditing 
         ? await updateProduct(product.id, productData)
         : await addProduct(productData);
@@ -153,6 +155,7 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
       setName(product?.name || '');
       setCategory(product?.category || '');
       setPrice(product?.price || 0);
+      setCost(product?.cost || 0);
       setStock(product?.stock || 0);
     }
     setOpen(isOpen);
@@ -184,9 +187,15 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="price" className="text-right">
-                Harga
+                Harga Jual
               </Label>
               <Input id="price" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="col-span-3" required disabled={isPending}/>
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="cost" className="text-right">
+                Harga Pokok
+              </Label>
+              <Input id="cost" type="number" value={cost} onChange={(e) => setCost(Number(e.target.value))} className="col-span-3" required disabled={isPending}/>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="stock" className="text-right">

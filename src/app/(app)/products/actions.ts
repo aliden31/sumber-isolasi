@@ -1,3 +1,4 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -13,6 +14,7 @@ export async function addProduct(productData: NewProduct) {
     const productsCol = collection(db, "products");
     await addDoc(productsCol, productData);
     revalidatePath("/(app)/products");
+    revalidatePath("/(app)/pos");
     return createResponse();
   } catch (e) {
     console.error("Error adding document: ", e);
@@ -25,6 +27,7 @@ export async function updateProduct(id: string, productData: Partial<NewProduct>
     const productRef = doc(db, "products", id);
     await updateDoc(productRef, productData);
     revalidatePath("/(app)/products");
+    revalidatePath("/(app)/pos");
     return createResponse();
   } catch (e) {
     console.error("Error updating document: ", e);
@@ -37,6 +40,7 @@ export async function deleteProduct(id: string) {
     const productRef = doc(db, "products", id);
     await deleteDoc(productRef);
     revalidatePath("/(app)/products");
+    revalidatePath("/(app)/pos");
     return createResponse();
   } catch (e) {
     console.error("Error deleting document: ", e);

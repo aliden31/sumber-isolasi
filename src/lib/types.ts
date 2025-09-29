@@ -1,7 +1,9 @@
+
 export type Product = {
   id: string;
   name: string;
   price: number;
+  cost: number; // Harga pokok produk
   stock: number;
   category: string;
 };
@@ -13,6 +15,7 @@ export type TransactionItem = {
   productName: string; // denormalized for easier display
   quantity: number;
   price: number;
+  cost: number; // denormalized for COGS calculation
 };
 
 export type Transaction = {

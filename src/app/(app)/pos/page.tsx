@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useTransition } from 'react';
@@ -26,7 +27,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { createTransaction } from './actions';
-import { collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function POSPage() {
@@ -47,8 +48,11 @@ export default function POSPage() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayTimestamp = Timestamp.fromDate(today);
+
     const transactionsCol = collection(db, "transactions");
-     const unsubscribeTransactions = onSnapshot(transactionsCol, (snapshot) => {
+    const q = query(transactionsCol, where("date", ">=", todayTimestamp));
+     const unsubscribeTransactions = onSnapshot(q, (snapshot) => {
         const transactionList = snapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -56,8 +60,7 @@ export default function POSPage() {
                 ...data,
                 date: data.date.toDate(),
             } as Transaction;
-        }).filter(tx => tx.date >= today)
-        .sort((a, b) => b.date.getTime() - a.date.getTime());
+        }).sort((a, b) => b.date.getTime() - a.date.getTime());
        setRecentTransactions(transactionList);
     });
 
@@ -142,9 +145,10 @@ export default function POSPage() {
         date: new Date(),
         items: cart.map(item => ({
           productId: item.product.id,
-          productName: item.product.name, // Store name for easier display
+          productName: item.product.name,
           quantity: item.quantity,
           price: item.product.price,
+          cost: item.product.cost,
         })),
         total: cartTotal,
         paymentMethod,
