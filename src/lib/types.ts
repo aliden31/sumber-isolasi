@@ -83,3 +83,12 @@ export type PurchaseOrder = {
 };
 
 export type NewPurchaseOrder = Omit<PurchaseOrder, 'id'>;
+
+export type Account = {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+}
+
+export type NewAccount = Omit<Account, 'id'>;
