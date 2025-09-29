@@ -99,51 +99,55 @@ export async function createTransaction(transactionData: NewTransaction, isPOS: 
     const { total, paymentMethod, customerId, customerName } = transactionData;
     const description = `Penjualan ${isPOS ? 'POS' : 'Manual'} #${newTransactionRef.ref.id}${customerName ? ` kepada ${customerName}`: ''}`;
 
-    const settings = await getAccountingSettings();
-    
-    let paymentAccountId: string | undefined;
-    if (paymentMethod === 'Tunai') {
-        paymentAccountId = settings.cashAccountId;
-    } else if (paymentMethod === 'Transfer') {
-        paymentAccountId = settings.bankAccountId;
-    } else if (paymentMethod === 'Kredit') {
-        paymentAccountId = settings.accountsReceivableAccountId;
+    try {
+        const settings = await getAccountingSettings();
+
+        let paymentAccountId: string | undefined;
+        if (paymentMethod === 'Tunai') {
+            paymentAccountId = settings.cashAccountId;
+        } else if (paymentMethod === 'Transfer') {
+            paymentAccountId = settings.bankAccountId;
+        } else if (paymentMethod === 'Kredit') {
+            paymentAccountId = settings.accountsReceivableAccountId;
+        }
+
+        const requiredAccountIds = [
+          paymentAccountId,
+          settings.salesRevenueAccountId,
+          settings.cogsAccountId,
+          settings.inventoryAccountId
+        ];
+
+        if (requiredAccountIds.some(id => !id)) {
+           console.warn("Lewati pembuatan jurnal otomatis: Pengaturan akun belum lengkap.");
+        } else {
+            const journalEntries: JournalEntry[] = [];
+
+            journalEntries.push(
+                { accountId: paymentAccountId!, accountName: '', debit: total, credit: 0 },
+                { accountId: settings.salesRevenueAccountId!, accountName: '', debit: 0, credit: total }
+            );
+
+            if (totalCost > 0) {
+                journalEntries.push(
+                    { accountId: settings.cogsAccountId!, accountName: '', debit: totalCost, credit: 0 },
+                    { accountId: settings.inventoryAccountId!, accountName: '', debit: 0, credit: totalCost }
+                );
+            }
+
+            const newJournal: NewJournal = {
+              date: transactionData.date,
+              description,
+              refNumber: newTransactionRef.ref.id,
+              entries: journalEntries,
+              total: total,
+            };
+
+            await addJournalEntry(newJournal);
+        }
+    } catch (journalError) {
+        console.error("Gagal membuat jurnal otomatis untuk transaksi penjualan.", journalError);
     }
-
-    const requiredAccountIds = [
-      paymentAccountId,
-      settings.salesRevenueAccountId,
-      settings.cogsAccountId,
-      settings.inventoryAccountId
-    ];
-
-    if (requiredAccountIds.some(id => !id)) {
-       throw new Error(`Gagal membuat jurnal otomatis: Pengaturan pemetaan akun belum lengkap. Mohon lengkapi di menu Pengaturan > Akuntansi.`);
-    }
-
-    const journalEntries: JournalEntry[] = [];
-    
-    journalEntries.push(
-        { accountId: paymentAccountId!, accountName: '', debit: total, credit: 0 },
-        { accountId: settings.salesRevenueAccountId!, accountName: '', debit: 0, credit: total }
-    );
-    
-    if (totalCost > 0) {
-        journalEntries.push(
-            { accountId: settings.cogsAccountId!, accountName: '', debit: totalCost, credit: 0 },
-            { accountId: settings.inventoryAccountId!, accountName: '', debit: 0, credit: totalCost }
-        );
-    }
-    
-    const newJournal: NewJournal = {
-      date: transactionData.date,
-      description,
-      refNumber: newTransactionRef.ref.id,
-      entries: journalEntries,
-      total: total, 
-    };
-
-    await addJournalEntry(newJournal);
 
     revalidatePath("/(app)/pos");
     revalidatePath("/(app)/transactions");

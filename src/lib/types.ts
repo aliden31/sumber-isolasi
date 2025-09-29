@@ -143,3 +143,261 @@ export type Journal = {
 export type NewJournal = Omit<Journal, 'id' | 'date'> & {
   date: Date | any; // Allow for server timestamp
 };
+
+export type ProcurementItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice?: number;
+  notes?: string;
+};
+
+export type PurchaseRequestStatus =
+  | 'Draft'
+  | 'Menunggu Persetujuan'
+  | 'Disetujui'
+  | 'Ditolak';
+
+export type PurchaseRequest = {
+  id: string;
+  number: string;
+  requestedBy: string;
+  department: string;
+  supplierId?: string;
+  supplierName?: string;
+  neededBy?: string;
+  notes?: string;
+  createdAt: string;
+  status: PurchaseRequestStatus;
+  items: ProcurementItem[];
+};
+
+export type PurchaseOrderStatus =
+  | 'Draft'
+  | 'Dikirim ke Pemasok'
+  | 'Diterima Parsial'
+  | 'Selesai'
+  | 'Dibatalkan';
+
+export type ProcurementOrderItem = ProcurementItem & {
+  unitPrice: number;
+};
+
+export type LocalPurchaseOrder = {
+  id: string;
+  number: string;
+  supplierId: string;
+  supplierName: string;
+  requestNumber?: string;
+  orderDate: string;
+  expectedDate?: string;
+  status: PurchaseOrderStatus;
+  notes?: string;
+  items: ProcurementOrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+};
+
+export type GoodsReceiptStatus = 'Draft' | 'Diposting';
+
+export type GoodsReceiptItem = {
+  productId: string;
+  productName: string;
+  orderedQty: number;
+  receivedQty: number;
+  unitPrice: number;
+};
+
+export type GoodsReceipt = {
+  id: string;
+  number: string;
+  supplierName: string;
+  supplierId?: string;
+  receiptDate: string;
+  purchaseOrderNumber: string;
+  status: GoodsReceiptStatus;
+  notes?: string;
+  items: GoodsReceiptItem[];
+};
+
+export type PurchaseInvoiceStatus =
+  | 'Draft'
+  | 'Belum Dibayar'
+  | 'Sebagian Dibayar'
+  | 'Lunas';
+
+export type PurchaseInvoice = {
+  id: string;
+  number: string;
+  supplierId?: string;
+  supplierName: string;
+  invoiceDate: string;
+  dueDate: string;
+  referenceNumbers: string[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  paidAmount: number;
+  status: PurchaseInvoiceStatus;
+  notes?: string;
+};
+
+export type PurchaseReturn = {
+  id: string;
+  number: string;
+  supplierId?: string;
+  supplierName: string;
+  referenceNumber: string;
+  returnDate: string;
+  total: number;
+  reason: string;
+  notes?: string;
+};
+
+export type PayableStatus =
+  | 'Belum Jatuh Tempo'
+  | 'Jatuh Tempo'
+  | 'Lewat Jatuh Tempo'
+  | 'Lunas';
+
+export type PayableSummary = {
+  invoiceId: string;
+  invoiceNumber: string;
+  supplierName: string;
+  dueDate: string;
+  total: number;
+  paidAmount: number;
+  status: PayableStatus;
+};
+
+export type Warehouse = {
+  id: string;
+  name: string;
+  type: 'Gudang' | 'Toko' | 'Retur';
+  address: string;
+  notes?: string;
+};
+
+export type StockTransferStatus = 'Draft' | 'Dikirim' | 'Diterima';
+
+export type StockTransferItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+};
+
+export type StockTransfer = {
+  id: string;
+  reference: string;
+  date: string;
+  fromWarehouse: string;
+  toWarehouse: string;
+  status: StockTransferStatus;
+  items: StockTransferItem[];
+  notes?: string;
+};
+
+export type StockOpnameStatus = 'Draft' | 'Berlangsung' | 'Selesai';
+
+export type StockOpnameLine = {
+  productId: string;
+  productName: string;
+  systemQty: number;
+  countedQty: number;
+};
+
+export type StockOpnameSession = {
+  id: string;
+  reference: string;
+  warehouse: string;
+  scheduledDate: string;
+  status: StockOpnameStatus;
+  notes?: string;
+  lines: StockOpnameLine[];
+};
+
+export type StockNotificationRule = {
+  id: string;
+  productId: string;
+  productName: string;
+  minStock: number;
+  emailNotification: boolean;
+  lastNotifiedAt?: string | null;
+};
+
+export type ProductCategory = {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  productIds: string[];
+};
+
+export type CurrencyRate = {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  rate: number;
+  isBase: boolean;
+  updatedAt: string;
+};
+
+export type Tax = {
+  id: string;
+  name: string;
+  rate: number;
+  type: 'PPN' | 'PPh' | 'Lainnya';
+  accountId?: string;
+  description?: string;
+  active: boolean;
+};
+
+export type AppUserRole = 'Admin' | 'Manajer' | 'Kasir' | 'Staf';
+
+export type AppUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: AppUserRole;
+  active: boolean;
+  lastLoginAt?: string;
+};
+
+export type BankStatementLine = {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'Debit' | 'Kredit';
+  matched: boolean;
+  referenceId?: string;
+};
+
+export type BankReconciliation = {
+  id: string;
+  accountName: string;
+  period: string;
+  startingBalance: number;
+  endingBalance: number;
+  difference: number;
+  lines: BankStatementLine[];
+  notes?: string;
+};
+
+export type ClosingTask = {
+  id: string;
+  title: string;
+  owner: string;
+  completed: boolean;
+  notes?: string;
+};
+
+export type PeriodClosing = {
+  id: string;
+  period: string;
+  startedAt: string;
+  closedAt?: string;
+  tasks: ClosingTask[];
+};
