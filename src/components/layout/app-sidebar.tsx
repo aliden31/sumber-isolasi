@@ -142,7 +142,7 @@ const navItems = [
     subItems: [
       { href: "/accounting/coa", label: "Chart of Accounts", icon: FileSpreadsheet },
       { href: "/accounting/journal", label: "Jurnal Umum", icon: FileDigit },
-      { href: "/srcs/app/(app)/accounting/ledger", label: "Buku Besar", icon: BookCopy },
+      { href: "/accounting/ledger", label: "Buku Besar", icon: BookCopy },
       { href: "/accounting/closing", label: "Closing Periode", icon: BookLock },
     ],
   },
