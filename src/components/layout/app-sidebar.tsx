@@ -21,6 +21,22 @@ import {
   ShoppingCart,
   Truck,
   Users,
+  Wallet,
+  FileBox,
+  ArrowRightLeft,
+  Warehouse,
+  ClipboardCheck,
+  Bell,
+  Banknote,
+  Scale,
+  BookUser,
+  UserCog,
+  LandmarkIcon,
+  Percent,
+  CircleHelp,
+  Factory,
+  UserSquare,
+  FileCog
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -63,7 +79,7 @@ const navItems = [
     label: "Penjualan",
     icon: CircleDollarSign,
     subItems: [
-      { href: "/sales", label: "Daftar Penjualan" },
+      { href: "/transactions", label: "Daftar Penjualan" },
       { href: "/sales/new", label: "Input Manual" },
       { href: "/sales/import", label: "Import Penjualan" },
       { href: "/sales/receivables", label: "Piutang Usaha" },
@@ -157,7 +173,7 @@ export function AppSidebar() {
         </span>
         <SidebarTrigger className="ml-auto" />
       </SidebarHeader>
-      <SidebarContent>
+        <SidebarContent>
         <SidebarMenu>
           {navItems.map((item, index) =>
             item.subItems ? (
