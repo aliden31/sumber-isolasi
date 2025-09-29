@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Link from "next/link";
@@ -21,6 +22,37 @@ import {
   Wallet,
   Landmark,
   BrainCircuit,
+  PackageSearch,
+  Warehouse,
+  ArrowRightLeft,
+  ClipboardCheck,
+  Bell,
+  Banknote,
+  LogOut,
+  RefreshCcw,
+  BookUser,
+  FileDigit,
+  FileSpreadsheet,
+  Handshake,
+  FilePlus,
+  PackagePlus,
+  PackageCheck,
+  FileKey2,
+  ReceiptText,
+  Factory,
+  CreditCard,
+  FileBox,
+  FileClock,
+  Printer,
+  FileUp,
+  Download,
+  BookCopy,
+  BookLock,
+  Archive,
+  Building,
+  UserCheck,
+  Percent,
+  Coins
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -54,61 +86,64 @@ const navItems = [
     label: "Kasir (POS)",
     icon: ShoppingCart,
     subItems: [
-      { href: "/pos", label: "Transaksi Baru" },
-      { href: "#", label: "Parkir Transaksi" },
-      { href: "#", label: "Retur Penjualan" },
-      { href: "#", label: "Cetak Struk" },
+      { href: "/pos", label: "Transaksi Baru", icon: FilePlus },
+      { href: "/pos/parked", label: "Parkir Transaksi", icon: FileClock },
+      { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
+      { href: "/pos/print", label: "Cetak Struk", icon: Printer },
     ],
   },
   {
     label: "Penjualan",
     icon: CircleDollarSign,
     subItems: [
-      { href: "/transactions", label: "Daftar Penjualan" },
-      { href: "#", label: "Input Manual" },
-      { href: "#", label: "Import Penjualan" },
-      { href: "#", label: "Piutang Usaha" },
+      { href: "/transactions", label: "Daftar Penjualan", icon: History },
+      { href: "/sales/manual-input", label: "Input Manual", icon: FileDigit },
+      { href: "/sales/import", label: "Import Penjualan", icon: FileUp },
+      { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
     ],
   },
   {
     label: "Pembelian",
     icon: Truck,
     subItems: [
-      { href: "#", label: "Purchase Request (PR)" },
-      { href: "#", label: "Purchase Order (PO)" },
-      { href: "#", label: "Penerimaan Barang" },
-      { href: "#", label: "Faktur Supplier" },
-      { href: "#", label: "Hutang Usaha" },
+      { href: "/purchasing/request", label: "Purchase Request", icon: FilePlus },
+      { href: "/purchasing/order", label: "Purchase Order", icon: PackagePlus },
+      { href: "/purchasing/goods-receipt", label: "Penerimaan Barang", icon: PackageCheck },
+      { href: "/purchasing/invoice", label: "Faktur Supplier", icon: FileKey2 },
+      { href: "/purchasing/returns", label: "Retur Pembelian", icon: ArrowRightLeft },
+      { href: "/purchasing/payables", label: "Hutang Usaha", icon: Handshake },
     ],
   },
   {
     label: "Produk & Stok",
     icon: Package,
     subItems: [
-      { href: "/products", label: "Master Produk" },
-      { href: "#", label: "Kategori Produk" },
-      { href: "#", label: "Multi Gudang" },
-      { href: "#", label: "Transfer Stok" },
-      { href: "/stock-estimation", label: "Stock Opname (AI)" },
+      { href: "/products", label: "Master Produk", icon: Package },
+      { href: "/products/categories", label: "Kategori Produk", icon: BookUser },
+      { href: "/stock/warehouses", label: "Multi Gudang", icon: Warehouse },
+      { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft },
+      { href: "/stock-estimation", label: "Stock Opname", icon: ClipboardCheck },
+      { href: "/stock/notifications", label: "Notifikasi Stok", icon: Bell },
     ],
   },
   {
     label: "Kas & Bank",
     icon: Landmark,
     subItems: [
-      { href: "#", label: "Kas Masuk" },
-      { href: "#", label: "Kas Keluar" },
-      { href: "#", label: "Transfer Antar Kas" },
-      { href: "#", label: "Rekonsiliasi Bank" },
+      { href: "/cash/in", label: "Kas Masuk", icon: Banknote },
+      { href: "/cash/out", label: "Kas Keluar", icon: LogOut },
+      { href: "/cash/transfer", label: "Transfer Antar Kas", icon: ArrowRightLeft },
+      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw },
     ],
   },
   {
     label: "Akuntansi",
     icon: Book,
     subItems: [
-      { href: "#", label: "Chart of Accounts" },
-      { href: "#", label: "Jurnal Umum" },
-      { href: "#", label: "Buku Besar" },
+      { href: "/accounting/coa", label: "Chart of Accounts", icon: FileSpreadsheet },
+      { href: "/accounting/journal", label: "Jurnal Umum", icon: FileDigit },
+      { href: "/srcs/app/(app)/accounting/ledger", label: "Buku Besar", icon: BookCopy },
+      { href: "/accounting/closing", label: "Closing Periode", icon: BookLock },
     ],
   },
   {
@@ -116,18 +151,20 @@ const navItems = [
     icon: BarChart2,
     subItems: [
       { href: "/reports", label: "Laporan Penjualan" },
-      { href: "#", label: "Laporan Pembelian" },
-      { href: "#", label: "Laporan Stok" },
-      { href: "#", label: "Laporan Keuangan" },
+      { href: "/reports/purchasing", label: "Laporan Pembelian" },
+      { href: "/reports/stock", label: "Laporan Stok" },
+      { href: "/reports/financial", label: "Laporan Keuangan" },
     ],
   },
     {
     label: "Master Data",
-    icon: History,
+    icon: Archive,
     subItems: [
-      { href: "/customers", label: "Pelanggan" },
-      { href: "#", label: "Supplier" },
-      { href: "#", label: "Pengguna" },
+      { href: "/customers", label: "Pelanggan", icon: Users },
+      { href: "/suppliers", label: "Supplier", icon: Factory },
+      { href: "/users", label: "Pengguna & Hak Akses", icon: UserCheck },
+      { href: "/taxes", label: "Pajak", icon: Percent },
+      { href: "/currencies", label: "Mata Uang", icon: Coins },
     ],
   },
   {
@@ -139,7 +176,6 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { isMobile, openMobile, setOpenMobile } = useSidebar();
 
   const isActive = (href: string) => pathname === href;
   const isSubActive = (subItems: any[]) =>
@@ -147,7 +183,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar
-      className={cn("border-r", isMobile ? "" : "md:block")}
+      className="border-r"
     >
       <SidebarHeader className="flex items-center gap-2">
         <TokoKilatLogo className="size-8" />
@@ -184,6 +220,7 @@ export function AppSidebar() {
                              <SidebarMenuSubButton
                               isActive={isActive(subItem.href || "#")}
                             >
+                              {subItem.icon && <subItem.icon />}
                               <span>{subItem.label}</span>
                             </SidebarMenuSubButton>
                           </Link>
