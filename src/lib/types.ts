@@ -23,7 +23,9 @@ export type Transaction = {
   paymentMethod: 'Tunai' | 'Transfer';
 };
 
-export type NewTransaction = Omit<Transaction, 'id'>;
+export type NewTransaction = Omit<Transaction, 'id' | 'date'> & {
+  date: Date | any; // Allow for server timestamp
+};
 
 export type CartItem = {
   product: Product;
