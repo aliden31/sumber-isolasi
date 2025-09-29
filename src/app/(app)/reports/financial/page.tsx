@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -10,6 +11,7 @@ import type { Account, Journal } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type ReportRow = {
   accountName: string;
