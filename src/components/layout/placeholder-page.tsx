@@ -15,8 +15,8 @@ export function PlaceholderPage({ title, description }: PlaceholderPageProps) {
             <Construction className="w-16 h-16 text-muted-foreground" />
             <div className="space-y-2">
                 <h2 className="text-xl font-semibold font-headline">Fitur Dalam Pengembangan</h2>
-                <p className="text-muted-foreground">{description}</p>
-                 <p className="text-sm text-muted-foreground pt-4">Halaman ini sedang dalam tahap pembuatan dan akan segera tersedia.</p>
+                <p className="text-muted-foreground max-w-xl">{description}</p>
+                 <p className="text-sm text-muted-foreground pt-4">Halaman ini adalah placeholder dan akan diimplementasikan dengan fungsionalitas penuh di masa mendatang.</p>
             </div>
         </CardContent>
       </Card>
