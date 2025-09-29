@@ -23,6 +23,8 @@ import { useToast } from '@/hooks/use-toast';
 import { DatePicker } from '@/components/ui/date-picker';
 import { RotateCcw } from 'lucide-react';
 
+const NONE_VALUE = '__none__';
+
 export default function PurchaseReturnsPage() {
   const [returns, setReturns] = usePersistentState<PurchaseReturn[]>('procurement:returns', []);
   const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
@@ -96,12 +98,15 @@ export default function PurchaseReturnsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Penerimaan Barang</Label>
-              <Select value={selectedReceiptId} onValueChange={setSelectedReceiptId}>
+              <Select
+                value={selectedReceiptId || NONE_VALUE}
+                onValueChange={(value) => setSelectedReceiptId(value === NONE_VALUE ? '' : value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih GRN" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">-</SelectItem>
+                  <SelectItem value={NONE_VALUE}>-</SelectItem>
                   {receipts.map((receipt) => (
                     <SelectItem key={receipt.id} value={receipt.id}>
                       {receipt.number} • {receipt.supplierName}

@@ -41,6 +41,7 @@ import { generateId } from '@/lib/id';
 import { CalendarPlus, CheckCircle2, ChevronDown, ClipboardList, MoreHorizontal, XCircle } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 
+const NONE_VALUE = '__none__';
 const DEPARTMENTS = ['Operasional', 'Produksi', 'Gudang', 'Penjualan', 'Lainnya'];
 const STATUS_BADGE: Record<PurchaseRequestStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   Draft: 'secondary',
@@ -196,14 +197,16 @@ export default function PurchaseRequestPage() {
             <div className="space-y-2">
               <Label htmlFor="supplier">Rekomendasi Pemasok (opsional)</Label>
               <Select
-                value={form.supplierId}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, supplierId: value }))}
+                value={form.supplierId || NONE_VALUE}
+                onValueChange={(value) =>
+                  setForm((prev) => ({ ...prev, supplierId: value === NONE_VALUE ? '' : value }))
+                }
               >
                 <SelectTrigger id="supplier">
                   <SelectValue placeholder="Pilih pemasok" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tidak ada</SelectItem>
+                  <SelectItem value={NONE_VALUE}>Tidak ada</SelectItem>
                   {suppliers.map((supplier) => (
                     <SelectItem key={supplier.id} value={supplier.id}>
                       {supplier.name}

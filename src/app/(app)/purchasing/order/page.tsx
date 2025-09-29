@@ -41,6 +41,9 @@ import { generateId } from '@/lib/id';
 import { DatePicker } from '@/components/ui/date-picker';
 import { CalendarCheck2, FileText, MoreHorizontal } from 'lucide-react';
 
+const NONE_VALUE = '__none__';
+const NO_SUPPLIER_VALUE = '__no_supplier__';
+
 const STATUS_OPTIONS: PurchaseOrderStatus[] = [
   'Draft',
   'Dikirim ke Pemasok',
@@ -191,12 +194,15 @@ export default function PurchaseOrderPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Referensi Permintaan</Label>
-              <Select value={selectedRequestId} onValueChange={setSelectedRequestId}>
+              <Select
+                value={selectedRequestId || NONE_VALUE}
+                onValueChange={(value) => setSelectedRequestId(value === NONE_VALUE ? '' : value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih permintaan" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tidak ada</SelectItem>
+                  <SelectItem value={NONE_VALUE}>Tidak ada</SelectItem>
                   {requests.map((request) => (
                     <SelectItem key={request.id} value={request.id}>
                       {request.number} • {request.requestedBy}
@@ -212,7 +218,11 @@ export default function PurchaseOrderPage() {
                   <SelectValue placeholder="Pilih pemasok" />
                 </SelectTrigger>
                 <SelectContent>
-                  {suppliers.length === 0 && <SelectItem value="" disabled>Belum ada pemasok</SelectItem>}
+                  {suppliers.length === 0 && (
+                    <SelectItem value={NO_SUPPLIER_VALUE} disabled>
+                      Belum ada pemasok
+                    </SelectItem>
+                  )}
                   {suppliers.map((supplier) => (
                     <SelectItem key={supplier.id} value={supplier.id}>
                       {supplier.name}

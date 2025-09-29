@@ -29,6 +29,8 @@ const STATUS_BADGE: Record<GoodsReceipt['status'], 'outline' | 'default'> = {
   Diposting: 'default',
 };
 
+const NONE_VALUE = '__none__';
+
 export default function GoodsReceiptPage() {
   const [receipts, setReceipts] = usePersistentState<GoodsReceipt[]>('procurement:receipts', []);
   const [orders, setOrders] = useState<LocalPurchaseOrder[]>([]);
@@ -121,12 +123,15 @@ export default function GoodsReceiptPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Pilih PO</Label>
-              <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+              <Select
+                value={selectedOrderId || NONE_VALUE}
+                onValueChange={(value) => setSelectedOrderId(value === NONE_VALUE ? '' : value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih PO" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">-</SelectItem>
+                  <SelectItem value={NONE_VALUE}>-</SelectItem>
                   {orders.map((order) => (
                     <SelectItem key={order.id} value={order.id}>
                       {order.number} • {order.supplierName}
