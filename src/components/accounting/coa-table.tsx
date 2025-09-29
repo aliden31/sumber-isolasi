@@ -47,4 +47,3 @@ export function CoaTable({ data }: CoaTableProps) {
     </div>
   );
 }
-
