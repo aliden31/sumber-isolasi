@@ -21,11 +21,12 @@ export function DateRangePicker({
 }: React.HTMLAttributes<HTMLDivElement> & { onSelect?: (date?: DateRange) => void; }) {
   const [date, setDate] = React.useState<DateRange | undefined>()
 
-  React.useEffect(() => {
+  const handleSelect = (selectedDate: DateRange | undefined) => {
+    setDate(selectedDate);
     if (onSelect) {
-      onSelect(date);
+      onSelect(selectedDate);
     }
-  }, [date, onSelect]);
+  }
  
   return (
     <div className={cn("grid gap-2", className)}>
@@ -54,13 +55,13 @@ export function DateRangePicker({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0" align="end">
           <Calendar
             initialFocus
             mode="range"
             defaultMonth={date?.from}
             selected={date}
-            onSelect={setDate}
+            onSelect={handleSelect}
             numberOfMonths={2}
           />
         </PopoverContent>
