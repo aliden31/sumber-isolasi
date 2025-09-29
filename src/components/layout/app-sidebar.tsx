@@ -197,7 +197,7 @@ export function AppSidebar() {
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       {item.subItems.map((subItem) => (
-                        <SidebarMenuSubItem key={subItem.href} asChild>
+                        <SidebarMenuSubItem key={subItem.href}>
                           <Link href={subItem.href || "#"}>
                              <SidebarMenuSubButton
                               isActive={isActive(subItem.href || "#")}
