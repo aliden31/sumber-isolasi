@@ -4,7 +4,7 @@ export default function BankReconciliationPage() {
   return (
     <PlaceholderPage
       title="Rekonsiliasi Bank"
-      description="Cocokkan catatan kas internal Anda dengan laporan rekening koran dari bank."
+      description="Cocokkan catatan kas internal Anda dengan laporan rekening koran dari bank untuk memastikan akurasi."
     />
   );
 }

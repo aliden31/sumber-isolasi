@@ -4,7 +4,7 @@ export default function PurchaseReturnsPage() {
   return (
     <PlaceholderPage
       title="Retur Pembelian"
-      description="Kelola pengembalian barang ke supplier."
+      description="Kelola proses pengembalian barang yang rusak atau tidak sesuai ke pemasok."
     />
   );
 }

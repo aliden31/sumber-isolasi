@@ -4,7 +4,7 @@ export default function PrintReceiptPage() {
   return (
     <PlaceholderPage
       title="Cetak Ulang Struk"
-      description="Cari transaksi berdasarkan ID atau tanggal untuk mencetak ulang struk."
+      description="Cari transaksi berdasarkan ID atau tanggal untuk mencetak ulang struk pembayaran."
     />
   );
 }

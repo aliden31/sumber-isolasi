@@ -4,7 +4,7 @@ export default function POSReturnsPage() {
   return (
     <PlaceholderPage
       title="Retur Penjualan (Kasir)"
-      description="Proses pengembalian barang dari pelanggan yang dibeli melalui kasir."
+      description="Proses pengembalian barang dari pelanggan yang dibeli melalui kasir secara langsung."
     />
   );
 }

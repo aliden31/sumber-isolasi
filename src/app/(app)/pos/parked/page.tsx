@@ -3,8 +3,8 @@ import { PlaceholderPage } from '@/components/layout/placeholder-page';
 export default function ParkedTransactionsPage() {
   return (
     <PlaceholderPage
-      title="Parkir Transaksi"
-      description="Lihat dan lanjutkan transaksi yang diparkir atau disimpan sementara."
+      title="Transaksi Terparkir"
+      description="Lihat dan lanjutkan transaksi yang disimpan sementara untuk diselesaikan nanti."
     />
   );
 }

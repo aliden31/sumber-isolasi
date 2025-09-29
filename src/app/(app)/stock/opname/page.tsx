@@ -4,7 +4,7 @@ export default function StockOpnamePage() {
   return (
     <PlaceholderPage
       title="Penyesuaian Stok / Stock Opname"
-      description="Lakukan penyesuaian jumlah stok fisik secara manual setelah penghitungan."
+      description="Lakukan penyesuaian jumlah stok fisik secara manual setelah penghitungan untuk menyamakan data."
     />
   );
 }

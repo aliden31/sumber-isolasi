@@ -4,7 +4,7 @@ export default function CashTransferPage() {
   return (
     <PlaceholderPage
       title="Transfer Antar Kas/Bank"
-      description="Catat perpindahan dana antar rekening kas atau bank Anda."
+      description="Catat perpindahan dana antar rekening kas atau bank internal perusahaan."
     />
   );
 }
