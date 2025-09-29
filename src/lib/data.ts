@@ -1,4 +1,4 @@
-import type { Product, Transaction, SalesData, TopProductData, MonthlyRevenue, Customer } from './types';
+import type { Product, Transaction, SalesData, TopProductData, MonthlyRevenue, Customer, Supplier } from './types';
 
 export const mockProducts: Product[] = [
   { id: 'PROD001', name: 'Kopi Arabika', price: 55000, stock: 48, category: 'Minuman' },
@@ -95,4 +95,10 @@ export const mockCustomers: Customer[] = [
   { id: 'CUST002', name: 'Citra Lestari', phone: '085678901234', email: 'citra.l@example.com' },
   { id: 'CUST003', name: 'Adi Prasetyo', phone: '087812345678', email: 'adi.p@example.com' },
   { id: 'CUST004', name: 'Dewi Anggraini', phone: '089956781234', email: 'dewi.a@example.com' },
+];
+
+export const mockSuppliers: Supplier[] = [
+    { id: 'SUP001', name: 'PT Pangan Sejahtera', phone: '021-555-1234', email: 'kontak@pangansejahtera.com', address: 'Jl. Industri No. 1, Jakarta' },
+    { id: 'SUP002', name: 'CV Sumber Roti', phone: '022-444-5678', email: 'sales@sumberroti.id', address: 'Jl. Raya Bandung No. 10, Bandung' },
+    { id: 'SUP003', name: 'Toko Bahan Kue Abadi', phone: '081122334455', email: 'abadi.bahan@gmail.com', address: 'Jl. Pasar Baru No. 5, Surabaya' },
 ];
