@@ -6,14 +6,11 @@ import { usePathname } from "next/navigation";
 import {
   BarChart2,
   Book,
-  Building,
   ChevronDown,
   CircleDollarSign,
   Contact,
   FileText,
   History,
-  Home,
-  Landmark,
   LayoutDashboard,
   Package,
   Receipt,
@@ -22,21 +19,8 @@ import {
   Truck,
   Users,
   Wallet,
-  FileBox,
-  ArrowRightLeft,
-  Warehouse,
-  ClipboardCheck,
-  Bell,
-  Banknote,
-  Scale,
-  BookUser,
-  UserCog,
-  LandmarkIcon,
-  Percent,
-  CircleHelp,
-  Factory,
-  UserSquare,
-  FileCog
+  Landmark,
+  BrainCircuit,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -71,8 +55,9 @@ const navItems = [
     icon: ShoppingCart,
     subItems: [
       { href: "/pos", label: "Transaksi Baru" },
-      { href: "/pos/parked", label: "Parkir Transaksi" },
-      { href: "/pos/returns", label: "Retur Penjualan" },
+      { href: "#", label: "Parkir Transaksi" },
+      { href: "#", label: "Retur Penjualan" },
+      { href: "#", label: "Cetak Struk" },
     ],
   },
   {
@@ -80,20 +65,20 @@ const navItems = [
     icon: CircleDollarSign,
     subItems: [
       { href: "/transactions", label: "Daftar Penjualan" },
-      { href: "/sales/new", label: "Input Manual" },
-      { href: "/sales/import", label: "Import Penjualan" },
-      { href: "/sales/receivables", label: "Piutang Usaha" },
+      { href: "#", label: "Input Manual" },
+      { href: "#", label: "Import Penjualan" },
+      { href: "#", label: "Piutang Usaha" },
     ],
   },
   {
     label: "Pembelian",
     icon: Truck,
     subItems: [
-      { href: "/purchases/request", label: "Purchase Request (PR)" },
-      { href: "/purchases", label: "Purchase Order (PO)" },
-      { href: "/purchases/grn", label: "Penerimaan Barang" },
-      { href: "/purchases/invoices", label: "Faktur Supplier" },
-      { href: "/purchases/payables", label: "Hutang Usaha" },
+      { href: "#", label: "Purchase Request (PR)" },
+      { href: "#", label: "Purchase Order (PO)" },
+      { href: "#", label: "Penerimaan Barang" },
+      { href: "#", label: "Faktur Supplier" },
+      { href: "#", label: "Hutang Usaha" },
     ],
   },
   {
@@ -101,29 +86,29 @@ const navItems = [
     icon: Package,
     subItems: [
       { href: "/products", label: "Master Produk" },
-      { href: "/products/categories", label: "Kategori Produk" },
-      { href: "/stock/warehouses", label: "Multi Gudang" },
-      { href: "/stock/transfers", label: "Transfer Stok" },
-      { href: "/stock-estimation", label: "Stock Opname" },
+      { href: "#", label: "Kategori Produk" },
+      { href: "#", label: "Multi Gudang" },
+      { href: "#", label: "Transfer Stok" },
+      { href: "/stock-estimation", label: "Stock Opname (AI)" },
     ],
   },
   {
     label: "Kas & Bank",
     icon: Landmark,
     subItems: [
-      { href: "/cash/in", label: "Kas Masuk" },
-      { href: "/cash/out", label: "Kas Keluar" },
-      { href: "/cash/transfers", label: "Transfer Antar Kas" },
-      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank" },
+      { href: "#", label: "Kas Masuk" },
+      { href: "#", label: "Kas Keluar" },
+      { href: "#", label: "Transfer Antar Kas" },
+      { href: "#", label: "Rekonsiliasi Bank" },
     ],
   },
   {
     label: "Akuntansi",
     icon: Book,
     subItems: [
-      { href: "/accounting/coa", label: "Chart of Accounts" },
-      { href: "/accounting/journals", label: "Jurnal Umum" },
-      { href: "/accounting/ledger", label: "Buku Besar" },
+      { href: "#", label: "Chart of Accounts" },
+      { href: "#", label: "Jurnal Umum" },
+      { href: "#", label: "Buku Besar" },
     ],
   },
   {
@@ -131,9 +116,9 @@ const navItems = [
     icon: BarChart2,
     subItems: [
       { href: "/reports", label: "Laporan Penjualan" },
-      { href: "/reports/purchases", label: "Laporan Pembelian" },
-      { href: "/reports/stock", label: "Laporan Stok" },
-      { href: "/reports/financial", label: "Laporan Keuangan" },
+      { href: "#", label: "Laporan Pembelian" },
+      { href: "#", label: "Laporan Stok" },
+      { href: "#", label: "Laporan Keuangan" },
     ],
   },
     {
@@ -141,8 +126,8 @@ const navItems = [
     icon: History,
     subItems: [
       { href: "/customers", label: "Pelanggan" },
-      { href: "/master/suppliers", label: "Supplier" },
-      { href: "/master/users", label: "Pengguna" },
+      { href: "#", label: "Supplier" },
+      { href: "#", label: "Pengguna" },
     ],
   },
   {
@@ -154,7 +139,7 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { isMobile } = useSidebar();
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
 
   const isActive = (href: string) => pathname === href;
   const isSubActive = (subItems: any[]) =>
@@ -162,16 +147,13 @@ export function AppSidebar() {
 
   return (
     <Sidebar
-      variant="sidebar"
-      collapsible="icon"
-      className={cn("border-r border-border/80", isMobile ? "" : "hidden md:block")}
+      className={cn("border-r", isMobile ? "" : "md:block")}
     >
-      <SidebarHeader className="hidden items-center gap-2 md:flex">
+      <SidebarHeader className="flex items-center gap-2">
         <TokoKilatLogo className="size-8" />
         <span className="text-lg font-headline font-semibold text-primary">
           Toko Kilat
         </span>
-        <SidebarTrigger className="ml-auto" />
       </SidebarHeader>
         <SidebarContent>
         <SidebarMenu>
