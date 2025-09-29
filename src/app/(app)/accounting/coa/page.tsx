@@ -3,7 +3,7 @@ import type { Account } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CoaActions } from '@/components/accounting/coa-actions';
 import { CoaTable } from '@/components/accounting/coa-table';
-import { collection, getDocs, orderBy } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 
 async function getAccounts(): Promise<Account[]> {
   const accountsCol = collection(db, 'coa');
