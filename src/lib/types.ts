@@ -1,4 +1,5 @@
 
+
 export type Product = {
   id: string;
   name: string;
@@ -23,10 +24,13 @@ export type Transaction = {
   date: Date;
   items: TransactionItem[];
   total: number;
-  paymentMethod: 'Tunai' | 'Transfer';
+  paymentMethod: 'Tunai' | 'Transfer' | 'Kredit';
+  status: 'Lunas' | 'Belum Lunas';
+  customerId?: string;
+  customerName?: string;
 };
 
-export type NewTransaction = Omit<Transaction, 'id' | 'date'> & {
+export type NewTransaction = Omit<Transaction, 'id' | 'date' | 'status'> & {
   date: Date | any; // Allow for server timestamp
 };
 
@@ -59,7 +63,7 @@ export type SalesReturn = {
   originalTransactionId: string;
   items: SalesReturnItem[];
   total: number;
-  originalPaymentMethod: 'Tunai' | 'Transfer';
+  originalPaymentMethod: 'Tunai' | 'Transfer' | 'Kredit';
 }
 
 export type NewSalesReturn = Omit<SalesReturn, 'id'>;

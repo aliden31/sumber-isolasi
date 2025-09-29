@@ -211,7 +211,8 @@ export default function POSPage() {
       } else {
         const generatedReceipt: Transaction = {
             id: result.id!,
-            ...newTransaction
+            ...newTransaction,
+            status: 'Lunas',
         };
         setReceipt(generatedReceipt);
         setCart([]);

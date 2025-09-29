@@ -8,10 +8,16 @@ import {
   Timestamp,
   runTransaction,
   addDoc,
-  getDoc
+  getDoc,
+  query,
+  where,
+  getDocs,
+  limit,
+  writeBatch,
+  updateDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewTransaction, Product, JournalEntry, NewJournal, Account, NewParkedTransaction, SalesReturn, NewSalesReturn } from "@/lib/types";
+import type { NewTransaction, Product, JournalEntry, NewJournal, NewParkedTransaction, NewSalesReturn, Transaction, Customer } from "@/lib/types";
 import { addJournalEntry } from "../accounting/journal/actions";
 import { getAccountingSettings } from "../settings/accounting/actions";
 
@@ -40,29 +46,27 @@ export async function getTransaction(id: string) {
             return { data: null, error: "Transaksi tidak ditemukan." };
         }
         const txData = txSnap.data();
-        const transaction = {
+        const transaction: Transaction = {
             id: txSnap.id,
             ...txData,
             date: txData.date.toDate(),
-        };
+        } as Transaction;
         return { data: transaction, error: null };
     } catch (e) {
         return { data: null, error: e instanceof Error ? e.message : 'An unknown error occurred.' };
     }
 }
 
-export async function createTransaction(transactionData: NewTransaction) {
+export async function createTransaction(transactionData: NewTransaction, isPOS: boolean = true) {
   try {
     const newTransactionRef = await runTransaction(db, async (t) => {
         const productsCol = collection(db, 'products');
         const transactionsCol = collection(db, "transactions");
 
-        // 1. Create a new transaction document reference
         const newDocRef = doc(transactionsCol);
 
         let totalCost = 0;
 
-        // 2. Validate stock and prepare batch updates
         for (const item of transactionData.items) {
             const productRef = doc(productsCol, item.productId);
             const productSnap = await t.get(productRef);
@@ -78,9 +82,12 @@ export async function createTransaction(transactionData: NewTransaction) {
             t.update(productRef, { stock: newStock });
         }
         
-        const transactionWithTimestamp = {
+        const status = transactionData.paymentMethod === 'Kredit' ? 'Belum Lunas' : 'Lunas';
+        
+        const transactionWithTimestamp: Omit<Transaction, 'id'> = {
           ...transactionData,
-          date: Timestamp.fromDate(new Date()),
+          date: Timestamp.fromDate(transactionData.date as Date),
+          status,
         };
 
         t.set(newDocRef, transactionWithTimestamp);
@@ -88,14 +95,21 @@ export async function createTransaction(transactionData: NewTransaction) {
         return { ref: newDocRef, totalCost };
     });
 
-    // 4. Create Automatic Journal Entry
     const { totalCost } = newTransactionRef;
-    const { total, paymentMethod } = transactionData;
-    const description = `Penjualan POS #${newTransactionRef.ref.id}`;
+    const { total, paymentMethod, customerId, customerName } = transactionData;
+    const description = `Penjualan ${isPOS ? 'POS' : 'Manual'} #${newTransactionRef.ref.id}${customerName ? ` kepada ${customerName}`: ''}`;
 
     const settings = await getAccountingSettings();
-    const paymentAccountId = paymentMethod === 'Tunai' ? settings.cashAccountId : settings.bankAccountId;
     
+    let paymentAccountId: string | undefined;
+    if (paymentMethod === 'Tunai') {
+        paymentAccountId = settings.cashAccountId;
+    } else if (paymentMethod === 'Transfer') {
+        paymentAccountId = settings.bankAccountId;
+    } else if (paymentMethod === 'Kredit') {
+        paymentAccountId = settings.accountsReceivableAccountId;
+    }
+
     const requiredAccountIds = [
       paymentAccountId,
       settings.salesRevenueAccountId,
@@ -122,21 +136,21 @@ export async function createTransaction(transactionData: NewTransaction) {
     }
     
     const newJournal: NewJournal = {
-      date: new Date(),
+      date: transactionData.date,
       description,
       refNumber: newTransactionRef.ref.id,
       entries: journalEntries,
       total: total, 
     };
 
-    if (newJournal.entries.length > 0) {
-       await addJournalEntry(newJournal);
-    }
+    await addJournalEntry(newJournal);
 
     revalidatePath("/(app)/pos");
     revalidatePath("/(app)/transactions");
     revalidatePath("/(app)/dashboard");
     revalidatePath("/(app)/accounting/ledger");
+    revalidatePath("/(app)/sales/receivables");
+    revalidatePath("/(app)/sales/manual-input");
     return createResponse(null, newTransactionRef.ref.id);
   } catch (e) {
     console.error("Error adding transaction: ", e);
@@ -163,6 +177,16 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
             t.update(productRef, { stock: productData.stock + item.quantity });
         }
         
+        // If the original transaction was credit and not yet paid, update its total
+        const originalTxRef = doc(db, 'transactions', returnData.originalTransactionId);
+        const originalTxSnap = await t.get(originalTxRef);
+        if (originalTxSnap.exists()) {
+            const originalTxData = originalTxSnap.data() as Transaction;
+            if (originalTxData.status === 'Belum Lunas') {
+                t.update(originalTxRef, { total: originalTxData.total - returnData.total });
+            }
+        }
+        
         const returnWithTimestamp = {
           ...returnData,
           date: Timestamp.fromDate(new Date()),
@@ -173,11 +197,18 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
 
     // Create reversing journal entry
     const { totalCost } = returnRef;
-    const { total, originalPaymentMethod } = returnData;
-    const description = `Retur Penjualan dari Transaksi #${returnData.originalTransactionId}`;
+    const { total, originalPaymentMethod, originalTransactionId } = returnData;
+    const description = `Retur Penjualan dari Transaksi #${originalTransactionId}`;
 
     const settings = await getAccountingSettings();
-    const paymentAccountId = originalPaymentMethod === 'Tunai' ? settings.cashAccountId : settings.bankAccountId;
+    let paymentAccountId;
+    if (originalPaymentMethod === 'Tunai') {
+        paymentAccountId = settings.cashAccountId;
+    } else if (originalPaymentMethod === 'Transfer') {
+        paymentAccountId = settings.bankAccountId;
+    } else {
+        paymentAccountId = settings.accountsReceivableAccountId;
+    }
     
     const requiredAccountIds = [
       paymentAccountId,
@@ -217,12 +248,59 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
     await addJournalEntry(newJournal);
 
     revalidatePath('/(app)/pos/returns');
+    revalidatePath('/(app)/sales/returns');
     revalidatePath('/(app)/dashboard');
     revalidatePath('/(app)/accounting/ledger');
+    revalidatePath('/(app)/sales/receivables');
 
     return createResponse(null, returnRef.ref.id);
   } catch (e) {
     console.error("Error processing sales return: ", e);
     return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
   }
+}
+
+
+export async function settleReceivable(transaction: Transaction, paymentAccountId: string) {
+    try {
+        const settings = await getAccountingSettings();
+        if (!settings.accountsReceivableAccountId) {
+            throw new Error("Akun Piutang Usaha belum diatur di Pengaturan Akuntansi.");
+        }
+
+        const batch = writeBatch(db);
+
+        // Update transaction status
+        const txRef = doc(db, 'transactions', transaction.id);
+        batch.update(txRef, { status: 'Lunas' });
+
+        // Create journal entry for settlement
+        const description = `Pelunasan piutang untuk transaksi #${transaction.id}`;
+        const journalEntries: JournalEntry[] = [
+            { accountId: paymentAccountId, accountName: '', debit: transaction.total, credit: 0 },
+            { accountId: settings.accountsReceivableAccountId, accountName: '', debit: 0, credit: transaction.total },
+        ];
+        
+        const newJournal: NewJournal = {
+            date: new Date(),
+            description,
+            refNumber: `PELUNASAN-${transaction.id}`,
+            entries: journalEntries,
+            total: transaction.total,
+        };
+
+        const journalsCol = collection(db, "journals");
+        const newJournalRef = doc(journalsCol);
+        
+        batch.set(newJournalRef, { ...newJournal, date: Timestamp.fromDate(newJournal.date as Date) });
+
+        await batch.commit();
+
+        revalidatePath('/(app)/sales/receivables');
+        revalidatePath('/(app)/accounting/ledger');
+
+        return createResponse();
+    } catch (e) {
+        return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
+    }
 }

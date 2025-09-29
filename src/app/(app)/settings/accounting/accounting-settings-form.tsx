@@ -30,6 +30,7 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
   const [salesRevenueAccountId, setSalesRevenueAccountId] = useState(initialData.salesRevenueAccountId || '');
   const [cogsAccountId, setCogsAccountId] = useState(initialData.cogsAccountId || '');
   const [inventoryAccountId, setInventoryAccountId] = useState(initialData.inventoryAccountId || '');
+  const [accountsReceivableAccountId, setAccountsReceivableAccountId] = useState(initialData.accountsReceivableAccountId || '');
 
   const handleSaveChanges = () => {
     startTransition(async () => {
@@ -39,6 +40,7 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
         salesRevenueAccountId,
         cogsAccountId,
         inventoryAccountId,
+        accountsReceivableAccountId,
       });
 
       if (result.error) {
@@ -80,6 +82,20 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
           </SelectTrigger>
           <SelectContent>
             {accounts.filter(a => a.type === 'Kas & Bank').map(acc => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+       <div className="space-y-2">
+        <Label>Akun Piutang Usaha</Label>
+        <Select value={accountsReceivableAccountId} onValueChange={setAccountsReceivableAccountId} disabled={isPending}>
+          <SelectTrigger>
+            <SelectValue placeholder="Pilih akun piutang usaha..." />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.filter(a => a.type === 'Aset Lancar').map(acc => (
               <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
             ))}
           </SelectContent>

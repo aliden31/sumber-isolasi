@@ -11,6 +11,7 @@ export type AccountingSettings = {
   salesRevenueAccountId?: string;
   cogsAccountId?: string;
   inventoryAccountId?: string;
+  accountsReceivableAccountId?: string;
 };
 
 const settingsDocRef = doc(db, "settings", "accounting");

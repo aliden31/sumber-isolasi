@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar as CalendarIcon, Wallet } from 'lucide-react';
+import { Calendar as CalendarIcon, Wallet, User, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
@@ -10,12 +10,7 @@ import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   Card,
   CardContent,
@@ -92,6 +87,22 @@ export default function TransactionsPage() {
   const totalSales = useMemo(() => {
     return transactions.reduce((sum, tx) => sum + tx.total, 0);
   }, [transactions]);
+  
+  const getPaymentBadge = (tx: Transaction) => {
+      if (tx.paymentMethod === 'Kredit') {
+          return (
+              <Badge variant={tx.status === 'Lunas' ? 'secondary' : 'destructive'} className="flex items-center gap-1">
+                {tx.status === 'Lunas' ? <CheckCircle2 size={12}/> : <Wallet size={12}/>}
+                {tx.status}
+            </Badge>
+          )
+      }
+      return (
+         <Badge variant={tx.paymentMethod === 'Tunai' ? 'default' : 'secondary'} className="flex items-center gap-1">
+            <Wallet size={12}/>{tx.paymentMethod}
+        </Badge>
+      )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -128,13 +139,14 @@ export default function TransactionsPage() {
                     <AccordionTrigger>
                     <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
                         <div className="mb-2 sm:mb-0">
-                        <p className="font-semibold text-sm sm:text-base font-mono">{tx.id}</p>
-                        <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyy 'pukul' HH:mm", { locale: id })}</p>
+                            <p className="font-semibold text-sm sm:text-base font-mono">{tx.id}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyy 'pukul' HH:mm", { locale: id })}</p>
+                            {tx.customerName && (
+                                <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1"><User size={12}/>{tx.customerName}</p>
+                            )}
                         </div>
                         <div className="flex items-center gap-2 sm:gap-4 justify-between">
-                            <Badge variant={tx.paymentMethod === 'Tunai' ? 'default' : 'secondary'} className="flex items-center gap-1">
-                                <Wallet size={12}/>{tx.paymentMethod}
-                            </Badge>
+                            {getPaymentBadge(tx)}
                             <p className="font-bold text-md sm:text-lg text-primary">Rp {tx.total.toLocaleString('id-ID')}</p>
                         </div>
                     </div>
