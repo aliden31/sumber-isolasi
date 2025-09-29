@@ -124,7 +124,7 @@ const navItems = [
     label: "Master Data",
     icon: History,
     subItems: [
-      { href: "/master/customers", label: "Pelanggan" },
+      { href: "/customers", label: "Pelanggan" },
       { href: "/master/suppliers", label: "Supplier" },
       { href: "/master/users", label: "Pengguna" },
     ],
