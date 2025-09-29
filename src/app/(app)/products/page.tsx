@@ -15,6 +15,7 @@ async function getProducts(): Promise<Product[]> {
       id: doc.id,
       name: data.name,
       price: data.price,
+      cost: data.cost,
       stock: data.stock,
       category: data.category,
     } as Product;
