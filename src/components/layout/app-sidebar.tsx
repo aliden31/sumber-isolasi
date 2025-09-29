@@ -88,7 +88,7 @@ const navItems = [
     subItems: [
       { href: "/pos", label: "Transaksi Baru", icon: FilePlus },
       { href: "/pos/parked", label: "Parkir Transaksi", icon: FileClock },
-      { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
+      { href: "/pos/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
       { href: "/pos/print", label: "Cetak Struk", icon: Printer },
     ],
   },
