@@ -128,9 +128,9 @@ export default function POSPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-6rem)]">
-      <div className="lg:col-span-2 flex flex-col gap-4">
-        <Card>
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full lg:h-[calc(100vh-6rem)]">
+      <div className="lg:col-span-3 flex flex-col gap-4">
+        <Card className="flex-1 flex flex-col">
           <CardHeader>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -142,12 +142,12 @@ export default function POSPage() {
               />
             </div>
           </CardHeader>
-          <CardContent className="h-[calc(100vh-20rem)] overflow-y-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <CardContent className="flex-1 h-0 overflow-y-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProducts.map(product => (
                 <Card key={product.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => addToCart(product)}>
-                  <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                    <p className="font-semibold text-sm">{product.name}</p>
+                  <CardContent className="p-3 sm:p-4 flex flex-col items-center justify-center text-center">
+                    <p className="font-semibold text-xs sm:text-sm">{product.name}</p>
                     <p className="text-xs text-muted-foreground">Rp {product.price.toLocaleString('id-ID')}</p>
                     <Badge className="mt-2" variant={product.stock > 0 ? 'secondary' : 'destructive'}>
                       Stok: {product.stock}
@@ -159,65 +159,67 @@ export default function POSPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="flex flex-col gap-4">
+      <div className="lg:col-span-2 flex flex-col gap-4">
         <Card className="flex-grow flex flex-col">
           <CardHeader>
             <CardTitle className="font-headline">Keranjang</CardTitle>
           </CardHeader>
-          <CardContent className="flex-grow overflow-y-auto">
+          <CardContent className="flex-grow overflow-y-auto p-0 sm:p-6">
             {cart.length === 0 ? (
-              <p className="text-muted-foreground text-center">Keranjang belanja kosong.</p>
+              <p className="text-muted-foreground text-center p-6 sm:p-0">Keranjang belanja kosong.</p>
             ) : (
-              <Table>
-                <TableBody>
-                  {cart.map(item => (
-                    <TableRow key={item.product.id}>
-                      <TableCell>
-                        <p className="font-medium">{item.product.name}</p>
-                        <p className="text-sm text-muted-foreground">Rp {item.product.price.toLocaleString('id-ID')}</p>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}>
-                            <MinusCircle className="h-4 w-4" />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableBody>
+                    {cart.map(item => (
+                      <TableRow key={item.product.id}>
+                        <TableCell className="px-2 sm:px-4">
+                          <p className="font-medium text-sm sm:text-base">{item.product.name}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground">Rp {item.product.price.toLocaleString('id-ID')}</p>
+                        </TableCell>
+                        <TableCell className="px-1 sm:px-4">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}>
+                              <MinusCircle className="h-4 w-4" />
+                            </Button>
+                            <span className="text-sm sm:text-base">{item.quantity}</span>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}>
+                              <PlusCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium px-2 sm:px-4 text-sm sm:text-base">
+                          Rp {(item.product.price * item.quantity).toLocaleString('id-ID')}
+                        </TableCell>
+                        <TableCell className="px-1 sm:px-4">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, 0)}>
+                            <X className="h-4 w-4 text-destructive" />
                           </Button>
-                          <span>{item.quantity}</span>
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}>
-                            <PlusCircle className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        Rp {(item.product.price * item.quantity).toLocaleString('id-ID')}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, 0)}>
-                          <X className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
           <Separator />
           <CardFooter className="flex flex-col gap-4 p-4">
-            <div className="flex justify-between w-full text-lg font-bold">
+            <div className="flex justify-between w-full text-md sm:text-lg font-bold">
               <span>Total</span>
               <span>Rp {cartTotal.toLocaleString('id-ID')}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 w-full">
-              <Button onClick={() => completeTransaction('Tunai')}>
+              <Button onClick={() => completeTransaction('Tunai')} disabled={cart.length === 0}>
                 <DollarSign className="mr-2 h-4 w-4" /> Tunai
               </Button>
-              <Button onClick={() => completeTransaction('Transfer')} variant="secondary">
+              <Button onClick={() => completeTransaction('Transfer')} variant="secondary" disabled={cart.length === 0}>
                 Transfer
               </Button>
             </div>
           </CardFooter>
         </Card>
-        <Card>
+        <Card className="hidden lg:block">
           <CardHeader>
             <CardTitle className="font-headline text-base">Riwayat Hari Ini</CardTitle>
           </CardHeader>

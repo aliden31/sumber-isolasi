@@ -48,16 +48,16 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-headline font-bold">Laporan</h1>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan</h1>
         <Button onClick={handleExport}>
           <Download className="mr-2 h-4 w-4" />
           Ekspor ke PDF
         </Button>
       </div>
 
-      <Tabs defaultValue="daily">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="daily" className="w-full">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto sm:h-10">
           <TabsTrigger value="daily">Penjualan Harian</TabsTrigger>
           <TabsTrigger value="top-products">Produk Terlaris</TabsTrigger>
           <TabsTrigger value="monthly">Pendapatan Bulanan</TabsTrigger>
@@ -71,26 +71,28 @@ export default function ReportsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Waktu</TableHead>
-                    <TableHead>ID Transaksi</TableHead>
-                    <TableHead>Metode Pembayaran</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dailySales.map(tx => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{new Date(tx.date).toLocaleTimeString('id-ID')}</TableCell>
-                      <TableCell>{tx.id}</TableCell>
-                      <TableCell>{tx.paymentMethod}</TableCell>
-                      <TableCell className="text-right">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Waktu</TableHead>
+                      <TableHead>ID Transaksi</TableHead>
+                      <TableHead>Metode</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {dailySales.map(tx => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{new Date(tx.date).toLocaleTimeString('id-ID')}</TableCell>
+                        <TableCell className="font-mono">{tx.id}</TableCell>
+                        <TableCell>{tx.paymentMethod}</TableCell>
+                        <TableCell className="text-right">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -101,24 +103,26 @@ export default function ReportsPage() {
               <CardDescription>Produk yang paling banyak terjual.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Peringkat</TableHead>
-                    <TableHead>Nama Produk</TableHead>
-                    <TableHead className="text-right">Jumlah Terjual</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockTopProducts.sort((a,b) => b.sold - a.sold).map((product, index) => (
-                    <TableRow key={product.name}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell className="text-right font-bold">{product.sold}</TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Peringkat</TableHead>
+                      <TableHead>Nama Produk</TableHead>
+                      <TableHead className="text-right">Jumlah Terjual</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {mockTopProducts.sort((a,b) => b.sold - a.sold).map((product, index) => (
+                      <TableRow key={product.name}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell className="text-right font-bold">{product.sold}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -128,8 +132,8 @@ export default function ReportsPage() {
               <CardTitle className="font-headline">Ringkasan Pendapatan Bulanan</CardTitle>
               <CardDescription>Grafik pendapatan selama beberapa bulan terakhir.</CardDescription>
             </CardHeader>
-            <CardContent className="pl-2">
-              <ChartContainer config={{}} className="min-h-[200px] w-full">
+            <CardContent className="pl-0 sm:pl-2">
+              <ChartContainer config={{}} className="min-h-[250px] sm:min-h-[200px] w-full">
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={mockMonthlyRevenue}>
                     <XAxis

@@ -32,8 +32,8 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-headline font-bold">Dashboard</h1>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <h1 className="text-2xl md:text-3xl font-headline font-bold">Dashboard</h1>
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium font-body">
@@ -89,7 +89,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
             <CardTitle className="font-headline">Penjualan Mingguan</CardTitle>
@@ -106,29 +106,31 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Produk</TableHead>
-                  <TableHead className="text-right">Stok</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lowStockProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <div className="font-medium">{product.name}</div>
-                      <div className="hidden text-sm text-muted-foreground md:inline">
-                        {product.category}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="destructive">{product.stock}</Badge>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produk</TableHead>
+                    <TableHead className="text-right">Stok</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {lowStockProducts.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {product.category}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="destructive">{product.stock}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
