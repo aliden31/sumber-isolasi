@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { ProcurementItem, Product, PurchaseRequest, PurchaseRequestStatus, Supplier } from '@/lib/types';
@@ -36,10 +36,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { usePersistentState } from '@/hooks/use-persistent-state';
 import { generateId } from '@/lib/id';
 import { CalendarPlus, CheckCircle2, ChevronDown, ClipboardList, MoreHorizontal, XCircle } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
+import { createPurchaseRequest, updatePurchaseRequestStatus } from '../actions';
 
 const NONE_VALUE = '__none__';
 const DEPARTMENTS = ['Operasional', 'Produksi', 'Gudang', 'Penjualan', 'Lainnya'];
@@ -57,7 +57,7 @@ interface ItemDraft {
 }
 
 export default function PurchaseRequestPage() {
-  const [requests, setRequests] = usePersistentState<PurchaseRequest[]>('procurement:requests', []);
+  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [neededBy, setNeededBy] = useState<Date | undefined>();
@@ -65,6 +65,8 @@ export default function PurchaseRequestPage() {
   const [draftItems, setDraftItems] = useState<ProcurementItem[]>([]);
   const [form, setForm] = useState({ requestedBy: '', department: '', supplierId: '', notes: '' });
   const { toast } = useToast();
+  const [isSaving, startSaving] = useTransition();
+  const [isUpdatingStatus, startUpdateStatus] = useTransition();
 
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
@@ -73,9 +75,36 @@ export default function PurchaseRequestPage() {
     const unsubSuppliers = onSnapshot(collection(db, 'suppliers'), (snapshot) => {
       setSuppliers(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Supplier)));
     });
+    const unsubRequests = onSnapshot(collection(db, 'purchaseRequests'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
+          const neededByValue = data.neededBy?.toDate
+            ? data.neededBy.toDate().toISOString()
+            : data.neededBy ?? undefined;
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            requestedBy: data.requestedBy ?? '',
+            department: data.department ?? '',
+            supplierId: data.supplierId ?? undefined,
+            supplierName: data.supplierName ?? undefined,
+            neededBy: neededByValue,
+            notes: data.notes ?? undefined,
+            createdAt,
+            status: (data.status as PurchaseRequestStatus) ?? 'Draft',
+            items: Array.isArray(data.items) ? data.items : [],
+          } satisfies PurchaseRequest;
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setRequests(list);
+    });
+
     return () => {
       unsubProducts();
       unsubSuppliers();
+      unsubRequests();
     };
   }, []);
 
@@ -118,31 +147,48 @@ export default function PurchaseRequestPage() {
       return;
     }
     const supplierName = supplierMap.get(form.supplierId)?.name;
-    const now = new Date();
-    const newRequest: PurchaseRequest = {
-      id: generateId('PR'),
-      number: `PR-${now.getFullYear()}${String(requests.length + 1).padStart(4, '0')}`,
-      requestedBy: form.requestedBy.trim(),
-      department: form.department,
-      neededBy: neededBy ? neededBy.toISOString() : undefined,
-      notes: [supplierName ? `Pemasok yang disarankan: ${supplierName}` : '', form.notes.trim()]
-        .filter(Boolean)
-        .join('\n') || undefined,
-      createdAt: now.toISOString(),
-      status: 'Menunggu Persetujuan',
-      items: draftItems,
-    };
 
-    setRequests([newRequest, ...requests]);
-    setForm({ requestedBy: '', department: '', supplierId: '', notes: '' });
-    setItemDraft({ productId: '', quantity: 1, notes: '' });
-    setNeededBy(undefined);
-    setDraftItems([]);
-    toast({ title: 'Permintaan pembelian dibuat', description: newRequest.number });
+    startSaving(async () => {
+      const noteLines = [
+        supplierName ? `Pemasok direkomendasikan: ${supplierName}` : undefined,
+        form.notes.trim() || undefined,
+      ].filter(Boolean) as string[];
+
+      const result = await createPurchaseRequest({
+        number: generateId('PR'),
+        requestedBy: form.requestedBy.trim(),
+        department: form.department,
+        supplierId: form.supplierId || undefined,
+        supplierName,
+        neededBy: neededBy ? neededBy.toISOString() : undefined,
+        notes: noteLines.length ? noteLines.join('\n') : undefined,
+        createdAt: new Date(),
+        status: 'Menunggu Persetujuan',
+        items: draftItems,
+      });
+
+      if (result.error) {
+        toast({ title: 'Gagal membuat permintaan', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Permintaan pembelian dibuat', description: 'Permintaan tersimpan di database.' });
+      setForm({ requestedBy: '', department: '', supplierId: '', notes: '' });
+      setItemDraft({ productId: '', quantity: 1, notes: '' });
+      setNeededBy(undefined);
+      setDraftItems([]);
+    });
   };
 
-  const updateStatus = (id: string, status: PurchaseRequestStatus) => {
-    setRequests((prev) => prev.map((request) => (request.id === id ? { ...request, status } : request)));
+  const updateStatus = (request: PurchaseRequest, status: PurchaseRequestStatus) => {
+    startUpdateStatus(async () => {
+      const result = await updatePurchaseRequestStatus(request.id, status);
+      if (result.error) {
+        toast({ title: 'Gagal memperbarui status', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Status diperbarui', description: `${request.number} sekarang ${status}.` });
+      }
+    });
   };
 
   return (
@@ -162,7 +208,7 @@ export default function PurchaseRequestPage() {
             <ClipboardList className="h-5 w-5" /> Permintaan Baru
           </CardTitle>
           <CardDescription>
-            Tentukan pemohon, departemen, dan daftar barang yang dibutuhkan. Data disimpan secara lokal di browser Anda.
+            Tentukan pemohon, departemen, dan daftar barang yang dibutuhkan. Data akan langsung tersimpan di database Firebase.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -332,8 +378,8 @@ export default function PurchaseRequestPage() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end border-t bg-muted/40">
-          <Button onClick={handleCreateRequest} disabled={draftItems.length === 0}>
-            Ajukan Permintaan
+          <Button onClick={handleCreateRequest} disabled={draftItems.length === 0 || isSaving}>
+            {isSaving ? 'Menyimpan...' : 'Ajukan Permintaan'}
           </Button>
         </CardFooter>
       </Card>
@@ -341,7 +387,7 @@ export default function PurchaseRequestPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-headline">Riwayat Permintaan</CardTitle>
-          <CardDescription>Semua permintaan tersimpan di browser Anda agar mudah dilacak statusnya.</CardDescription>
+          <CardDescription>Semua permintaan tersimpan di database sehingga dapat dilacak oleh tim purchasing.</CardDescription>
         </CardHeader>
         <CardContent>
           {requests.length === 0 ? (
@@ -395,9 +441,18 @@ export default function PurchaseRequestPage() {
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
-                              {request.notes && (
-                                <div className="rounded-md bg-muted/60 p-3 text-sm whitespace-pre-line">
-                                  {request.notes}
+                              {(request.supplierName || request.notes) && (
+                                <div className="space-y-2">
+                                  {request.supplierName && (
+                                    <div className="rounded-md bg-muted/40 p-3 text-sm">
+                                      <span className="font-medium">Rekomendasi pemasok:</span> {request.supplierName}
+                                    </div>
+                                  )}
+                                  {request.notes && (
+                                    <div className="rounded-md bg-muted/60 p-3 text-sm whitespace-pre-line">
+                                      {request.notes}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                               <Table>
@@ -430,13 +485,22 @@ export default function PurchaseRequestPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Ubah Status</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => updateStatus(request.id, 'Menunggu Persetujuan')}>
+                            <DropdownMenuItem
+                              onClick={() => updateStatus(request, 'Menunggu Persetujuan')}
+                              disabled={isUpdatingStatus}
+                            >
                               <ChevronDown className="mr-2 h-4 w-4" /> Tandai Menunggu
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateStatus(request.id, 'Disetujui')}>
+                            <DropdownMenuItem
+                              onClick={() => updateStatus(request, 'Disetujui')}
+                              disabled={isUpdatingStatus}
+                            >
                               <CheckCircle2 className="mr-2 h-4 w-4" /> Setujui Permintaan
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateStatus(request.id, 'Ditolak')}>
+                            <DropdownMenuItem
+                              onClick={() => updateStatus(request, 'Ditolak')}
+                              disabled={isUpdatingStatus}
+                            >
                               <XCircle className="mr-2 h-4 w-4" /> Tolak Permintaan
                             </DropdownMenuItem>
                           </DropdownMenuContent>

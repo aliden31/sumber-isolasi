@@ -163,6 +163,8 @@ export type PurchaseRequest = {
   number: string;
   requestedBy: string;
   department: string;
+  supplierId?: string;
+  supplierName?: string;
   neededBy?: string;
   notes?: string;
   createdAt: string;
@@ -211,6 +213,7 @@ export type GoodsReceipt = {
   id: string;
   number: string;
   supplierName: string;
+  supplierId?: string;
   receiptDate: string;
   purchaseOrderNumber: string;
   status: GoodsReceiptStatus;
@@ -227,6 +230,7 @@ export type PurchaseInvoiceStatus =
 export type PurchaseInvoice = {
   id: string;
   number: string;
+  supplierId?: string;
   supplierName: string;
   invoiceDate: string;
   dueDate: string;
@@ -242,6 +246,7 @@ export type PurchaseInvoice = {
 export type PurchaseReturn = {
   id: string;
   number: string;
+  supplierId?: string;
   supplierName: string;
   referenceNumber: string;
   returnDate: string;
@@ -326,6 +331,37 @@ export type ProductCategory = {
   description?: string;
   color: string;
   productIds: string[];
+};
+
+export type CurrencyRate = {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  rate: number;
+  isBase: boolean;
+  updatedAt: string;
+};
+
+export type Tax = {
+  id: string;
+  name: string;
+  rate: number;
+  type: 'PPN' | 'PPh' | 'Lainnya';
+  accountId?: string;
+  description?: string;
+  active: boolean;
+};
+
+export type AppUserRole = 'Admin' | 'Manajer' | 'Kasir' | 'Staf';
+
+export type AppUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: AppUserRole;
+  active: boolean;
+  lastLoginAt?: string;
 };
 
 export type BankStatementLine = {
