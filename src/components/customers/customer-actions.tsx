@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Plus, MoreHorizontal, Loader2, Edit, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, Edit, Trash2, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,15 +23,68 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { addCustomer, updateCustomer, deleteCustomer } from '@/app/(app)/customers/actions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { seedInitialCustomers } from '@/lib/seed-actions';
 
-export function CustomerActions() {
+
+export function CustomerActions({ hasCustomers }: { hasCustomers: boolean }) {
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleSeed = () => {
+    startTransition(async () => {
+      const result = await seedInitialCustomers();
+      if (result.error) {
+        toast({ title: 'Gagal', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Berhasil', description: 'Contoh data pelanggan berhasil ditambahkan.' });
+      }
+    });
+  }
+
   return (
-    <CustomerFormDialog>
-      <Button>
-        <Plus className="mr-2 h-4 w-4" />
-        Tambah Pelanggan
-      </Button>
-    </CustomerFormDialog>
+     <div className="flex gap-2">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+             <Button variant="outline" disabled={hasCustomers || isPending}>
+                <Database className="mr-2 h-4 w-4" /> Seed Pelanggan
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tindakan ini akan menambahkan beberapa contoh data pelanggan ke database Anda.
+                Tindakan ini hanya bisa dilakukan jika daftar pelanggan Anda masih kosong.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSeed} disabled={isPending}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Lanjutkan
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+       
+        <CustomerFormDialog>
+            <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Tambah Pelanggan
+            </Button>
+        </CustomerFormDialog>
+    </div>
   );
 }
 
@@ -158,7 +211,7 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        {isDropdownItem ? <div className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><Edit className="mr-2 h-4 w-4" /> Edit</div> : children}
+        {isDropdownItem ? <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><Edit className="mr-2 h-4 w-4" /> Edit</div> : children}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

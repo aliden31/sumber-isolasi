@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 
 async function getCustomers(): Promise<Customer[]> {
   const customersCol = collection(db, "customers");
-  const customerSnapshot = await getDocs(customerCol);
+  const customerSnapshot = await getDocs(customersCol);
   const customerList = customerSnapshot.docs.map(doc => {
     const data = doc.data();
     return {
@@ -27,7 +27,7 @@ export default async function CustomersPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Manajemen Pelanggan</h1>
-        <CustomerActions />
+        <CustomerActions hasCustomers={customers.length > 0} />
       </div>
       <Card>
         <CardHeader>

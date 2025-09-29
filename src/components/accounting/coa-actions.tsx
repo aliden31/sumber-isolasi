@@ -22,7 +22,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { addAccount, updateAccount, deleteAccount, seedInitialAccounts } from '@/app/(app)/accounting/coa/actions';
+import { addAccount, updateAccount, deleteAccount } from '@/app/(app)/accounting/coa/actions';
+import { seedInitialAccounts } from '@/lib/seed-actions';
 import {
   Select,
   SelectContent,

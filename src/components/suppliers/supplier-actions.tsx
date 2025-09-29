@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Plus, MoreHorizontal, Loader2, Edit, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, Edit, Trash2, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,15 +24,68 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '../ui/textarea';
 import { addSupplier, updateSupplier, deleteSupplier } from '@/app/(app)/suppliers/actions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { seedInitialSuppliers } from '@/lib/seed-actions';
 
-export function SupplierActions() {
+
+export function SupplierActions({ hasSuppliers }: { hasSuppliers: boolean }) {
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleSeed = () => {
+    startTransition(async () => {
+      const result = await seedInitialSuppliers();
+      if (result.error) {
+        toast({ title: 'Gagal', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Berhasil', description: 'Contoh data supplier berhasil ditambahkan.' });
+      }
+    });
+  }
+
   return (
-    <SupplierFormDialog>
-      <Button>
-        <Plus className="mr-2 h-4 w-4" />
-        Tambah Supplier
-      </Button>
-    </SupplierFormDialog>
+     <div className="flex gap-2">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+             <Button variant="outline" disabled={hasSuppliers || isPending}>
+                <Database className="mr-2 h-4 w-4" /> Seed Supplier
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tindakan ini akan menambahkan beberapa contoh data supplier ke database Anda.
+                Tindakan ini hanya bisa dilakukan jika daftar supplier Anda masih kosong.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSeed} disabled={isPending}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Lanjutkan
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+       
+        <SupplierFormDialog>
+            <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Tambah Supplier
+            </Button>
+        </SupplierFormDialog>
+    </div>
   );
 }
 
