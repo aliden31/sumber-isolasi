@@ -6,7 +6,7 @@ export default function SupplierInvoicePage() {
   return (
      <PlaceholderPage 
         title="Faktur / Invoice Pemasok"
-        description="Fitur ini akan digunakan untuk mencatat faktur yang diterima dari pemasok dan menghubungkannya dengan Pesanan Pembelian (PO) atau Penerimaan Barang (GRN)."
+        description="Gunakan fitur ini untuk mencatat faktur tagihan yang diterima dari pemasok. Sistem akan mencocokkan faktur dengan data Penerimaan Barang (GRN) dan Pesanan Pembelian (PO). Pencatatan faktur akan memicu entri jurnal untuk mengakui Utang Usaha (Accounts Payable) secara resmi."
     />
   );
 }

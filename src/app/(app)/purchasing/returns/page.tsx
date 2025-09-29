@@ -6,7 +6,7 @@ export default function PurchaseReturnsPage() {
   return (
      <PlaceholderPage 
         title="Retur Pembelian"
-        description="Fitur ini akan memungkinkan proses pengembalian barang ke pemasok, penyesuaian stok, dan pencatatan nota kredit."
+        description="Fitur ini digunakan untuk memproses pengembalian barang ke pemasok. Sistem akan menangani pengurangan stok, pencatatan nota kredit dari pemasok, dan pembuatan jurnal pembalik untuk mengurangi nilai persediaan dan utang usaha Anda."
     />
   );
 }
