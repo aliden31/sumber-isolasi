@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import type { PayableSummary, PurchaseInvoice } from '@/lib/types';
+import { useEffect, useMemo, useState, useTransition } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import type { PayableSummary, PurchaseInvoice, PurchaseInvoiceStatus } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -15,9 +16,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useToast } from '@/hooks/use-toast';
 import { Wallet, Wallet2 } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { recordInvoicePayment } from '../actions';
 
 const FILTERS = ['Semua', 'Belum Jatuh Tempo', 'Jatuh Tempo', 'Lewat Jatuh Tempo', 'Lunas'] as const;
 
@@ -38,11 +40,46 @@ function computeStatus(invoice: PurchaseInvoice): PayableSummary['status'] {
 }
 
 export default function PayablesPage() {
-  const [invoices, setInvoices] = usePersistentState<PurchaseInvoice[]>('procurement:invoices', []);
+  const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [filter, setFilter] = useState<FilterOption>('Semua');
-  const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoice | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const { toast } = useToast();
+  const [isRecordingPayment, startRecordingPayment] = useTransition();
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'purchaseInvoices'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const invoiceDateValue = data.invoiceDate?.toDate
+            ? data.invoiceDate.toDate().toISOString()
+            : data.invoiceDate ?? new Date().toISOString();
+          const dueDateValue = data.dueDate?.toDate
+            ? data.dueDate.toDate().toISOString()
+            : data.dueDate ?? invoiceDateValue;
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            supplierId: data.supplierId ?? undefined,
+            supplierName: data.supplierName ?? 'Pemasok',
+            invoiceDate: invoiceDateValue,
+            dueDate: dueDateValue,
+            referenceNumbers: Array.isArray(data.referenceNumbers) ? data.referenceNumbers : [],
+            subtotal: Number(data.subtotal) || 0,
+            tax: Number(data.tax) || 0,
+            total: Number(data.total) || 0,
+            paidAmount: Number(data.paidAmount) || 0,
+            status: (data.status as PurchaseInvoiceStatus) ?? 'Draft',
+            notes: data.notes ?? undefined,
+          } satisfies PurchaseInvoice;
+        })
+        .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime());
+      setInvoices(list);
+    });
+
+    return () => unsub();
+  }, []);
 
   const summaries = useMemo<PayableSummary[]>(
     () =>
@@ -70,22 +107,25 @@ export default function PayablesPage() {
   );
 
   const handleRegisterPayment = () => {
-    if (!selectedInvoice) return;
-    const newPaid = Math.min(selectedInvoice.total, selectedInvoice.paidAmount + paymentAmount);
-    setInvoices((prev) =>
-      prev.map((invoice) =>
-        invoice.id === selectedInvoice.id
-          ? {
-              ...invoice,
-              paidAmount: newPaid,
-              status: newPaid >= invoice.total ? 'Lunas' : invoice.status === 'Draft' ? 'Belum Dibayar' : invoice.status,
-            }
-          : invoice
-      )
-    );
-    toast({ title: 'Pembayaran dicatat', description: selectedInvoice.number });
-    setSelectedInvoice(null);
-    setPaymentAmount(0);
+    if (!selectedInvoiceId) return;
+    const invoice = invoices.find((item) => item.id === selectedInvoiceId);
+    if (!invoice) return;
+    if (paymentAmount <= 0) {
+      toast({ title: 'Masukkan jumlah pembayaran', variant: 'destructive' });
+      return;
+    }
+
+    startRecordingPayment(async () => {
+      const result = await recordInvoicePayment(selectedInvoiceId, paymentAmount);
+      if (result.error) {
+        toast({ title: 'Gagal mencatat pembayaran', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Pembayaran dicatat', description: invoice.number });
+      setSelectedInvoiceId(null);
+      setPaymentAmount(0);
+    });
   };
 
   return (
@@ -160,7 +200,15 @@ export default function PayablesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Dialog open={selectedInvoice?.id === summary.invoiceId} onOpenChange={(open) => !open && setSelectedInvoice(null)}>
+                      <Dialog
+                        open={selectedInvoiceId === summary.invoiceId}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setSelectedInvoiceId(null);
+                            setPaymentAmount(0);
+                          }
+                        }}
+                      >
                         <DialogTrigger asChild>
                           <Button
                             variant="outline"
@@ -168,8 +216,8 @@ export default function PayablesPage() {
                             onClick={() => {
                               const invoice = invoices.find((item) => item.id === summary.invoiceId);
                               if (invoice) {
-                                setSelectedInvoice(invoice);
-                                setPaymentAmount(invoice.total - invoice.paidAmount);
+                                setSelectedInvoiceId(invoice.id);
+                                setPaymentAmount(Math.max(invoice.total - invoice.paidAmount, 0));
                               }
                             }}
                             disabled={summary.status === 'Lunas'}
@@ -188,7 +236,7 @@ export default function PayablesPage() {
                             <Input
                               type="number"
                               min={0}
-                              max={summary.total - summary.paidAmount}
+                              max={Math.max(summary.total - summary.paidAmount, 0)}
                               value={paymentAmount}
                               onChange={(event) => setPaymentAmount(Number(event.target.value) || 0)}
                             />
@@ -198,7 +246,9 @@ export default function PayablesPage() {
                             </p>
                           </div>
                           <DialogFooter>
-                            <Button onClick={handleRegisterPayment}>Simpan</Button>
+                            <Button onClick={handleRegisterPayment} disabled={isRecordingPayment}>
+                              Simpan
+                            </Button>
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>

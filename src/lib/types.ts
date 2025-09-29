@@ -252,6 +252,7 @@ export type PurchaseReturn = {
   returnDate: string;
   total: number;
   reason: string;
+  notes?: string;
 };
 
 export type PayableStatus =

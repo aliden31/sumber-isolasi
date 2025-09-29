@@ -130,7 +130,7 @@ export default function PurchaseRequestPage() {
       productId: product.id,
       productName: product.name,
       quantity: itemDraft.quantity,
-      notes: itemDraft.notes || undefined,
+      ...(itemDraft.notes.trim() ? { notes: itemDraft.notes.trim() } : {}),
     };
 
     setDraftItems((prev) => [...prev, newItem]);
@@ -154,17 +154,25 @@ export default function PurchaseRequestPage() {
         form.notes.trim() || undefined,
       ].filter(Boolean) as string[];
 
+      const sanitizedItems = draftItems.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        ...(typeof item.unitPrice === 'number' ? { unitPrice: item.unitPrice } : {}),
+        ...(item.notes ? { notes: item.notes } : {}),
+      }));
+
       const result = await createPurchaseRequest({
         number: generateId('PR'),
         requestedBy: form.requestedBy.trim(),
         department: form.department,
         supplierId: form.supplierId || undefined,
         supplierName,
-        neededBy: neededBy ? neededBy.toISOString() : undefined,
+        neededBy,
         notes: noteLines.length ? noteLines.join('\n') : undefined,
         createdAt: new Date(),
         status: 'Menunggu Persetujuan',
-        items: draftItems,
+        items: sanitizedItems,
       });
 
       if (result.error) {

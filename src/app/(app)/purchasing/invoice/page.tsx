@@ -1,7 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { GoodsReceipt, PurchaseInvoice, PurchaseInvoiceStatus } from '@/lib/types';
+import { useEffect, useMemo, useState, useTransition } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import type {
+  GoodsReceipt,
+  GoodsReceiptItem,
+  PurchaseInvoice,
+  PurchaseInvoiceStatus,
+} from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -17,7 +23,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { usePersistentState } from '@/hooks/use-persistent-state';
 import { generateId } from '@/lib/id';
 import { useToast } from '@/hooks/use-toast';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -30,11 +35,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { FileCheck, FileSpreadsheet, MoreHorizontal } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { createPurchaseInvoice, updatePurchaseInvoiceStatus } from '../actions';
 
 const STATUS_OPTIONS: PurchaseInvoiceStatus[] = ['Draft', 'Belum Dibayar', 'Sebagian Dibayar', 'Lunas'];
 
 export default function PurchaseInvoicePage() {
-  const [invoices, setInvoices] = usePersistentState<PurchaseInvoice[]>('procurement:invoices', []);
+  const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
   const [selectedReceiptIds, setSelectedReceiptIds] = useState<string[]>([]);
   const [supplierName, setSupplierName] = useState('');
@@ -43,23 +50,88 @@ export default function PurchaseInvoicePage() {
   const [notes, setNotes] = useState('');
   const [paidAmount, setPaidAmount] = useState(0);
   const { toast } = useToast();
+  const [isSaving, startSaving] = useTransition();
+  const [isUpdatingStatus, startUpdatingStatus] = useTransition();
+  const [isRecordingPayment, startRecordingPayment] = useTransition();
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = window.localStorage.getItem('procurement:receipts');
-      if (stored) {
-        setReceipts(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.warn('Failed to load receipts', error);
-    }
+    const unsubReceipts = onSnapshot(collection(db, 'goodsReceipts'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const receiptDateValue = data.receiptDate?.toDate
+            ? data.receiptDate.toDate().toISOString()
+            : data.receiptDate ?? new Date().toISOString();
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            supplierName: data.supplierName ?? 'Pemasok',
+            supplierId: data.supplierId ?? undefined,
+            receiptDate: receiptDateValue,
+            purchaseOrderNumber: data.purchaseOrderNumber ?? '-',
+            status: data.status ?? 'Draft',
+            notes: data.notes ?? undefined,
+            items: Array.isArray(data.items)
+              ? data.items.map((item: GoodsReceiptItem) => ({
+                  productId: item.productId,
+                  productName: item.productName,
+                  orderedQty: item.orderedQty,
+                  receivedQty: item.receivedQty,
+                  unitPrice: item.unitPrice,
+                }))
+              : [],
+          } satisfies GoodsReceipt;
+        })
+        .sort((a, b) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime());
+      setReceipts(list);
+    });
+
+    const unsubInvoices = onSnapshot(collection(db, 'purchaseInvoices'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const invoiceDateValue = data.invoiceDate?.toDate
+            ? data.invoiceDate.toDate().toISOString()
+            : data.invoiceDate ?? new Date().toISOString();
+          const dueDateValue = data.dueDate?.toDate
+            ? data.dueDate.toDate().toISOString()
+            : data.dueDate ?? invoiceDateValue;
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            supplierId: data.supplierId ?? undefined,
+            supplierName: data.supplierName ?? 'Pemasok',
+            invoiceDate: invoiceDateValue,
+            dueDate: dueDateValue,
+            referenceNumbers: Array.isArray(data.referenceNumbers) ? data.referenceNumbers : [],
+            subtotal: Number(data.subtotal) || 0,
+            tax: Number(data.tax) || 0,
+            total: Number(data.total) || 0,
+            paidAmount: Number(data.paidAmount) || 0,
+            status: (data.status as PurchaseInvoiceStatus) ?? 'Draft',
+            notes: data.notes ?? undefined,
+          } satisfies PurchaseInvoice;
+        })
+        .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime());
+      setInvoices(list);
+    });
+
+    return () => {
+      unsubReceipts();
+      unsubInvoices();
+    };
   }, []);
 
   const selectedReceipts = useMemo(
     () => receipts.filter((receipt) => selectedReceiptIds.includes(receipt.id)),
     [receipts, selectedReceiptIds]
   );
+
+  useEffect(() => {
+    if (selectedReceipts.length > 0 && !supplierName.trim()) {
+      setSupplierName(selectedReceipts[0].supplierName);
+    }
+  }, [selectedReceipts, supplierName]);
 
   const subtotal = useMemo(
     () =>
@@ -89,32 +161,49 @@ export default function PurchaseInvoicePage() {
       toast({ title: 'Pilih minimal satu GRN', variant: 'destructive' });
       return;
     }
-    const newInvoice: PurchaseInvoice = {
-      id: generateId('PINV'),
-      number: `PINV-${new Date().getFullYear()}${String(invoices.length + 1).padStart(4, '0')}`,
-      supplierName: supplierName.trim(),
-      invoiceDate: (invoiceDate ?? new Date()).toISOString(),
-      dueDate: dueDate?.toISOString() ?? new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(),
-      referenceNumbers: selectedReceipts.map((receipt) => receipt.number),
-      subtotal,
-      tax,
-      total,
-      paidAmount,
-      status: paidAmount >= total ? 'Lunas' : paidAmount > 0 ? 'Sebagian Dibayar' : 'Belum Dibayar',
-      notes: notes.trim() || undefined,
-    };
-    setInvoices([newInvoice, ...invoices]);
-    setSupplierName('');
-    setSelectedReceiptIds([]);
-    setNotes('');
-    setPaidAmount(0);
-    setInvoiceDate(new Date());
-    setDueDate(undefined);
-    toast({ title: 'Faktur pembelian dibuat', description: newInvoice.number });
+    const supplierId = selectedReceipts[0]?.supplierId;
+    const invoiceNumber = generateId('PINV');
+
+    startSaving(async () => {
+      const result = await createPurchaseInvoice({
+        number: invoiceNumber,
+        supplierId,
+        supplierName: supplierName.trim(),
+        invoiceDate: invoiceDate ?? new Date(),
+        dueDate: dueDate ?? new Date(Date.now() + 14 * 24 * 3600 * 1000),
+        referenceNumbers: selectedReceipts.map((receipt) => receipt.number),
+        subtotal,
+        tax,
+        total,
+        paidAmount,
+        status: paidAmount >= total ? 'Lunas' : paidAmount > 0 ? 'Sebagian Dibayar' : 'Belum Dibayar',
+        notes: notes.trim() || undefined,
+      });
+
+      if (result.error) {
+        toast({ title: 'Gagal membuat faktur', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Faktur pembelian dibuat', description: invoiceNumber });
+      setSupplierName('');
+      setSelectedReceiptIds([]);
+      setNotes('');
+      setPaidAmount(0);
+      setInvoiceDate(new Date());
+      setDueDate(undefined);
+    });
   };
 
   const updateStatus = (id: string, status: PurchaseInvoiceStatus) => {
-    setInvoices((prev) => prev.map((invoice) => (invoice.id === id ? { ...invoice, status } : invoice)));
+    startUpdatingStatus(async () => {
+      const result = await updatePurchaseInvoiceStatus(id, status);
+      if (result.error) {
+        toast({ title: 'Gagal memperbarui status', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Status faktur diperbarui', description: status });
+      }
+    });
   };
 
   return (
@@ -226,7 +315,10 @@ export default function PurchaseInvoicePage() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end border-t bg-muted/40">
-          <Button onClick={handleCreateInvoice} disabled={selectedReceipts.length === 0 || !supplierName.trim()}>
+          <Button
+            onClick={handleCreateInvoice}
+            disabled={selectedReceipts.length === 0 || !supplierName.trim() || isSaving}
+          >
             Simpan Faktur
           </Button>
         </CardFooter>
@@ -281,11 +373,15 @@ export default function PurchaseInvoicePage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Perbarui Status</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          {STATUS_OPTIONS.map((status) => (
-                            <DropdownMenuItem key={status} onClick={() => updateStatus(invoice.id, status)}>
-                              {status}
-                            </DropdownMenuItem>
-                          ))}
+                            {STATUS_OPTIONS.map((status) => (
+                              <DropdownMenuItem
+                                key={status}
+                                disabled={isUpdatingStatus}
+                                onClick={() => updateStatus(invoice.id, status)}
+                              >
+                                {status}
+                              </DropdownMenuItem>
+                            ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

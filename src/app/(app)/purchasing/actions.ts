@@ -12,9 +12,11 @@ import {
 import { db } from "@/lib/firebase";
 import type {
   GoodsReceipt,
+  GoodsReceiptItem,
   GoodsReceiptStatus,
   LocalPurchaseOrder,
   PayableSummary,
+  ProcurementItem,
   PurchaseInvoice,
   PurchaseInvoiceStatus,
   PurchaseOrderStatus,
@@ -29,6 +31,16 @@ function normalizeString(value?: string | null) {
   return value?.trim() ? value.trim() : null;
 }
 
+function sanitizeItem<T extends ProcurementItem | GoodsReceiptItem>(item: T): T {
+  const next: Record<string, unknown> = { ...item };
+  if ("notes" in next && (!next.notes || typeof next.notes !== "string" || !next.notes.trim())) {
+    delete next.notes;
+  } else if (typeof next.notes === "string") {
+    next.notes = next.notes.trim();
+  }
+  return next as T;
+}
+
 export type PurchaseRequestInput = Omit<PurchaseRequest, "id" | "createdAt"> & {
   createdAt?: Date;
 };
@@ -36,17 +48,20 @@ export type PurchaseRequestInput = Omit<PurchaseRequest, "id" | "createdAt"> & {
 export async function createPurchaseRequest(data: PurchaseRequestInput) {
   try {
     const now = Timestamp.fromDate(data.createdAt ? new Date(data.createdAt) : new Date());
+    const neededBy = data.neededBy
+      ? Timestamp.fromDate(new Date(data.neededBy))
+      : null;
     const docRef = await addDoc(collection(db, "purchaseRequests"), {
       number: data.number,
       requestedBy: data.requestedBy,
       department: data.department,
       supplierId: normalizeString(data.supplierId),
       supplierName: normalizeString(data.supplierName),
-      neededBy: normalizeString(data.neededBy),
+      neededBy,
       notes: normalizeString(data.notes),
       status: data.status ?? ("Draft" as PurchaseRequestStatus),
       createdAt: now,
-      items: data.items,
+      items: data.items.map((item) => sanitizeItem(item)),
     });
 
     revalidatePath("/(app)/purchasing/request");
@@ -79,14 +94,14 @@ export async function createPurchaseOrder(data: PurchaseOrderInput) {
   try {
     const docRef = await addDoc(collection(db, "purchaseOrders"), {
       number: data.number,
-      supplierId: data.supplierId,
+      supplierId: normalizeString(data.supplierId),
       supplierName: data.supplierName,
       requestNumber: normalizeString(data.requestNumber),
       orderDate: Timestamp.fromDate(new Date(data.orderDate)),
       expectedDate: data.expectedDate ? Timestamp.fromDate(new Date(data.expectedDate)) : null,
       status: data.status,
       notes: normalizeString(data.notes),
-      items: data.items,
+      items: data.items.map((item) => sanitizeItem(item)),
       subtotal: data.subtotal,
       tax: data.tax,
       total: data.total,
@@ -123,12 +138,12 @@ export async function createGoodsReceipt(data: GoodsReceiptInput) {
     const docRef = await addDoc(collection(db, "goodsReceipts"), {
       number: data.number,
       supplierName: data.supplierName,
-      supplierId: data.supplierId ?? null,
+      supplierId: normalizeString(data.supplierId),
       receiptDate: Timestamp.fromDate(new Date(data.receiptDate)),
       purchaseOrderNumber: data.purchaseOrderNumber,
       status: data.status ?? ("Draft" as GoodsReceiptStatus),
       notes: normalizeString(data.notes),
-      items: data.items,
+      items: data.items.map((item) => sanitizeItem(item)),
     });
 
     revalidatePath("/(app)/purchasing/goods-receipt");
@@ -160,11 +175,13 @@ export async function createPurchaseInvoice(data: PurchaseInvoiceInput) {
   try {
     const docRef = await addDoc(collection(db, "purchaseInvoices"), {
       number: data.number,
-      supplierId: data.supplierId ?? null,
+      supplierId: normalizeString(data.supplierId),
       supplierName: data.supplierName,
       invoiceDate: Timestamp.fromDate(new Date(data.invoiceDate)),
       dueDate: Timestamp.fromDate(new Date(data.dueDate)),
-      referenceNumbers: data.referenceNumbers,
+      referenceNumbers: data.referenceNumbers
+        .map((ref) => normalizeString(ref) ?? undefined)
+        .filter((value): value is string => typeof value === "string"),
       subtotal: data.subtotal,
       tax: data.tax,
       total: data.total,
@@ -212,6 +229,18 @@ export async function recordInvoicePayment(invoiceId: string, amount: number) {
   }
 }
 
+export async function updatePurchaseInvoiceStatus(id: string, status: PurchaseInvoiceStatus) {
+  try {
+    await updateDoc(doc(db, "purchaseInvoices", id), { status });
+    revalidatePath("/(app)/purchasing/invoice");
+    revalidatePath("/(app)/purchasing/payables");
+    return createResponse();
+  } catch (error) {
+    console.error("updatePurchaseInvoiceStatus", error);
+    return createResponse(error instanceof Error ? error.message : "Gagal memperbarui status faktur.");
+  }
+}
+
 export type PurchaseReturnInput = Omit<PurchaseReturn, "id"> & {
   returnDate: string | Date;
 };
@@ -220,12 +249,13 @@ export async function createPurchaseReturn(data: PurchaseReturnInput) {
   try {
     const docRef = await addDoc(collection(db, "purchaseReturns"), {
       number: data.number,
-      supplierId: data.supplierId ?? null,
+      supplierId: normalizeString(data.supplierId),
       supplierName: data.supplierName,
       referenceNumber: data.referenceNumber,
       returnDate: Timestamp.fromDate(new Date(data.returnDate)),
       total: data.total,
       reason: data.reason,
+      notes: normalizeString(data.notes),
     });
 
     revalidatePath("/(app)/purchasing/returns");

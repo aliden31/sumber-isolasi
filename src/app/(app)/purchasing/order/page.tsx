@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type {
   LocalPurchaseOrder,
+  ProcurementItem,
   ProcurementOrderItem,
   Product,
   PurchaseOrderStatus,
   PurchaseRequest,
+  PurchaseRequestStatus,
   Supplier,
 } from '@/lib/types';
 import {
@@ -36,10 +38,10 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { usePersistentState } from '@/hooks/use-persistent-state';
 import { generateId } from '@/lib/id';
 import { DatePicker } from '@/components/ui/date-picker';
 import { CalendarCheck2, FileText, MoreHorizontal } from 'lucide-react';
+import { createPurchaseOrder, updatePurchaseOrderStatus } from '../actions';
 
 const NONE_VALUE = '__none__';
 const NO_SUPPLIER_VALUE = '__no_supplier__';
@@ -53,7 +55,7 @@ const STATUS_OPTIONS: PurchaseOrderStatus[] = [
 ];
 
 export default function PurchaseOrderPage() {
-  const [orders, setOrders] = usePersistentState<LocalPurchaseOrder[]>('procurement:orders', []);
+  const [orders, setOrders] = useState<LocalPurchaseOrder[]>([]);
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -65,18 +67,8 @@ export default function PurchaseOrderPage() {
   const [supplierId, setSupplierId] = useState('');
   const [notes, setNotes] = useState('');
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = window.localStorage.getItem('procurement:requests');
-      if (stored) {
-        setRequests(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.warn('Failed to load purchase requests from storage', error);
-    }
-  }, []);
+  const [isSaving, startSaving] = useTransition();
+  const [isUpdatingStatus, startUpdatingStatus] = useTransition();
 
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
@@ -85,9 +77,79 @@ export default function PurchaseOrderPage() {
     const unsubSuppliers = onSnapshot(collection(db, 'suppliers'), (snapshot) => {
       setSuppliers(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Supplier)));
     });
+    const unsubRequests = onSnapshot(collection(db, 'purchaseRequests'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString();
+          const neededByValue = data.neededBy?.toDate
+            ? data.neededBy.toDate().toISOString()
+            : data.neededBy ?? undefined;
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            requestedBy: data.requestedBy ?? '',
+            department: data.department ?? '',
+            supplierId: data.supplierId ?? undefined,
+            supplierName: data.supplierName ?? undefined,
+            neededBy: neededByValue,
+            notes: data.notes ?? undefined,
+            createdAt,
+            status: (data.status as PurchaseRequestStatus) ?? 'Draft',
+            items: Array.isArray(data.items)
+              ? data.items.map((item: ProcurementItem) => ({
+                  productId: item.productId,
+                  productName: item.productName,
+                  quantity: item.quantity,
+                  ...(typeof item.unitPrice === 'number' ? { unitPrice: item.unitPrice } : {}),
+                  ...(item.notes ? { notes: item.notes } : {}),
+                }))
+              : [],
+          } satisfies PurchaseRequest;
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setRequests(list);
+    });
+    const unsubOrders = onSnapshot(collection(db, 'purchaseOrders'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const orderDateValue = data.orderDate?.toDate ? data.orderDate.toDate().toISOString() : new Date().toISOString();
+          const expectedDateValue = data.expectedDate?.toDate
+            ? data.expectedDate.toDate().toISOString()
+            : data.expectedDate ?? undefined;
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            supplierId: data.supplierId ?? '',
+            supplierName: data.supplierName ?? 'Pemasok',
+            requestNumber: data.requestNumber ?? undefined,
+            orderDate: orderDateValue,
+            expectedDate: expectedDateValue,
+            status: (data.status as PurchaseOrderStatus) ?? 'Draft',
+            notes: data.notes ?? undefined,
+            items: Array.isArray(data.items)
+              ? data.items.map((item: ProcurementOrderItem) => ({
+                  productId: item.productId,
+                  productName: item.productName,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice ?? 0,
+                  ...(item.notes ? { notes: item.notes } : {}),
+                }))
+              : [],
+            subtotal: Number(data.subtotal) || 0,
+            tax: Number(data.tax) || 0,
+            total: Number(data.total) || 0,
+          } satisfies LocalPurchaseOrder;
+        })
+        .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+      setOrders(list);
+    });
     return () => {
       unsubProducts();
       unsubSuppliers();
+      unsubRequests();
+      unsubOrders();
     };
   }, []);
 
@@ -106,12 +168,25 @@ export default function PurchaseOrderPage() {
       };
     });
     setItems(generatedItems);
-    if (!supplierId && request.notes) {
-      const match = request.notes.match(/Pemasok yang disarankan: (.*)/);
-      if (match) {
-        const supplier = suppliers.find((sup) => sup.name === match[1]);
-        if (supplier) {
-          setSupplierId(supplier.id);
+    if (!supplierId) {
+      if (request.supplierId && supplierMap.has(request.supplierId)) {
+        setSupplierId(request.supplierId);
+        return;
+      }
+      if (request.notes) {
+        const patterns = [
+          /Pemasok direkomendasikan: (.*)/i,
+          /Pemasok yang disarankan: (.*)/i,
+        ];
+        for (const pattern of patterns) {
+          const match = request.notes.match(pattern);
+          if (match) {
+            const supplier = suppliers.find((sup) => sup.name === match[1].trim());
+            if (supplier) {
+              setSupplierId(supplier.id);
+              break;
+            }
+          }
         }
       }
     }
@@ -142,34 +217,57 @@ export default function PurchaseOrderPage() {
       toast({ title: 'Tidak ada item PO', description: 'Tambahkan minimal satu item ke PO.', variant: 'destructive' });
       return;
     }
-    const now = new Date();
-    const newOrder: LocalPurchaseOrder = {
-      id: generateId('PO'),
-      number: `PO-${now.getFullYear()}${String(orders.length + 1).padStart(4, '0')}`,
-      supplierId,
-      supplierName: supplierMap.get(supplierId)?.name ?? 'Pemasok',
-      requestNumber: requests.find((req) => req.id === selectedRequestId)?.number,
-      orderDate: (orderDate ?? now).toISOString(),
-      expectedDate: expectedDate?.toISOString(),
-      status: 'Draft',
-      notes: notes.trim() || undefined,
-      items,
-      subtotal,
-      tax,
-      total,
-    };
-    setOrders([newOrder, ...orders]);
-    setSelectedRequestId('');
-    setItems([]);
-    setSupplierId('');
-    setNotes('');
-    setOrderDate(new Date());
-    setExpectedDate(undefined);
-    toast({ title: 'PO disimpan', description: newOrder.number });
+    const request = requests.find((req) => req.id === selectedRequestId);
+    const supplierName = supplierMap.get(supplierId)?.name ?? 'Pemasok';
+    const orderNumber = generateId('PO');
+    const sanitizedItems = items.map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      ...(item.notes ? { notes: item.notes } : {}),
+    }));
+
+    startSaving(async () => {
+      const result = await createPurchaseOrder({
+        number: orderNumber,
+        supplierId,
+        supplierName,
+        requestNumber: request?.number,
+        orderDate: orderDate ?? new Date(),
+        expectedDate,
+        status: 'Draft',
+        notes: notes.trim() || undefined,
+        items: sanitizedItems,
+        subtotal,
+        tax,
+        total,
+      });
+
+      if (result.error) {
+        toast({ title: 'Gagal menyimpan PO', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'PO disimpan', description: orderNumber });
+      setSelectedRequestId('');
+      setItems([]);
+      setSupplierId('');
+      setNotes('');
+      setOrderDate(new Date());
+      setExpectedDate(undefined);
+    });
   };
 
   const updateStatus = (id: string, status: PurchaseOrderStatus) => {
-    setOrders((prev) => prev.map((order) => (order.id === id ? { ...order, status } : order)));
+    startUpdatingStatus(async () => {
+      const result = await updatePurchaseOrderStatus(id, status);
+      if (result.error) {
+        toast({ title: 'Gagal memperbarui status', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Status diperbarui', description: `PO sekarang ${status}.` });
+      }
+    });
   };
 
   return (
@@ -213,11 +311,15 @@ export default function PurchaseOrderPage() {
             </div>
             <div className="space-y-2">
               <Label>Pemasok</Label>
-              <Select value={supplierId} onValueChange={setSupplierId}>
+              <Select
+                value={supplierId || NONE_VALUE}
+                onValueChange={(value) => setSupplierId(value === NONE_VALUE ? '' : value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih pemasok" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={NONE_VALUE}>Tidak ada</SelectItem>
                   {suppliers.length === 0 && (
                     <SelectItem value={NO_SUPPLIER_VALUE} disabled>
                       Belum ada pemasok
@@ -328,7 +430,7 @@ export default function PurchaseOrderPage() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end border-t bg-muted/40">
-          <Button onClick={handleSaveOrder} disabled={items.length === 0 || !supplierId}>
+          <Button onClick={handleSaveOrder} disabled={items.length === 0 || !supplierId || isSaving}>
             Simpan PO
           </Button>
         </CardFooter>
@@ -425,7 +527,11 @@ export default function PurchaseOrderPage() {
                             <DropdownMenuLabel>Ubah status</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             {STATUS_OPTIONS.map((status) => (
-                              <DropdownMenuItem key={status} onClick={() => updateStatus(order.id, status)}>
+                              <DropdownMenuItem
+                                key={status}
+                                disabled={isUpdatingStatus}
+                                onClick={() => updateStatus(order.id, status)}
+                              >
                                 {status}
                               </DropdownMenuItem>
                             ))}

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { GoodsReceipt, GoodsReceiptItem, LocalPurchaseOrder } from '@/lib/types';
+import { useEffect, useMemo, useState, useTransition } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import type { GoodsReceipt, GoodsReceiptItem, LocalPurchaseOrder, ProcurementOrderItem } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -18,11 +19,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { usePersistentState } from '@/hooks/use-persistent-state';
 import { generateId } from '@/lib/id';
 import { useToast } from '@/hooks/use-toast';
 import { DatePicker } from '@/components/ui/date-picker';
 import { PackageCheck, PackageOpen } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { createGoodsReceipt } from '../actions';
 
 const STATUS_BADGE: Record<GoodsReceipt['status'], 'outline' | 'default'> = {
   Draft: 'outline',
@@ -32,24 +34,87 @@ const STATUS_BADGE: Record<GoodsReceipt['status'], 'outline' | 'default'> = {
 const NONE_VALUE = '__none__';
 
 export default function GoodsReceiptPage() {
-  const [receipts, setReceipts] = usePersistentState<GoodsReceipt[]>('procurement:receipts', []);
+  const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
   const [orders, setOrders] = useState<LocalPurchaseOrder[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [receiptDate, setReceiptDate] = useState<Date | undefined>(new Date());
   const [items, setItems] = useState<GoodsReceiptItem[]>([]);
   const [notes, setNotes] = useState('');
   const { toast } = useToast();
+  const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = window.localStorage.getItem('procurement:orders');
-      if (stored) {
-        setOrders(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.warn('Failed to load orders from storage', error);
-    }
+    const unsubOrders = onSnapshot(collection(db, 'purchaseOrders'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const orderDateValue = data.orderDate?.toDate ? data.orderDate.toDate().toISOString() : new Date().toISOString();
+          const expectedDateValue = data.expectedDate?.toDate
+            ? data.expectedDate.toDate().toISOString()
+            : data.expectedDate ?? undefined;
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            supplierId: data.supplierId ?? '',
+            supplierName: data.supplierName ?? 'Pemasok',
+            requestNumber: data.requestNumber ?? undefined,
+            orderDate: orderDateValue,
+            expectedDate: expectedDateValue,
+            status: data.status ?? 'Draft',
+            notes: data.notes ?? undefined,
+            items: Array.isArray(data.items)
+              ? data.items.map((item: ProcurementOrderItem) => ({
+                  productId: item.productId,
+                  productName: item.productName,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice ?? 0,
+                  ...(item.notes ? { notes: item.notes } : {}),
+                }))
+              : [],
+            subtotal: Number(data.subtotal) || 0,
+            tax: Number(data.tax) || 0,
+            total: Number(data.total) || 0,
+          } satisfies LocalPurchaseOrder;
+        })
+        .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+      setOrders(list);
+    });
+
+    const unsubReceipts = onSnapshot(collection(db, 'goodsReceipts'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const receiptDateValue = data.receiptDate?.toDate
+            ? data.receiptDate.toDate().toISOString()
+            : data.receiptDate ?? new Date().toISOString();
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            supplierName: data.supplierName ?? 'Pemasok',
+            supplierId: data.supplierId ?? undefined,
+            receiptDate: receiptDateValue,
+            purchaseOrderNumber: data.purchaseOrderNumber ?? '-',
+            status: (data.status as GoodsReceipt['status']) ?? 'Draft',
+            notes: data.notes ?? undefined,
+            items: Array.isArray(data.items)
+              ? data.items.map((item: GoodsReceiptItem) => ({
+                  productId: item.productId,
+                  productName: item.productName,
+                  orderedQty: item.orderedQty,
+                  receivedQty: item.receivedQty,
+                  unitPrice: item.unitPrice,
+                }))
+              : [],
+          } satisfies GoodsReceipt;
+        })
+        .sort((a, b) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime());
+      setReceipts(list);
+    });
+
+    return () => {
+      unsubOrders();
+      unsubReceipts();
+    };
   }, []);
 
   useEffect(() => {
@@ -85,22 +150,39 @@ export default function GoodsReceiptPage() {
     }
     const order = orders.find((po) => po.id === selectedOrderId);
     if (!order) return;
-    const newReceipt: GoodsReceipt = {
-      id: generateId('GRN'),
-      number: `GRN-${new Date().getFullYear()}${String(receipts.length + 1).padStart(4, '0')}`,
-      supplierName: order.supplierName,
-      receiptDate: (receiptDate ?? new Date()).toISOString(),
-      purchaseOrderNumber: order.number,
-      status: 'Diposting',
-      notes: notes.trim() || undefined,
-      items,
-    };
-    setReceipts([newReceipt, ...receipts]);
-    setSelectedOrderId('');
-    setNotes('');
-    setItems([]);
-    setReceiptDate(new Date());
-    toast({ title: 'Penerimaan barang disimpan', description: newReceipt.number });
+    const sanitizedItems = items.map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      orderedQty: item.orderedQty,
+      receivedQty: item.receivedQty,
+      unitPrice: item.unitPrice,
+    }));
+
+    const receiptNumber = generateId('GRN');
+
+    startSaving(async () => {
+      const result = await createGoodsReceipt({
+        number: receiptNumber,
+        supplierName: order.supplierName,
+        supplierId: order.supplierId || undefined,
+        receiptDate: receiptDate ?? new Date(),
+        purchaseOrderNumber: order.number,
+        status: 'Diposting',
+        notes: notes.trim() || undefined,
+        items: sanitizedItems,
+      });
+
+      if (result.error) {
+        toast({ title: 'Gagal menyimpan penerimaan', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Penerimaan barang disimpan', description: receiptNumber });
+      setSelectedOrderId('');
+      setNotes('');
+      setItems([]);
+      setReceiptDate(new Date());
+    });
   };
 
   return (
@@ -207,7 +289,7 @@ export default function GoodsReceiptPage() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end border-t bg-muted/40">
-          <Button onClick={handleSaveReceipt} disabled={!selectedOrderId || items.length === 0}>
+          <Button onClick={handleSaveReceipt} disabled={!selectedOrderId || items.length === 0 || isSaving}>
             Simpan Penerimaan
           </Button>
         </CardFooter>

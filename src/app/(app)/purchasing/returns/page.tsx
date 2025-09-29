@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { GoodsReceipt, PurchaseReturn } from '@/lib/types';
+import { useEffect, useMemo, useState, useTransition } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import type { GoodsReceipt, GoodsReceiptItem, PurchaseReturn } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -17,33 +18,84 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { usePersistentState } from '@/hooks/use-persistent-state';
 import { generateId } from '@/lib/id';
 import { useToast } from '@/hooks/use-toast';
 import { DatePicker } from '@/components/ui/date-picker';
 import { RotateCcw } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { createPurchaseReturn } from '../actions';
 
 const NONE_VALUE = '__none__';
 
 export default function PurchaseReturnsPage() {
-  const [returns, setReturns] = usePersistentState<PurchaseReturn[]>('procurement:returns', []);
+  const [returns, setReturns] = useState<PurchaseReturn[]>([]);
   const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
   const [selectedReceiptId, setSelectedReceiptId] = useState('');
   const [returnDate, setReturnDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState('');
   const [reason, setReason] = useState('Kualitas tidak sesuai');
   const { toast } = useToast();
+  const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = window.localStorage.getItem('procurement:receipts');
-      if (stored) {
-        setReceipts(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.warn('Failed to load receipts', error);
-    }
+    const unsubReceipts = onSnapshot(collection(db, 'goodsReceipts'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const receiptDateValue = data.receiptDate?.toDate
+            ? data.receiptDate.toDate().toISOString()
+            : data.receiptDate ?? new Date().toISOString();
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            supplierName: data.supplierName ?? 'Pemasok',
+            supplierId: data.supplierId ?? undefined,
+            receiptDate: receiptDateValue,
+            purchaseOrderNumber: data.purchaseOrderNumber ?? '-',
+            status: data.status ?? 'Draft',
+            notes: data.notes ?? undefined,
+            items: Array.isArray(data.items)
+              ? data.items.map((item: GoodsReceiptItem) => ({
+                  productId: item.productId,
+                  productName: item.productName,
+                  orderedQty: item.orderedQty,
+                  receivedQty: item.receivedQty,
+                  unitPrice: item.unitPrice,
+                }))
+              : [],
+          } satisfies GoodsReceipt;
+        })
+        .sort((a, b) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime());
+      setReceipts(list);
+    });
+
+    const unsubReturns = onSnapshot(collection(db, 'purchaseReturns'), (snapshot) => {
+      const list = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const returnDateValue = data.returnDate?.toDate
+            ? data.returnDate.toDate().toISOString()
+            : data.returnDate ?? new Date().toISOString();
+          return {
+            id: doc.id,
+            number: data.number ?? doc.id,
+            supplierName: data.supplierName ?? 'Pemasok',
+            supplierId: data.supplierId ?? undefined,
+            referenceNumber: data.referenceNumber ?? '-',
+            returnDate: returnDateValue,
+            total: Number(data.total) || 0,
+            reason: data.reason ?? '-',
+            notes: data.notes ?? undefined,
+          } satisfies PurchaseReturn;
+        })
+        .sort((a, b) => new Date(b.returnDate).getTime() - new Date(a.returnDate).getTime());
+      setReturns(list);
+    });
+
+    return () => {
+      unsubReceipts();
+      unsubReturns();
+    };
   }, []);
 
   const selectedReceipt = useMemo(
@@ -61,21 +113,31 @@ export default function PurchaseReturnsPage() {
       toast({ title: 'Pilih penerimaan yang akan diretur', variant: 'destructive' });
       return;
     }
-    const newReturn: PurchaseReturn = {
-      id: generateId('PRET'),
-      number: `PRET-${new Date().getFullYear()}${String(returns.length + 1).padStart(4, '0')}`,
-      supplierName: selectedReceipt.supplierName,
-      referenceNumber: selectedReceipt.number,
-      returnDate: (returnDate ?? new Date()).toISOString(),
-      total: totalReturn,
-      reason,
-    };
-    setReturns([newReturn, ...returns]);
-    setSelectedReceiptId('');
-    setReturnDate(new Date());
-    setReason('Kualitas tidak sesuai');
-    setNotes('');
-    toast({ title: 'Retur pembelian tercatat', description: newReturn.number });
+    const returnNumber = generateId('PRET');
+
+    startSaving(async () => {
+      const result = await createPurchaseReturn({
+        number: returnNumber,
+        supplierId: selectedReceipt.supplierId,
+        supplierName: selectedReceipt.supplierName,
+        referenceNumber: selectedReceipt.number,
+        returnDate: returnDate ?? new Date(),
+        total: totalReturn,
+        reason: reason.trim(),
+        notes: notes.trim() || undefined,
+      });
+
+      if (result.error) {
+        toast({ title: 'Gagal menyimpan retur', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Retur pembelian tercatat', description: returnNumber });
+      setSelectedReceiptId('');
+      setReturnDate(new Date());
+      setReason('Kualitas tidak sesuai');
+      setNotes('');
+    });
   };
 
   return (
@@ -169,7 +231,7 @@ export default function PurchaseReturnsPage() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end border-t bg-muted/40">
-          <Button onClick={handleCreateReturn} disabled={!selectedReceipt}>
+          <Button onClick={handleCreateReturn} disabled={!selectedReceipt || isSaving}>
             Simpan Retur
           </Button>
         </CardFooter>
@@ -178,7 +240,7 @@ export default function PurchaseReturnsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-headline">Riwayat Retur</CardTitle>
-          <CardDescription>Data retur pembelian tersimpan di browser untuk keperluan audit.</CardDescription>
+          <CardDescription>Semua retur terekam di database untuk kebutuhan audit dan penagihan.</CardDescription>
         </CardHeader>
         <CardContent>
           {returns.length === 0 ? (
@@ -204,7 +266,10 @@ export default function PurchaseReturnsPage() {
                     <TableCell>{entry.referenceNumber}</TableCell>
                     <TableCell>Rp {entry.total.toLocaleString('id-ID')}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{entry.reason}</Badge>
+                      <div className="space-y-1">
+                        <Badge variant="outline">{entry.reason}</Badge>
+                        {entry.notes && <p className="text-xs text-muted-foreground">{entry.notes}</p>}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
