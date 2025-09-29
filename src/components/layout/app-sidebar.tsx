@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import Link from "next/link";
@@ -53,7 +52,8 @@ import {
   UserCheck,
   Percent,
   Coins,
-  SlidersHorizontal
+  SlidersHorizontal,
+  DatabaseZap
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -176,6 +176,7 @@ const navItems = [
     subItems: [
       { href: "/settings", label: "Profil Perusahaan", icon: Building },
       { href: "/settings/accounting", label: "Akuntansi", icon: SlidersHorizontal },
+      { href: "/settings/danger", label: "Data & Reset", icon: DatabaseZap },
     ],
   },
 ];
