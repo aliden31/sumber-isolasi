@@ -1,3 +1,7 @@
+
+'use client';
+
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -9,8 +13,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
+  const { toast } = useToast();
+  const [companyName, setCompanyName] = useState("Toko Kilat");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+
+  const handleSaveChanges = () => {
+    // In a real app, you would save these settings to your database.
+    toast({
+      title: "Pengaturan Disimpan",
+      description: "Informasi perusahaan telah berhasil diperbarui.",
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl md:text-3xl font-headline font-bold">Pengaturan</h1>
@@ -24,20 +43,41 @@ export default function SettingsPage() {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="company-name">Nama Perusahaan</Label>
-            <Input id="company-name" placeholder="Contoh: Toko Kilat Sejahtera" defaultValue="Toko Kilat" />
+            <Input 
+              id="company-name" 
+              placeholder="Contoh: Toko Kilat Sejahtera" 
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)} 
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="company-address">Alamat</Label>
-            <Textarea id="company-address" placeholder="Masukkan alamat lengkap perusahaan" />
+            <Textarea 
+              id="company-address" 
+              placeholder="Masukkan alamat lengkap perusahaan"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
                 <Label htmlFor="company-phone">Nomor Telepon</Label>
-                <Input id="company-phone" placeholder="Contoh: 021-1234567" />
+                <Input 
+                  id="company-phone" 
+                  placeholder="Contoh: 021-1234567"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
             </div>
              <div className="space-y-2">
                 <Label htmlFor="company-email">Email</Label>
-                <Input id="company-email" type="email" placeholder="Contoh: kontak@tokokilat.com" />
+                <Input 
+                  id="company-email" 
+                  type="email" 
+                  placeholder="Contoh: kontak@tokokilat.com" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
             </div>
           </div>
            <div className="space-y-2">
@@ -46,7 +86,7 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">Unggah logo Anda dalam format PNG atau JPG.</p>
           </div>
           <div className="flex justify-end">
-             <Button>Simpan Perubahan</Button>
+             <Button onClick={handleSaveChanges}>Simpan Perubahan</Button>
           </div>
         </CardContent>
       </Card>
