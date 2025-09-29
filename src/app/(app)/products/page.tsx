@@ -1,12 +1,25 @@
-import { mockProducts } from '@/lib/data';
+import { db } from '@/lib/firebase';
 import type { Product } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductTable } from '@/components/products/product-table';
 import { ProductActions } from '@/components/products/product-actions';
+import { collection, getDocs } from 'firebase/firestore';
 
 // This would typically fetch data from a database
 async function getProducts(): Promise<Product[]> {
-  return mockProducts;
+  const productsCol = collection(db, 'products');
+  const productSnapshot = await getDocs(productsCol);
+  const productList = productSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+      price: data.price,
+      stock: data.stock,
+      category: data.category,
+    } as Product;
+  });
+  return productList;
 }
 
 export default async function ProductsPage() {
