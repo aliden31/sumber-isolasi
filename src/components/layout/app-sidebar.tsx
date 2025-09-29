@@ -52,7 +52,8 @@ import {
   Building,
   UserCheck,
   Percent,
-  Coins
+  Coins,
+  SlidersHorizontal
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -170,9 +171,12 @@ const navItems = [
     ],
   },
   {
-    href: "/settings",
-    icon: Settings,
     label: "Pengaturan",
+    icon: Settings,
+    subItems: [
+      { href: "/settings", label: "Profil Perusahaan", icon: Building },
+      { href: "/settings/accounting", label: "Akuntansi", icon: SlidersHorizontal },
+    ],
   },
 ];
 

@@ -7,29 +7,18 @@ import {
   doc, 
   Timestamp,
   runTransaction,
-  where,
-  query,
-  getDocs,
-  limit
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewTransaction, Product, Account, JournalEntry, NewJournal } from "@/lib/types";
+import type { NewTransaction, Product, JournalEntry, NewJournal, Account } from "@/lib/types";
 import { addJournalEntry } from "../accounting/journal/actions";
+import { getAccountingSettings } from "../settings/accounting/actions";
 
 // Helper function to return a consistent response shape
 const createResponse = (error: string | null = null, id: string | null = null) => ({ error, id });
 
-// Helper function to find an account by its name. This is a temporary solution.
-// A better approach would be to have a dedicated settings page for account mapping.
-async function getAccountByName(name: string): Promise<Account | null> {
-  const q = query(collection(db, "coa"), where("name", "==", name), limit(1));
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) {
-    console.error(`Account with name "${name}" not found.`);
-    return null;
-  }
-  const doc = snapshot.docs[0];
-  return { id: doc.id, ...doc.data() } as Account;
+// Helper function to get an account from a list by its ID
+function getAccountById(accounts: Account[], id: string): Account | null {
+    return accounts.find(acc => acc.id === id) || null;
 }
 
 export async function createTransaction(transactionData: NewTransaction) {
@@ -76,37 +65,43 @@ export async function createTransaction(transactionData: NewTransaction) {
     const { total, paymentMethod } = transactionData;
     const description = `Penjualan POS #${newTransactionRef.ref.id}`;
 
-    // Get account IDs (replace with a more robust mapping system in the future)
-    const kasAccount = await getAccountByName(paymentMethod === 'Tunai' ? 'Kas' : 'Bank');
-    const pendapatanAccount = await getAccountByName('Pendapatan Penjualan');
-    const hppAccount = await getAccountByName('Beban Pokok Penjualan');
-    const persediaanAccount = await getAccountByName('Persediaan Barang Dagang');
+    // Get accounting settings for account mapping
+    const settings = await getAccountingSettings();
+    const paymentAccountId = paymentMethod === 'Tunai' ? settings.cashAccountId : settings.bankAccountId;
+    
+    const requiredAccountIds = [
+      paymentAccountId,
+      settings.salesRevenueAccountId,
+      settings.cogsAccountId,
+      settings.inventoryAccountId
+    ];
 
-    if (!kasAccount || !pendapatanAccount || !hppAccount || !persediaanAccount) {
-      const missingAccounts = [
-        !kasAccount && (paymentMethod === 'Tunai' ? 'Kas' : 'Bank'),
-        !pendapatanAccount && 'Pendapatan Penjualan',
-        !hppAccount && 'Beban Pokok Penjualan',
-        !persediaanAccount && 'Persediaan Barang Dagang'
-      ].filter(Boolean).join(', ');
-      throw new Error(`Gagal membuat jurnal otomatis: Akun (${missingAccounts}) tidak ditemukan. Mohon buat akun tersebut di Bagan Akun.`);
+    if (requiredAccountIds.some(id => !id)) {
+       throw new Error(`Gagal membuat jurnal otomatis: Pengaturan pemetaan akun belum lengkap. Mohon lengkapi di menu Pengaturan > Akuntansi.`);
     }
 
-    const journalEntries: JournalEntry[] = [
-      // Debit Kas/Bank, Credit Pendapatan
-      { accountId: kasAccount.id, accountName: kasAccount.name, debit: total, credit: 0 },
-      { accountId: pendapatanAccount.id, accountName: pendapatanAccount.name, debit: 0, credit: total },
-      // Debit HPP, Credit Persediaan
-      { accountId: hppAccount.id, accountName: hppAccount.name, debit: totalCost, credit: 0 },
-      { accountId: persediaanAccount.id, accountName: persediaanAccount.name, debit: 0, credit: totalCost },
-    ];
+    const journalEntries: JournalEntry[] = [];
+    
+    // Journal for Sales Revenue
+    journalEntries.push(
+        { accountId: paymentAccountId!, accountName: '', debit: total, credit: 0 },
+        { accountId: settings.salesRevenueAccountId!, accountName: '', debit: 0, credit: total }
+    );
+    
+    // Journal for COGS if there is cost
+    if (totalCost > 0) {
+        journalEntries.push(
+            { accountId: settings.cogsAccountId!, accountName: '', debit: totalCost, credit: 0 },
+            { accountId: settings.inventoryAccountId!, accountName: '', debit: 0, credit: totalCost }
+        );
+    }
     
     const newJournal: NewJournal = {
       date: new Date(),
       description,
       refNumber: newTransactionRef.ref.id,
-      entries: journalEntries.filter(entry => entry.debit > 0 || entry.credit > 0), // Filter out zero entries if cost is 0
-      total: total, // For accounting purpose, the total of journal is the main transaction amount, not including COGS
+      entries: journalEntries,
+      total: total, 
     };
 
     if (newJournal.entries.length > 0) {
