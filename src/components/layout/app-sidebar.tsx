@@ -152,10 +152,10 @@ const navItems = [
     label: "Laporan",
     icon: BarChart2,
     subItems: [
-      { href: "/reports", label: "Laporan Penjualan" },
-      { href: "/reports/purchasing", label: "Laporan Pembelian" },
-      { href: "/reports/stock", label: "Laporan Stok" },
-      { href: "/reports/financial", label: "Laporan Keuangan" },
+      { href: "/reports", label: "Laporan Penjualan", icon: FileText },
+      { href: "/reports/purchasing", label: "Laporan Pembelian", icon: FileText },
+      { href: "/reports/stock", label: "Laporan Stok", icon: FileText },
+      { href: "/reports/financial", label: "Laporan Keuangan", icon: FileText },
     ],
   },
     {
@@ -187,7 +187,7 @@ export function AppSidebar() {
     <Sidebar
       className="border-r"
     >
-      <SidebarHeader className="flex items-center gap-2">
+       <SidebarHeader className="flex items-center gap-2">
         <TokoKilatLogo className="size-8" />
         <span className="text-lg font-headline font-semibold text-primary">
           Toko Kilat
