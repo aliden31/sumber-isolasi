@@ -20,6 +20,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { TokoKilatLogo } from "../icons/logo";
 
@@ -34,14 +35,15 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { isMobile } = useSidebar();
 
   return (
     <Sidebar
       variant="sidebar"
       collapsible="icon"
-      className="border-r border-border/80"
+      className={cn("border-r border-border/80", isMobile ? "" : "hidden md:block")}
     >
-      <SidebarHeader className="flex items-center gap-2">
+      <SidebarHeader className="hidden items-center gap-2 md:flex">
         <TokoKilatLogo className="size-8" />
         <span className="text-lg font-headline font-semibold text-primary">
           Toko Kilat
@@ -52,9 +54,8 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href} passHref>
+              <Link href={item.href}>
                 <SidebarMenuButton
-                  as="a"
                   isActive={pathname === item.href}
                   tooltip={{
                     children: item.label,
