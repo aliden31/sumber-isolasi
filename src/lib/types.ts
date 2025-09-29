@@ -49,6 +49,8 @@ export type Customer = {
   email: string;
 };
 
+export type NewCustomer = Omit<Customer, 'id'>;
+
 export type Supplier = {
   id: string;
   name: string;

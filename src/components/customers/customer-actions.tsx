@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import React, { useState, useTransition } from 'react';
+import { Plus, MoreHorizontal, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { addCustomer, updateCustomer, deleteCustomer } from '@/app/(app)/customers/actions';
 
 export function CustomerActions() {
   return (
@@ -35,49 +36,116 @@ export function CustomerActions() {
 }
 
 export function CustomerRowActions({ customer }: { customer: Customer }) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleDelete = () => {
+    startTransition(async () => {
+      const result = await deleteCustomer(customer.id);
+      if (result.error) {
+        toast({
+          title: 'Gagal Menghapus',
+          description: result.error,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Pelanggan Dihapus',
+          description: `${customer.name} telah berhasil dihapus.`,
+        });
+        setIsDeleteDialogOpen(false);
+      }
+    });
+  }
+
   return (
-    <CustomerFormDialog customer={customer}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Buka menu</span>
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive">Hapus</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </CustomerFormDialog>
+     <>
+      <CustomerFormDialog customer={customer}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Buka menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onSelect={() => setIsDeleteDialogOpen(true)}
+            >
+              Hapus
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </CustomerFormDialog>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anda yakin?</DialogTitle>
+            <DialogDescription>
+              Tindakan ini tidak dapat diurungkan. Ini akan menghapus data pelanggan 
+              bernama <span className="font-semibold">{customer.name}</span> secara permanen.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} disabled={isPending}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
 
 function CustomerFormDialog({ children, customer }: { children: React.ReactNode, customer?: Customer }) {
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  
   const [name, setName] = useState(customer?.name || '');
   const [email, setEmail] = useState(customer?.email || '');
   const [phone, setPhone] = useState(customer?.phone || '');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real app, you'd call a server action here to save the customer.
-    toast({
-      title: `Pelanggan ${customer ? 'diperbarui' : 'ditambahkan'}`,
-      description: `${name} telah berhasil disimpan.`,
-    });
-    setOpen(false);
-  };
   
   const isEditing = !!customer;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      const customerData = { name, email, phone };
+      const result = isEditing
+        ? await updateCustomer(customer.id, customerData)
+        : await addCustomer(customerData);
+
+      if (result.error) {
+        toast({
+          title: `Gagal ${isEditing ? 'memperbarui' : 'menambahkan'} pelanggan`,
+          description: result.error,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: `Pelanggan ${isEditing ? 'diperbarui' : 'ditambahkan'}`,
+          description: `${name} telah berhasil disimpan.`,
+        });
+        setOpen(false);
+      }
+    });
+  };
+
   const handleOpenChange = (isOpen: boolean) => {
+    if (isPending) return;
     if (!isOpen) {
-      // Reset form on close
       setName(customer?.name || '');
       setEmail(customer?.email || '');
       setPhone(customer?.phone || '');
@@ -101,23 +169,26 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
               <Label htmlFor="name" className="text-right">
                 Nama
               </Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required disabled={isPending} />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="email" className="text-right">
                 Email
               </Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" required disabled={isPending} />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="phone" className="text-right">
                 No. Telepon
               </Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" required />
+              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" required disabled={isPending} />
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Simpan</Button>
+             <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

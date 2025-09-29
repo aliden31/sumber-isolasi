@@ -1,12 +1,23 @@
-import { mockCustomers } from '@/lib/data';
 import type { Customer } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CustomerTable } from '@/components/customers/customer-table';
 import { CustomerActions } from '@/components/customers/customer-actions';
+import { collection, getDocs, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 async function getCustomers(): Promise<Customer[]> {
-  // In a real app, you would fetch this data from your database.
-  return mockCustomers;
+  const customersCol = collection(db, "customers");
+  const customerSnapshot = await getDocs(customerCol);
+  const customerList = customerSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+    } as Customer;
+  });
+  return customerList;
 }
 
 export default async function CustomersPage() {
