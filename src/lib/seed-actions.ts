@@ -1,13 +1,16 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, writeBatch, getDocs, query } from "firebase/firestore";
+import { collection, writeBatch, getDocs, query, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 import { COA_SEED_DATA } from "@/lib/coa-seed";
 import { CUSTOMERS_SEED_DATA } from "@/lib/customers-seed";
 import { PRODUCTS_SEED_DATA } from "@/lib/products-seed";
 import { SUPPLIERS_SEED_DATA } from "@/lib/suppliers-seed";
+import type { NewAccount } from "./types";
+import type { AccountingSettings } from "@/app/(app)/settings/accounting/actions";
 
 const createResponse = (error: string | null = null) => ({ error });
 
@@ -21,22 +24,63 @@ async function seedCollection(collectionName: string, data: any[], revalidationP
     }
     
     const batch = writeBatch(db);
-    data.forEach(item => {
-      const docRef = collection(db, collectionName).doc();
-      batch.set(docRef, item);
+    const docRefs: { [key: string]: string } = {}; // To store name -> id mapping
+
+    data.forEach((item: NewAccount) => {
+      const newDocRef = doc(colRef);
+      batch.set(newDocRef, item);
+      if (item.name) {
+          docRefs[item.name] = newDocRef.id;
+      }
     });
 
     await batch.commit();
     revalidatePath(revalidationPath);
-    return createResponse();
+    return { error: null, docRefs };
   } catch(e) {
     console.error(`Error seeding ${collectionName}: `, e);
-    return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
+    return { error: e instanceof Error ? e.message : "An unknown error occurred.", docRefs: null };
   }
 }
 
 export async function seedInitialAccounts() {
-  return seedCollection("coa", COA_SEED_DATA, "/(app)/accounting/coa");
+  const result = await seedCollection("coa", COA_SEED_DATA, "/(app)/accounting/coa");
+
+  if (result.error || !result.docRefs) {
+      return createResponse(result.error);
+  }
+
+  // After seeding COA, let's seed the accounting settings with the new account IDs
+  try {
+    const docRefs = result.docRefs;
+
+    // We need to get the IDs of the accounts we just created.
+    // The `seedCollection` function was modified to return the docRefs map.
+    const settingsData: AccountingSettings = {
+        cashAccountId: docRefs['Kas Kecil'],
+        bankAccountId: docRefs['Kas pada Bank ABC'],
+        accountsReceivableAccountId: docRefs['Piutang Usaha'],
+        salesRevenueAccountId: docRefs['Pendapatan Penjualan Produk'],
+        cogsAccountId: docRefs['Beban Pokok Penjualan'],
+        inventoryAccountId: docRefs['Persediaan Barang Dagang'],
+    };
+
+    // Check if all required accounts were found
+    if (Object.values(settingsData).some(id => !id)) {
+        console.error("Could not find all required accounts in the seed data to create mappings.", settingsData);
+        return createResponse("Gagal membuat pemetaan akun otomatis: tidak semua akun standar ditemukan.");
+    }
+    
+    const settingsDocRef = doc(db, "settings", "accounting");
+    await setDoc(settingsDocRef, settingsData, { merge: true });
+    revalidatePath("/(app)/settings/accounting");
+
+    return createResponse();
+
+  } catch(e) {
+      console.error("Error seeding accounting settings: ", e);
+      return createResponse(e instanceof Error ? e.message : "An unknown error occurred while seeding settings.");
+  }
 }
 
 export async function seedInitialCustomers() {
