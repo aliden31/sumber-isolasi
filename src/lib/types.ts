@@ -89,6 +89,26 @@ export type Account = {
   code: string;
   name: string;
   type: string;
-}
+};
 
 export type NewAccount = Omit<Account, 'id'>;
+
+export type JournalEntry = {
+  accountId: string;
+  accountName: string; // Denormalized for display
+  debit: number;
+  credit: number;
+};
+
+export type Journal = {
+  id: string;
+  date: Date;
+  refNumber: string;
+  description: string;
+  entries: JournalEntry[];
+  total: number;
+};
+
+export type NewJournal = Omit<Journal, 'id' | 'date'> & {
+  date: Date | any; // Allow for server timestamp
+};

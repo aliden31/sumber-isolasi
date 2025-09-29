@@ -17,10 +17,14 @@ import {
 type DatePickerProps = {
     className?: string;
     placeholder?: string;
+    date?: Date;
+    setDate?: (date?: Date) => void;
 }
 
-export function DatePicker({ className, placeholder = "Pilih tanggal" }: DatePickerProps) {
-  const [date, setDate] = React.useState<Date>()
+export function DatePicker({ className, placeholder = "Pilih tanggal", date: propDate, setDate: propSetDate }: DatePickerProps) {
+  const [internalDate, setInternalDate] = React.useState<Date>()
+  const date = propDate ?? internalDate;
+  const setDate = propSetDate ?? setInternalDate;
 
   return (
     <Popover>

@@ -17,8 +17,15 @@ import {
  
 export function DateRangePicker({
   className,
-}: React.HTMLAttributes<HTMLDivElement>) {
+  onSelect,
+}: React.HTMLAttributes<HTMLDivElement> & { onSelect?: (date?: DateRange) => void; }) {
   const [date, setDate] = React.useState<DateRange | undefined>()
+
+  React.useEffect(() => {
+    if (onSelect) {
+      onSelect(date);
+    }
+  }, [date, onSelect]);
  
   return (
     <div className={cn("grid gap-2", className)}>
