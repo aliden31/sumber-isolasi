@@ -58,3 +58,5 @@ export type Supplier = {
   email: string;
   address: string;
 };
+
+export type NewSupplier = Omit<Supplier, 'id'>;

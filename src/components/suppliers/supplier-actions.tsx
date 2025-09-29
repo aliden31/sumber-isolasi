@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import React, { useState, useTransition } from 'react';
+import { Plus, MoreHorizontal, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '../ui/textarea';
+import { addSupplier, updateSupplier, deleteSupplier } from '@/app/(app)/suppliers/actions';
 
 export function SupplierActions() {
   return (
@@ -36,8 +37,31 @@ export function SupplierActions() {
 }
 
 export function SupplierRowActions({ supplier }: { supplier: Supplier }) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleDelete = () => {
+    startTransition(async () => {
+      const result = await deleteSupplier(supplier.id);
+      if (result.error) {
+        toast({
+          title: 'Gagal Menghapus',
+          description: result.error,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Supplier Dihapus',
+          description: `${supplier.name} telah berhasil dihapus.`,
+        });
+        setIsDeleteDialogOpen(false);
+      }
+    });
+  };
+
   return (
-    <SupplierFormDialog supplier={supplier}>
+    <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -46,51 +70,100 @@ export function SupplierRowActions({ supplier }: { supplier: Supplier }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-            Edit
+          <SupplierFormDialog supplier={supplier}>
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              Edit
+            </DropdownMenuItem>
+          </SupplierFormDialog>
+          <DropdownMenuItem
+            className="text-destructive"
+            onSelect={() => setIsDeleteDialogOpen(true)}
+          >
+            Hapus
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive">Hapus</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </SupplierFormDialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anda yakin?</DialogTitle>
+            <DialogDescription>
+              Tindakan ini tidak dapat diurungkan. Ini akan menghapus supplier
+              bernama <span className="font-semibold">{supplier.name}</span> secara permanen.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} disabled={isPending}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-
 function SupplierFormDialog({ children, supplier }: { children: React.ReactNode, supplier?: Supplier }) {
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  
   const [name, setName] = useState(supplier?.name || '');
   const [email, setEmail] = useState(supplier?.email || '');
   const [phone, setPhone] = useState(supplier?.phone || '');
   const [address, setAddress] = useState(supplier?.address || '');
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real app, you'd call a server action here to save the supplier.
-    toast({
-      title: `Supplier ${supplier ? 'diperbarui' : 'ditambahkan'}`,
-      description: `${name} telah berhasil disimpan.`,
-    });
-    setOpen(false);
-  };
-  
   const isEditing = !!supplier;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      const supplierData = { name, email, phone, address };
+      const result = isEditing
+        ? await updateSupplier(supplier.id, supplierData)
+        : await addSupplier(supplierData);
+
+      if (result.error) {
+        toast({
+          title: `Gagal ${isEditing ? 'memperbarui' : 'menambahkan'} supplier`,
+          description: result.error,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: `Supplier ${isEditing ? 'diperbarui' : 'ditambahkan'}`,
+          description: `${name} telah berhasil disimpan.`,
+        });
+        setOpen(false);
+      }
+    });
+  };
+
   const handleOpenChange = (isOpen: boolean) => {
+    if (isPending) return;
     if (!isOpen) {
-      // Reset form on close
       setName(supplier?.name || '');
       setEmail(supplier?.email || '');
       setPhone(supplier?.phone || '');
       setAddress(supplier?.address || '');
     }
     setOpen(isOpen);
-  }
+  };
+  
+  // The 'children' prop can be a DropdownMenuItem which needs to be wrapped in a DialogTrigger
+  // or it can be a Button which also can be a trigger.
+  const isDropdownItem = React.isValidElement(children) && (children.type as any).displayName === 'DropdownMenuItem';
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogTrigger asChild>
+        { isDropdownItem ? <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">Edit</div> : children }
+      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-headline">{isEditing ? 'Edit Supplier' : 'Tambah Supplier Baru'}</DialogTitle>
@@ -98,25 +171,28 @@ function SupplierFormDialog({ children, supplier }: { children: React.ReactNode,
             {isEditing ? 'Perbarui detail supplier di bawah ini.' : 'Isi detail untuk supplier baru.'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4">
             <div>
               <Label htmlFor="name">Nama Supplier</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isPending} />
             </div>
              <div>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={isPending} />
             </div>
             <div>
               <Label htmlFor="phone">No. Telepon</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required disabled={isPending} />
             </div>
             <div>
               <Label htmlFor="address">Alamat</Label>
-              <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} required />
+              <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} required disabled={isPending} />
             </div>
           <DialogFooter>
-            <Button type="submit">Simpan</Button>
+             <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
