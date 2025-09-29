@@ -100,6 +100,7 @@ const navItems = [
       { href: "/sales/manual-input", label: "Input Manual", icon: FileDigit },
       { href: "/sales/import", label: "Import Penjualan", icon: FileUp },
       { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
+      { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
     ],
   },
   {
@@ -122,7 +123,8 @@ const navItems = [
       { href: "/products/categories", label: "Kategori Produk", icon: BookUser },
       { href: "/stock/warehouses", label: "Multi Gudang", icon: Warehouse },
       { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft },
-      { href: "/stock-estimation", label: "Stock Opname", icon: ClipboardCheck },
+      { href: "/stock/opname", label: "Penyesuaian Stok", icon: ClipboardCheck },
+      { href: "/stock-estimation", label: "AI Stock Estimation", icon: BrainCircuit },
       { href: "/stock/notifications", label: "Notifikasi Stok", icon: Bell },
     ],
   },
