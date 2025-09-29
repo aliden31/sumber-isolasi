@@ -35,7 +35,6 @@ export default function DashboardPage() {
     const transactionsCol = collection(db, "transactions");
     const today = new Date();
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const startOfTodayTimestamp = Timestamp.fromDate(startOfToday);
     
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
@@ -52,21 +51,27 @@ export default function DashboardPage() {
 
       snapshot.docs.forEach(doc => {
         const tx = { ...doc.data(), date: doc.data().date.toDate() } as Transaction;
-        
-        if (tx.date >= startOfToday) {
+        const txDate = tx.date;
+
+        // Check if transaction is from today
+        if (txDate.getFullYear() === today.getFullYear() &&
+            txDate.getMonth() === today.getMonth() &&
+            txDate.getDate() === today.getDate()) {
           totalToday += tx.total;
+          if (tx.paymentMethod === 'Tunai') {
+              cashTotal += tx.total;
+          }
         }
 
-        if (tx.paymentMethod === 'Tunai') {
-            cashTotal += tx.total;
+        // Aggregate sales for the last 7 days
+        const dayOfWeek = dayMapping[txDate.getDay()];
+        if(salesByDay.hasOwnProperty(dayOfWeek)){
+            salesByDay[dayOfWeek] += tx.total;
         }
-
-        const dayOfWeek = dayMapping[tx.date.getDay()];
-        salesByDay[dayOfWeek] += tx.total;
       });
 
       setDailySales(totalToday);
-      setCashBalance(cashTotal); // Note: This is total cash from all transactions, not a true running balance.
+      setCashBalance(cashTotal);
       
       const formattedWeeklySales = dayMapping.map(day => ({
         day,
@@ -77,13 +82,13 @@ export default function DashboardPage() {
 
     // --- Products Listener ---
     const productsCol = collection(db, "products");
-    const qProducts = query(productsCol, where("stock", "<", 10));
+    const qLowStock = query(productsCol, where("stock", "<", 10));
 
     const unsubscribeProducts = onSnapshot(productsCol, (snapshot) => {
       setTotalProducts(snapshot.size);
     });
     
-    const unsubscribeLowStock = onSnapshot(qProducts, (snapshot) => {
+    const unsubscribeLowStock = onSnapshot(qLowStock, (snapshot) => {
        const lowStock = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
        setLowStockProducts(lowStock);
     });
@@ -117,7 +122,7 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium font-body">Penerimaan Kas</CardTitle>
+            <CardTitle className="text-sm font-medium font-body">Penerimaan Kas Hari Ini</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -157,7 +162,7 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle className="font-headline">Penjualan Mingguan</CardTitle>
+            <CardTitle className="font-headline">Penjualan 7 Hari Terakhir</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
             <WeeklySalesChart data={weeklySales} />
