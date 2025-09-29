@@ -16,7 +16,7 @@ const EstimateStockQuantityInputSchema = z.object({
   historicalSalesData: z
     .string()
     .describe(
-      'Data penjualan historis untuk produk, termasuk tanggal dan jumlah terjual. Direpresentasikan sebagai array JSON dari objek.'
+      'Data penjualan historis untuk produk, termasuk tanggal dan jumlah terjual. Direpresentasikan sebagai larik JSON dari objek.'
     ),
   currentStockLevel: z.number().describe('Tingkat stok produk saat ini.'),
   leadTimeDays: z.number().describe('Waktu tunggu dalam hari untuk restock produk.'),
@@ -29,7 +29,7 @@ const EstimateStockQuantityInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Data opsional tentang tren musiman yang memengaruhi penjualan produk, jika berlaku. Direpresentasikan sebagai array JSON dari objek.'
+      'Data opsional tentang tren musiman yang memengaruhi penjualan produk, jika berlaku. Direpresentasikan sebagai larik JSON dari objek.'
     ),
 });
 export type EstimateStockQuantityInput = z.infer<typeof EstimateStockQuantityInputSchema>;
