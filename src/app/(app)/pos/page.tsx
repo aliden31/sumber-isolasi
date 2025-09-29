@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import { PlusCircle, MinusCircle, X, Search, Printer, DollarSign } from 'lucide-react';
-import { mockProducts, mockTransactions } from '@/lib/data';
-import type { Product, CartItem, Transaction } from '@/lib/types';
+import React, { useState, useMemo, useTransition } from 'react';
+import { PlusCircle, MinusCircle, X, Search, Printer, DollarSign, Loader2 } from 'lucide-react';
+import type { Product, CartItem, Transaction, NewTransaction, TransactionItem } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -26,21 +25,53 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { createTransaction } from './actions';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function POSPage() {
+  const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
-    mockTransactions.filter(tx => new Date(tx.date).toDateString() === new Date().toDateString())
-  );
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [receipt, setReceipt] = useState<Transaction | null>(null);
+  const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
+  React.useEffect(() => {
+    const productsCol = collection(db, "products");
+    const unsubscribeProducts = onSnapshot(productsCol, (snapshot) => {
+      const productList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(productList);
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const transactionsCol = collection(db, "transactions");
+     const unsubscribeTransactions = onSnapshot(transactionsCol, (snapshot) => {
+        const transactionList = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                date: data.date.toDate(),
+            } as Transaction;
+        }).filter(tx => tx.date >= today)
+        .sort((a, b) => b.date.getTime() - a.date.getTime());
+       setRecentTransactions(transactionList);
+    });
+
+    return () => {
+        unsubscribeProducts();
+        unsubscribeTransactions();
+    }
+  }, []);
+
   const filteredProducts = useMemo(() => {
-    return mockProducts.filter(product =>
+    return products.filter(product =>
       product.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [searchQuery, products]);
 
   const addToCart = (product: Product) => {
     setCart(prevCart => {
@@ -78,14 +109,16 @@ export default function POSPage() {
         return prevCart.filter(item => item.product.id !== productId);
       }
       const itemToUpdate = prevCart.find(item => item.product.id === productId);
-      if(itemToUpdate && quantity > itemToUpdate.product.stock) {
+      const productInStock = products.find(p => p.id === productId);
+      
+      if(itemToUpdate && productInStock && quantity > productInStock.stock) {
         toast({
           title: 'Stok tidak mencukupi',
-          description: `Stok untuk ${itemToUpdate.product.name} hanya tersisa ${itemToUpdate.product.stock}.`,
+          description: `Stok untuk ${productInStock.name} hanya tersisa ${productInStock.stock}.`,
           variant: 'destructive',
         });
         return prevCart.map(item =>
-          item.product.id === productId ? { ...item, quantity: itemToUpdate.product.stock } : item
+          item.product.id === productId ? { ...item, quantity: productInStock.stock } : item
         );
       }
       return prevCart.map(item =>
@@ -103,29 +136,47 @@ export default function POSPage() {
       toast({ title: 'Keranjang kosong', description: 'Tambahkan produk ke keranjang terlebih dahulu.', variant: 'destructive' });
       return;
     }
-    const newTransaction: Transaction = {
-      id: `TRX${Date.now()}`,
-      date: new Date(),
-      items: cart.map(item => ({
-        productId: item.product.id,
-        quantity: item.quantity,
-        price: item.product.price,
-      })),
-      total: cartTotal,
-      paymentMethod,
-    };
-    
-    // In a real app, you would update product stock in the database here.
-    
-    setRecentTransactions(prev => [newTransaction, ...prev]);
-    setReceipt(newTransaction);
-    setCart([]);
-    toast({ title: 'Transaksi Berhasil', description: `Total: Rp ${cartTotal.toLocaleString('id-ID')}` });
+
+    startTransition(async () => {
+      const newTransaction: NewTransaction = {
+        date: new Date(),
+        items: cart.map(item => ({
+          productId: item.product.id,
+          productName: item.product.name, // Store name for easier display
+          quantity: item.quantity,
+          price: item.product.price,
+        })),
+        total: cartTotal,
+        paymentMethod,
+      };
+
+      const result = await createTransaction(newTransaction);
+      
+      if (result.error) {
+        toast({
+          title: 'Transaksi Gagal',
+          description: result.error,
+          variant: 'destructive',
+        });
+      } else {
+        const generatedReceipt: Transaction = {
+            id: result.id!,
+            ...newTransaction
+        };
+        setReceipt(generatedReceipt);
+        setCart([]);
+        toast({ title: 'Transaksi Berhasil', description: `Total: Rp ${cartTotal.toLocaleString('id-ID')}` });
+      }
+    });
   };
 
   const printReceipt = () => {
     window.print();
   };
+  
+  const getProductName = (productId: string) => {
+    return products.find(p => p.id === productId)?.name || 'Produk Dihapus';
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full lg:h-[calc(100vh-6rem)]">
@@ -210,10 +261,11 @@ export default function POSPage() {
               <span>Rp {cartTotal.toLocaleString('id-ID')}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 w-full">
-              <Button onClick={() => completeTransaction('Tunai')} disabled={cart.length === 0}>
-                <DollarSign className="mr-2 h-4 w-4" /> Tunai
+              <Button onClick={() => completeTransaction('Tunai')} disabled={cart.length === 0 || isPending}>
+                 {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DollarSign className="mr-2 h-4 w-4" />} Tunai
               </Button>
-              <Button onClick={() => completeTransaction('Transfer')} variant="secondary" disabled={cart.length === 0}>
+              <Button onClick={() => completeTransaction('Transfer')} variant="secondary" disabled={cart.length === 0 || isPending}>
+                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Transfer
               </Button>
             </div>
@@ -229,7 +281,7 @@ export default function POSPage() {
                   {recentTransactions.map(tx => (
                     <TableRow key={tx.id}>
                       <TableCell>
-                        <p className="font-medium">{tx.id}</p>
+                        <p className="font-medium font-mono text-xs">{tx.id}</p>
                         <p className="text-sm text-muted-foreground">{new Date(tx.date).toLocaleTimeString('id-ID')}</p>
                       </TableCell>
                       <TableCell className="text-right">
@@ -267,7 +319,7 @@ export default function POSPage() {
                     {receipt.items.map(item => (
                        <TableRow key={item.productId}>
                           <TableCell>
-                            {mockProducts.find(p => p.id === item.productId)?.name}
+                            {item.productName}
                             <div className="text-muted-foreground">
                               {item.quantity} x Rp {item.price.toLocaleString('id-ID')}
                             </div>

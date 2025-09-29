@@ -1,14 +1,13 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar as CalendarIcon, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
 
 import { cn } from '@/lib/utils';
-import { mockTransactions, mockProducts } from '@/lib/data';
 import type { Transaction } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,32 +38,53 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function TransactionsPage() {
   const [date, setDate] = useState<DateRange | undefined>();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const filteredTransactions = useMemo(() => {
-    return mockTransactions.filter(tx => {
-      if (!date || (!date.from && !date.to)) return true;
-      const txDate = new Date(tx.date);
-      if (date.from && !date.to) {
-        // If only from is selected, filter for that day
-        const fromDay = new Date(date.from);
-        return txDate.toDateString() === fromDay.toDateString();
-      }
-      if (date.from && date.to) {
-        // Adjust to include the whole 'to' day
-        const toDayEnd = new Date(date.to);
-        toDayEnd.setHours(23, 59, 59, 999);
-        return txDate >= date.from && txDate <= toDayEnd;
-      }
-      return true;
-    }).sort((a,b) => b.date.getTime() - a.date.getTime());
+  useEffect(() => {
+    const transactionsCol = collection(db, "transactions");
+    
+    let q = query(transactionsCol);
+
+    if (date?.from) {
+        const from = Timestamp.fromDate(date.from);
+        if (date.to) {
+            // Adjust to include the whole 'to' day
+            const toDayEnd = new Date(date.to);
+            toDayEnd.setHours(23, 59, 59, 999);
+            const to = Timestamp.fromDate(toDayEnd);
+            q = query(q, where("date", ">=", from), where("date", "<=", to));
+        } else {
+            // If only 'from' is selected, filter for that day
+            const fromDayEnd = new Date(date.from);
+            fromDayEnd.setHours(23, 59, 59, 999);
+            const to = Timestamp.fromDate(fromDayEnd);
+            q = query(q, where("date", ">=", from), where("date", "<=", to));
+        }
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const transactionList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: data.date.toDate(), // Convert Firestore Timestamp to JS Date
+        } as Transaction;
+      }).sort((a,b) => b.date.getTime() - a.date.getTime());
+      setTransactions(transactionList);
+    });
+
+    return () => unsubscribe();
   }, [date]);
 
   const totalSales = useMemo(() => {
-    return filteredTransactions.reduce((sum, tx) => sum + tx.total, 0);
-  }, [filteredTransactions]);
+    return transactions.reduce((sum, tx) => sum + tx.total, 0);
+  }, [transactions]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,12 +143,12 @@ export default function TransactionsPage() {
         </CardHeader>
         <CardContent>
           <Accordion type="single" collapsible className="w-full">
-            {filteredTransactions.map(tx => (
+            {transactions.map(tx => (
               <AccordionItem value={tx.id} key={tx.id}>
                 <AccordionTrigger>
                   <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
                     <div className="mb-2 sm:mb-0">
-                      <p className="font-semibold text-sm sm:text-base">{tx.id}</p>
+                      <p className="font-semibold text-sm sm:text-base font-mono">{tx.id}</p>
                       <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyy 'pukul' HH:mm", { locale: id })}</p>
                     </div>
                     <div className="flex items-center gap-2 sm:gap-4 justify-between">
@@ -151,17 +171,14 @@ export default function TransactionsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {tx.items.map(item => {
-                          const product = mockProducts.find(p => p.id === item.productId);
-                          return (
-                            <TableRow key={item.productId}>
-                              <TableCell>{product?.name || 'Produk tidak ditemukan'}</TableCell>
+                        {tx.items.map((item, index) => (
+                          <TableRow key={`${item.productId}-${index}`}>
+                              <TableCell>{item.productName || item.productId}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>Rp {item.price.toLocaleString('id-ID')}</TableCell>
                               <TableCell className="text-right">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</TableCell>
-                            </TableRow>
-                          );
-                        })}
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
@@ -174,3 +191,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+

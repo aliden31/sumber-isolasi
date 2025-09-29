@@ -1,4 +1,10 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { ArrowUpRight, DollarSign, Package, ShoppingCart } from "lucide-react";
+import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Product, Transaction, SalesData } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -15,20 +21,79 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { mockWeeklySales, mockProducts, mockTransactions } from "@/lib/data";
 import { WeeklySalesChart } from "@/components/dashboard/weekly-sales-chart";
 
 export default function DashboardPage() {
-  const today = new Date();
-  const dailySales = mockTransactions
-    .filter(tx => tx.date.toDateString() === today.toDateString())
-    .reduce((sum, tx) => sum + tx.total, 0);
-  
-  const cashBalance = mockTransactions.reduce((balance, tx) => {
-    return tx.paymentMethod === 'Tunai' ? balance + tx.total : balance;
-  }, 0);
+  const [dailySales, setDailySales] = useState(0);
+  const [cashBalance, setCashBalance] = useState(0);
+  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [weeklySales, setWeeklySales] = useState<SalesData[]>([]);
 
-  const lowStockProducts = mockProducts.filter((p) => p.stock < 10);
+  useEffect(() => {
+    // --- Transactions Listener ---
+    const transactionsCol = collection(db, "transactions");
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfTodayTimestamp = Timestamp.fromDate(startOfToday);
+    
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    sevenDaysAgo.setHours(0,0,0,0);
+    const sevenDaysAgoTimestamp = Timestamp.fromDate(sevenDaysAgo);
+
+    const qTransactions = query(transactionsCol, where("date", ">=", sevenDaysAgoTimestamp));
+
+    const unsubscribeTransactions = onSnapshot(qTransactions, (snapshot) => {
+      let totalToday = 0;
+      let cashTotal = 0;
+      const salesByDay: { [key: string]: number } = { 'Sen': 0, 'Sel': 0, 'Rab': 0, 'Kam': 0, 'Jum': 0, 'Sab': 0, 'Min': 0 };
+      const dayMapping = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+      snapshot.docs.forEach(doc => {
+        const tx = { ...doc.data(), date: doc.data().date.toDate() } as Transaction;
+        
+        if (tx.date >= startOfToday) {
+          totalToday += tx.total;
+        }
+
+        if (tx.paymentMethod === 'Tunai') {
+            cashTotal += tx.total;
+        }
+
+        const dayOfWeek = dayMapping[tx.date.getDay()];
+        salesByDay[dayOfWeek] += tx.total;
+      });
+
+      setDailySales(totalToday);
+      setCashBalance(cashTotal); // Note: This is total cash from all transactions, not a true running balance.
+      
+      const formattedWeeklySales = dayMapping.map(day => ({
+        day,
+        total: salesByDay[day]
+      }));
+      setWeeklySales(formattedWeeklySales);
+    });
+
+    // --- Products Listener ---
+    const productsCol = collection(db, "products");
+    const qProducts = query(productsCol, where("stock", "<", 10));
+
+    const unsubscribeProducts = onSnapshot(productsCol, (snapshot) => {
+      setTotalProducts(snapshot.size);
+    });
+    
+    const unsubscribeLowStock = onSnapshot(qProducts, (snapshot) => {
+       const lowStock = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+       setLowStockProducts(lowStock);
+    });
+
+    return () => {
+      unsubscribeTransactions();
+      unsubscribeProducts();
+      unsubscribeLowStock();
+    };
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -52,7 +117,7 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium font-body">Saldo Kas</CardTitle>
+            <CardTitle className="text-sm font-medium font-body">Penerimaan Kas</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -60,7 +125,7 @@ export default function DashboardPage() {
               Rp {cashBalance.toLocaleString("id-ID")}
             </div>
             <p className="text-xs text-muted-foreground">
-              Total kas yang dipegang
+              Total penerimaan tunai hari ini
             </p>
           </CardContent>
         </Card>
@@ -82,7 +147,7 @@ export default function DashboardPage() {
             <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockProducts.length}</div>
+            <div className="text-2xl font-bold">{totalProducts}</div>
             <p className="text-xs text-muted-foreground">
               Jumlah jenis produk
             </p>
@@ -95,7 +160,7 @@ export default function DashboardPage() {
             <CardTitle className="font-headline">Penjualan Mingguan</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            <WeeklySalesChart data={mockWeeklySales} />
+            <WeeklySalesChart data={weeklySales} />
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">

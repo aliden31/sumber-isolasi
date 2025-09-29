@@ -10,6 +10,7 @@ export type NewProduct = Omit<Product, 'id'>;
 
 export type TransactionItem = {
   productId: string;
+  productName: string; // denormalized for easier display
   quantity: number;
   price: number;
 };
@@ -21,6 +22,8 @@ export type Transaction = {
   total: number;
   paymentMethod: 'Tunai' | 'Transfer';
 };
+
+export type NewTransaction = Omit<Transaction, 'id'>;
 
 export type CartItem = {
   product: Product;
