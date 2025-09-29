@@ -197,7 +197,7 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item, index) =>
             item.subItems ? (
-              <SidebarMenuItem key={`${item.label}-${index}`} asChild>
+              <SidebarMenuItem key={`${item.label}-${index}`}>
                 <Collapsible>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
