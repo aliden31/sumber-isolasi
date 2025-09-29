@@ -1,7 +1,4 @@
-
-'use client';
-
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Card,
   CardContent,
@@ -9,26 +6,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from '@/hooks/use-toast';
+import { getCompanySettings, CompanySettings } from './actions';
+import { SettingsForm } from './settings-form';
 
-export default function SettingsPage() {
-  const { toast } = useToast();
-  const [companyName, setCompanyName] = useState("Toko Kilat");
-  const [address, setAddress] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-
-  const handleSaveChanges = () => {
-    // In a real app, you would save these settings to your database.
-    toast({
-      title: "Pengaturan Disimpan",
-      description: "Informasi perusahaan telah berhasil diperbarui.",
-    });
-  };
+export default async function SettingsPage() {
+  const settings = await getCompanySettings();
 
   return (
     <div className="flex flex-col gap-6">
@@ -37,57 +19,11 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="font-headline">Profil Perusahaan</CardTitle>
           <CardDescription>
-            Atur informasi dasar mengenai usaha Anda.
+            Atur informasi dasar mengenai usaha Anda. Informasi ini akan digunakan pada struk dan laporan.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="company-name">Nama Perusahaan</Label>
-            <Input 
-              id="company-name" 
-              placeholder="Contoh: Toko Kilat Sejahtera" 
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)} 
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="company-address">Alamat</Label>
-            <Textarea 
-              id="company-address" 
-              placeholder="Masukkan alamat lengkap perusahaan"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-                <Label htmlFor="company-phone">Nomor Telepon</Label>
-                <Input 
-                  id="company-phone" 
-                  placeholder="Contoh: 021-1234567"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-            </div>
-             <div className="space-y-2">
-                <Label htmlFor="company-email">Email</Label>
-                <Input 
-                  id="company-email" 
-                  type="email" 
-                  placeholder="Contoh: kontak@tokokilat.com" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-            </div>
-          </div>
-           <div className="space-y-2">
-            <Label htmlFor="logo">Logo Perusahaan</Label>
-            <Input id="logo" type="file" />
-            <p className="text-xs text-muted-foreground">Unggah logo Anda dalam format PNG atau JPG.</p>
-          </div>
-          <div className="flex justify-end">
-             <Button onClick={handleSaveChanges}>Simpan Perubahan</Button>
-          </div>
+        <CardContent>
+          <SettingsForm initialData={settings} />
         </CardContent>
       </Card>
     </div>
