@@ -12,24 +12,24 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const EstimateStockQuantityInputSchema = z.object({
-  productName: z.string().describe('The name of the product to estimate stock quantity for.'),
+  productName: z.string().describe('Nama produk yang akan diestimasi kuantitas stoknya.'),
   historicalSalesData: z
     .string()
     .describe(
-      'Historical sales data for the product, including dates and quantities sold. Represented as a JSON array of objects.'
+      'Data penjualan historis untuk produk, termasuk tanggal dan jumlah terjual. Direpresentasikan sebagai array JSON dari objek.'
     ),
-  currentStockLevel: z.number().describe('The current stock level of the product.'),
-  leadTimeDays: z.number().describe('The lead time in days for restocking the product.'),
+  currentStockLevel: z.number().describe('Tingkat stok produk saat ini.'),
+  leadTimeDays: z.number().describe('Waktu tunggu dalam hari untuk restock produk.'),
   storageCapacity: z
     .number()
     .describe(
-      'The available storage capacity for the product, limiting the maximum stock level.'
+      'Kapasitas penyimpanan yang tersedia untuk produk, membatasi tingkat stok maksimum.'
     ),
   seasonalTrends: z
     .string()
     .optional()
     .describe(
-      'Optional data on seasonal trends affecting the product sales, if applicable. Represented as a JSON array of objects.'
+      'Data opsional tentang tren musiman yang memengaruhi penjualan produk, jika berlaku. Direpresentasikan sebagai array JSON dari objek.'
     ),
 });
 export type EstimateStockQuantityInput = z.infer<typeof EstimateStockQuantityInputSchema>;
@@ -38,12 +38,12 @@ const EstimateStockQuantityOutputSchema = z.object({
   estimatedQuantity: z
     .number()
     .describe(
-      'The estimated optimal stock quantity for the product, considering all input factors.'
+      'Estimasi kuantitas stok optimal untuk produk, mempertimbangkan semua faktor input.'
     ),
   reasoning: z
     .string()
     .describe(
-      'The detailed reasoning behind the estimated quantity, explaining the factors considered and the calculations made.'
+      'Penjelasan rinci di balik jumlah yang diestimasi, menjelaskan faktor-faktor yang dipertimbangkan dan perhitungan yang dibuat.'
     ),
 });
 export type EstimateStockQuantityOutput = z.infer<typeof EstimateStockQuantityOutputSchema>;
@@ -58,20 +58,20 @@ const prompt = ai.definePrompt({
   name: 'estimateStockQuantityPrompt',
   input: {schema: EstimateStockQuantityInputSchema},
   output: {schema: EstimateStockQuantityOutputSchema},
-  prompt: `You are an AI assistant helping store managers estimate the optimal stock quantity for a product.
+  prompt: `Anda adalah asisten AI yang membantu manajer toko memperkirakan jumlah stok optimal untuk suatu produk.
 
-  Consider the following factors to determine the estimated quantity:
-  - Product Name: {{{productName}}}
-  - Historical Sales Data: {{{historicalSalesData}}}
-  - Current Stock Level: {{{currentStockLevel}}}
-  - Lead Time (days): {{{leadTimeDays}}}
-  - Storage Capacity: {{{storageCapacity}}}
-  - Seasonal Trends (if available): {{{seasonalTrends}}}
+  Pertimbangkan faktor-faktor berikut untuk menentukan perkiraan kuantitas:
+  - Nama Produk: {{{productName}}}
+  - Data Penjualan Historis: {{{historicalSalesData}}}
+  - Tingkat Stok Saat Ini: {{{currentStockLevel}}}
+  - Waktu Tunggu (hari): {{{leadTimeDays}}}
+  - Kapasitas Penyimpanan: {{{storageCapacity}}}
+  - Tren Musiman (jika tersedia): {{{seasonalTrends}}}
 
-  Provide the estimated quantity and a detailed reasoning explaining your decision. Include calculations made to support the optimal number, consider trends from sales data, lead time and any seasonality.
-  Ensure the suggested stock level does not exceed the storage capacity.
-  Use JSON format to represent historicalSalesData and seasonalTrends for easy parsing.
-  Strictly adhere to provided schema when responding.
+  Berikan perkiraan kuantitas dan alasan terperinci yang menjelaskan keputusan Anda. Sertakan perhitungan yang dibuat untuk mendukung angka optimal, pertimbangkan tren dari data penjualan, waktu tunggu, dan musiman apa pun.
+  Pastikan tingkat stok yang disarankan tidak melebihi kapasitas penyimpanan.
+  Gunakan format JSON untuk merepresentasikan historicalSalesData dan seasonalTrends agar mudah diurai.
+  Patuhi skema yang diberikan secara ketat saat merespons.
   `,
 });
 

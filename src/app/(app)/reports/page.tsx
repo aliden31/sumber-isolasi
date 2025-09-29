@@ -52,7 +52,7 @@ export default function ReportsPage() {
         <h1 className="text-3xl font-headline font-bold">Laporan</h1>
         <Button onClick={handleExport}>
           <Download className="mr-2 h-4 w-4" />
-          Export ke PDF
+          Ekspor ke PDF
         </Button>
       </div>
 
