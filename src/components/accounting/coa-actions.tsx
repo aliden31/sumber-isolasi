@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Plus, MoreHorizontal, Loader2, FileUp, Edit, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, FileUp, Edit, Trash2, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,7 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { addAccount, updateAccount, deleteAccount } from '@/app/(app)/accounting/coa/actions';
+import { addAccount, updateAccount, deleteAccount, seedInitialAccounts } from '@/app/(app)/accounting/coa/actions';
 import {
   Select,
   SelectContent,
@@ -30,6 +30,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const ACCOUNT_TYPES = [
     "Aset Lancar", "Kas & Bank", "Aset Tetap", "Akumulasi Penyusutan", "Aset Lainnya", 
@@ -38,12 +49,47 @@ const ACCOUNT_TYPES = [
 ];
 
 
-export function CoaActions() {
+export function CoaActions({ hasAccounts }: { hasAccounts: boolean }) {
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleSeed = () => {
+    startTransition(async () => {
+      const result = await seedInitialAccounts();
+      if (result.error) {
+        toast({ title: 'Gagal', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Berhasil', description: 'Akun standar berhasil ditambahkan.' });
+      }
+    });
+  }
+
   return (
      <div className="flex gap-2">
-        <Button variant="outline">
-            <FileUp className="mr-2 h-4 w-4" /> Impor
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+             <Button variant="outline" disabled={hasAccounts || isPending}>
+                <Database className="mr-2 h-4 w-4" /> Gunakan Akun Standar
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tindakan ini akan menambahkan daftar akun standar (PSAK) ke dalam bagan akun Anda.
+                Tindakan ini hanya bisa dilakukan jika bagan akun Anda masih kosong.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSeed} disabled={isPending}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Lanjutkan
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+       
         <AccountFormDialog>
             <Button>
                 <Plus className="mr-2 h-4 w-4" />
