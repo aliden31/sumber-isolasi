@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState, useMemo, useTransition } from 'react';
-import { PlusCircle, MinusCircle, X, Search, Printer, DollarSign, Loader2 } from 'lucide-react';
-import type { Product, CartItem, Transaction, NewTransaction, TransactionItem } from '@/lib/types';
+import React, { useState, useMemo, useTransition, useEffect } from 'react';
+import { PlusCircle, MinusCircle, X, Search, Printer, DollarSign, Loader2, ParkingSquare } from 'lucide-react';
+import type { Product, CartItem, Transaction, NewTransaction, TransactionItem, NewParkedTransaction } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -25,10 +25,12 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogTrigger
 } from '@/components/ui/dialog';
-import { createTransaction } from './actions';
+import { createTransaction, parkTransaction } from './actions';
 import { collection, getDocs, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Label } from '@/components/ui/label';
 
 export default function POSPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -39,7 +41,22 @@ export default function POSPage() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
-  React.useEffect(() => {
+  // For parking transaction
+  const [parkName, setParkName] = useState('');
+  const [isParkDialogOpen, setIsParkDialogOpen] = useState(false);
+
+  useEffect(() => {
+    // Resume cart from local storage if exists
+    const resumedCart = localStorage.getItem('resumedCart');
+    if (resumedCart) {
+      try {
+        setCart(JSON.parse(resumedCart));
+      } catch (e) {
+        console.error("Failed to parse resumed cart", e)
+      }
+      localStorage.removeItem('resumedCart');
+    }
+
     const productsCol = collection(db, "products");
     const unsubscribeProducts = onSnapshot(productsCol, (snapshot) => {
       const productList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
@@ -133,6 +150,35 @@ export default function POSPage() {
   const cartTotal = useMemo(() => {
     return cart.reduce((total, item) => total + item.product.price * item.quantity, 0);
   }, [cart]);
+
+  const handleParkTransaction = () => {
+    if (cart.length === 0) {
+      toast({ title: 'Keranjang kosong', description: 'Tidak ada yang bisa diparkir.', variant: 'destructive' });
+      return;
+    }
+    const defaultName = `Diparkir pada ${new Date().toLocaleTimeString('id-ID')}`;
+    setParkName(defaultName);
+    setIsParkDialogOpen(true);
+  }
+
+  const confirmParkTransaction = () => {
+      startTransition(async () => {
+        const newParkedTx: NewParkedTransaction = {
+            name: parkName,
+            cart: cart,
+            createdAt: new Date(),
+        };
+        const result = await parkTransaction(newParkedTx);
+        if (result.error) {
+            toast({ title: 'Gagal Memarkir', description: result.error, variant: 'destructive' });
+        } else {
+            toast({ title: 'Transaksi Berhasil Diparkir' });
+            setCart([]);
+            setIsParkDialogOpen(false);
+            setParkName('');
+        }
+      });
+  }
 
   const completeTransaction = (paymentMethod: 'Tunai' | 'Transfer') => {
     if (cart.length === 0) {
@@ -264,6 +310,9 @@ export default function POSPage() {
               <span>Total</span>
               <span>Rp {cartTotal.toLocaleString('id-ID')}</span>
             </div>
+             <Button variant="outline" className="w-full" onClick={handleParkTransaction} disabled={cart.length === 0 || isPending}>
+                <ParkingSquare className="mr-2 h-4 w-4"/> Parkir Transaksi
+             </Button>
             <div className="grid grid-cols-2 gap-2 w-full">
               <Button onClick={() => completeTransaction('Tunai')} disabled={cart.length === 0 || isPending}>
                  {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DollarSign className="mr-2 h-4 w-4" />} Tunai
@@ -300,6 +349,27 @@ export default function POSPage() {
         </Card>
       </div>
       
+      {/* Park transaction dialog */}
+      <Dialog open={isParkDialogOpen} onOpenChange={setIsParkDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Parkir Transaksi</DialogTitle>
+                <DialogDescription>Beri nama untuk keranjang ini agar mudah ditemukan nanti.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+                <Label htmlFor="park-name">Nama Parkir</Label>
+                <Input id="park-name" value={parkName} onChange={(e) => setParkName(e.target.value)} />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsParkDialogOpen(false)}>Batal</Button>
+                <Button onClick={confirmParkTransaction} disabled={isPending || !parkName}>
+                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Simpan
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {receipt && (
         <Dialog open={!!receipt} onOpenChange={() => setReceipt(null)}>
           <DialogContent className="max-w-sm print:shadow-none print:border-none">

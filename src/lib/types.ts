@@ -35,6 +35,36 @@ export type CartItem = {
   quantity: number;
 };
 
+export type ParkedTransaction = {
+    id: string;
+    name: string;
+    cart: CartItem[];
+    createdAt: any; // Firestore timestamp
+}
+
+export type NewParkedTransaction = Omit<ParkedTransaction, 'id'>;
+
+
+export type SalesReturnItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  cost: number;
+}
+
+export type SalesReturn = {
+  id: string;
+  date: Date;
+  originalTransactionId: string;
+  items: SalesReturnItem[];
+  total: number;
+  originalPaymentMethod: 'Tunai' | 'Transfer';
+}
+
+export type NewSalesReturn = Omit<SalesReturn, 'id'>;
+
+
 export type SalesData = {
   day: string;
   total: number;
