@@ -6,7 +6,7 @@ export default function BankReconciliationPage() {
   return (
      <PlaceholderPage 
         title="Rekonsiliasi Bank"
-        description="Fitur ini akan membantu mencocokkan transaksi yang tercatat di sistem dengan laporan koran dari bank untuk memastikan akurasi data keuangan."
+        description="Gunakan fitur ini untuk mencocokkan catatan transaksi kas/bank di sistem Anda dengan laporan koran (rekening koran) yang diterima dari bank. Proses ini penting untuk memastikan akurasi data keuangan, mengidentifikasi transaksi yang belum tercatat (misalnya, biaya admin bank, bunga), dan mendeteksi adanya potensi kesalahan atau penipuan."
     />
   );
 }
