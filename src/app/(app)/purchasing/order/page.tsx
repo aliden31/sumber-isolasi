@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/componentsui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -19,11 +19,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import type { PurchaseOrder } from '@/lib/types';
 
-const mockOrders = [
-    { id: 'PO-2024-07-001', supplier: 'PT Pangan Sejahtera', date: '2024-07-18', total: 5500000, status: 'Terkirim Sebagian' },
-    { id: 'PO-2024-07-002', supplier: 'CV Sumber Roti', date: '2024-07-15', total: 2300000, status: 'Selesai' },
-    { id: 'PO-2024-06-005', supplier: 'Toko Bahan Kue Abadi', date: '2024-06-25', total: 850000, status: 'Menunggu Persetujuan' },
+const mockOrders: PurchaseOrder[] = [
+    { id: 'PO-2024-07-001', supplier: 'PT Pangan Sejahtera', date: '2024-07-18', total: 5500000, status: 'Terkirim Sebagian', items: [] },
+    { id: 'PO-2024-07-002', supplier: 'CV Sumber Roti', date: '2024-07-15', total: 2300000, status: 'Selesai', items: [] },
+    { id: 'PO-2024-06-005', supplier: 'Toko Bahan Kue Abadi', date: '2024-06-25', total: 850000, status: 'Menunggu Persetujuan', items: [] },
 ];
 
 export default function PurchaseOrderPage() {

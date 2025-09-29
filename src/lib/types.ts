@@ -63,3 +63,21 @@ export type Supplier = {
 };
 
 export type NewSupplier = Omit<Supplier, 'id'>;
+
+export type PurchaseOrderItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+};
+
+export type PurchaseOrder = {
+  id: string;
+  supplier: string;
+  date: string;
+  items: PurchaseOrderItem[];
+  total: number;
+  status: 'Menunggu Persetujuan' | 'Terkirim Sebagian' | 'Selesai' | 'Ditolak';
+};
+
+export type NewPurchaseOrder = Omit<PurchaseOrder, 'id'>;
