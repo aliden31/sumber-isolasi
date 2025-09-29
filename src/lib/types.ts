@@ -39,3 +39,10 @@ export type MonthlyRevenue = {
   month: string;
   revenue: number;
 };
+
+export type Customer = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+};

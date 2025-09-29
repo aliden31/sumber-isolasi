@@ -1,4 +1,4 @@
-import type { Product, Transaction, SalesData, TopProductData, MonthlyRevenue } from './types';
+import type { Product, Transaction, SalesData, TopProductData, MonthlyRevenue, Customer } from './types';
 
 export const mockProducts: Product[] = [
   { id: 'PROD001', name: 'Kopi Arabika', price: 55000, stock: 48, category: 'Minuman' },
@@ -88,4 +88,11 @@ export const mockMonthlyRevenue: MonthlyRevenue[] = [
   { month: 'Apr', revenue: 19000000 },
   { month: 'Mei', revenue: 25000000 },
   { month: 'Jun', revenue: 28000000 },
+];
+
+export const mockCustomers: Customer[] = [
+  { id: 'CUST001', name: 'Budi Santoso', phone: '081234567890', email: 'budi.s@example.com' },
+  { id: 'CUST002', name: 'Citra Lestari', phone: '085678901234', email: 'citra.l@example.com' },
+  { id: 'CUST003', name: 'Adi Prasetyo', phone: '087812345678', email: 'adi.p@example.com' },
+  { id: 'CUST004', name: 'Dewi Anggraini', phone: '089956781234', email: 'dewi.a@example.com' },
 ];
