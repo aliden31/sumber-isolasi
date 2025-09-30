@@ -149,13 +149,11 @@ export default function ImportMarketplacePage() {
                     const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
                     const fee = fee_pengelolaan + fee_transaksi;
                     
-                    const diskon_penjual = normalizeNumber(getVal(['diskon penjual', 'diskon dari penjual']));
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace']));
                     const voucher = normalizeNumber(getVal(['voucher']));
-                    const discount = diskon_penjual + diskon_marketplace + voucher;
+                    const discount = diskon_marketplace + voucher;
                     
-                    // Correct Net Total Calculation: subtotal + shipping - discount
-                    const net_total = subtotal + shipping - discount;
+                    const net_total = subtotal - discount;
 
                     let tanggal_order_formatted = 'N/A';
                     if (tanggal_order_raw) {
@@ -286,4 +284,5 @@ export default function ImportMarketplacePage() {
     </div>
   );
 }
+
 
