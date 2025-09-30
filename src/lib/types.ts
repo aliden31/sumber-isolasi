@@ -305,7 +305,9 @@ export type StockTransfer = {
     items: StockTransferItem[];
     notes?: string;
 }
-export type NewStockTransfer = Omit<StockTransfer, 'id'>;
+export type NewStockTransfer = Omit<StockTransfer, 'id' | 'date'> & {
+    date: Date;
+};
 
 
 export type Tax = {

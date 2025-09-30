@@ -96,7 +96,7 @@ export default function StockTransferPage() {
     }
 
     const newTransfer: NewStockTransfer = {
-      date,
+      date: date as Date,
       fromWarehouseId,
       fromWarehouseName: fromWarehouse.name,
       toWarehouseId,

@@ -32,6 +32,8 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Gudang**: Manajemen daftar gudang (CRUD).
 - **Notifikasi Stok**: Dasbor untuk melihat produk yang stoknya menipis.
 - **Estimasi Stok (AI)**: Alat bantu AI untuk memprediksi kebutuhan stok.
+- **Transfer Stok**: Fitur untuk mencatat perpindahan barang antar gudang.
+- **Penyesuaian Stok (Stock Opname)**: Alat untuk rekonsiliasi stok fisik dengan data sistem.
 
 ### Modul: Kas & Bank
 - **Kas Masuk**: Mencatat pemasukan di luar penjualan (misal: setoran modal).
@@ -66,7 +68,5 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 Fitur-fitur berikut masih berupa halaman *placeholder* dan belum memiliki fungsionalitas penuh.
 
 - **Impor Penjualan**: Kemampuan untuk mengunggah data penjualan secara massal dari file CSV/Excel.
-- **Transfer Stok**: Fitur untuk mencatat perpindahan barang antar gudang.
-- **Penyesuaian Stok (Stock Opname)**: Alat untuk rekonsiliasi stok fisik dengan data sistem.
 - **Rekonsiliasi Bank**: Alat untuk mencocokkan transaksi internal dengan laporan koran dari bank.
 - **Pengguna & Hak Akses**: Manajemen pengguna dan peran (role) untuk membatasi akses.

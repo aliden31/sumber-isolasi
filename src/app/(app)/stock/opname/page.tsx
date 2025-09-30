@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { processStockOpname } from './actions';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 type OpnameItem = {
   product: Product;

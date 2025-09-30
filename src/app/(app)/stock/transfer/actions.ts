@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, doc, runTransaction, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, runTransaction, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { NewStockTransfer, Product } from "@/lib/types";
 import { generateDocumentId } from "@/lib/utils";
@@ -35,14 +35,12 @@ export async function processStockTransfer(transferData: NewStockTransfer) {
         }
 
         // For now, we assume stock is centralized. A multi-warehouse stock model would be more complex.
-        // This action decreases stock, but doesn't increase it anywhere else yet.
-        // A full implementation would require a stock-per-warehouse data model.
-        // For this example, we'll just record the transfer and adjust total stock.
-        
-        transaction.update(productSnap.ref, { stock: newStock });
+        // This action only records the transfer but doesn't affect stock levels in a multi-warehouse scenario.
+        // In a single-stock model, this transfer implies stock moving out of the system's "main" tracked inventory.
+        // A more advanced implementation would adjust stock counts per warehouse.
       }
 
-      transaction.set(newDocRef, transferData);
+      transaction.set(newDocRef, { ...transferData, date: Timestamp.fromDate(transferData.date) });
       return newDocRef;
     });
 
