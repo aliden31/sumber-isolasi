@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Transaction, ProductSalesSummary, SalesMetric, SalesTrendData, Product } from '@/lib/types';
+import type { Transaction, ProductSalesSummary, SalesMetric, SalesTrendData, Product, TransactionItem } from '@/lib/types';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+
 
 (jsPDF as any).autoTableSetDefaults({
     headStyles: { fillColor: [15, 23, 42] },
@@ -33,6 +35,7 @@ export default function SalesReportPage() {
     to: new Date(),
   });
   const reportRef = useRef<HTMLDivElement>(null);
+  const [selectedProductSummary, setSelectedProductSummary] = useState<ProductSalesSummary | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -179,7 +182,6 @@ export default function SalesReportPage() {
         head: [['Produk', 'Kuantitas Terjual', 'Pendapatan Kotor', 'Laba Kotor']],
         body: tableData,
         theme: 'striped',
-        headStyles: { fillColor: [22, 22, 22] },
         styles: { cellPadding: 2, fontSize: 8 },
         columnStyles: {
             1: { halign: 'right' },
@@ -188,17 +190,17 @@ export default function SalesReportPage() {
         }
     });
     
-    // Add footer
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 14, doc.internal.pageSize.getHeight() - 10);
-    }
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 14, doc.internal.pageSize.getHeight() - 10);
     
     doc.save(`laporan-penjualan-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
+
+  const productTransactions = useMemo(() => {
+    if (!selectedProductSummary) return [];
+    return transactions.filter(tx => tx.items.some(item => item.productId === selectedProductSummary.productId));
+  }, [selectedProductSummary, transactions]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -258,36 +260,78 @@ export default function SalesReportPage() {
               </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Rangkuman Penjualan per Produk</CardTitle>
-              <CardDescription>
-                Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Produk</TableHead>
-                    <TableHead className="text-right">Kuantitas Terjual</TableHead>
-                    <TableHead className="text-right">Pendapatan Kotor</TableHead>
-                    <TableHead className="text-right">Laba Kotor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {productSummary.map(p => (
-                    <TableRow key={p.productId}>
-                      <TableCell className="font-medium">{p.productName}</TableCell>
-                      <TableCell className="text-right">{p.quantitySold}</TableCell>
-                      <TableCell className="text-right font-mono">Rp {p.grossRevenue.toLocaleString('id-ID')}</TableCell>
-                      <TableCell className="text-right font-mono">Rp {p.grossProfit.toLocaleString('id-ID')}</TableCell>
+          <Dialog>
+            <Card>
+              <CardHeader>
+                <CardTitle>Rangkuman Penjualan per Produk</CardTitle>
+                <CardDescription>
+                  Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produk</TableHead>
+                      <TableHead className="text-right">Kuantitas Terjual</TableHead>
+                      <TableHead className="text-right">Pendapatan Kotor</TableHead>
+                      <TableHead className="text-right">Laba Kotor</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {productSummary.map(p => (
+                      <TableRow key={p.productId}>
+                        <TableCell>
+                          <DialogTrigger asChild>
+                             <Button variant="link" className="p-0 h-auto font-medium" onClick={() => setSelectedProductSummary(p)}>
+                                {p.productName}
+                             </Button>
+                           </DialogTrigger>
+                        </TableCell>
+                        <TableCell className="text-right">{p.quantitySold}</TableCell>
+                        <TableCell className="text-right font-mono">Rp {p.grossRevenue.toLocaleString('id-ID')}</TableCell>
+                        <TableCell className="text-right font-mono">Rp {p.grossProfit.toLocaleString('id-ID')}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Detail Transaksi untuk: {selectedProductSummary?.productName}</DialogTitle>
+                <DialogDescription>
+                  Menampilkan semua transaksi yang melibatkan produk ini dalam periode yang dipilih.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[60vh] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>No. Transaksi</TableHead>
+                      <TableHead className="text-right">Jumlah</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {productTransactions.map(tx => {
+                        const relevantItem = tx.items.find(item => item.productId === selectedProductSummary?.productId)!;
+                        return (
+                             <TableRow key={tx.id}>
+                                <TableCell>{format(tx.date, 'dd MMM yyyy, HH:mm')}</TableCell>
+                                <TableCell className="font-mono">{tx.id}</TableCell>
+                                <TableCell className="text-right">{relevantItem.quantity}</TableCell>
+                                <TableCell className="text-right font-mono">Rp {(relevantItem.price * relevantItem.quantity).toLocaleString('id-ID')}</TableCell>
+                            </TableRow>
+                        )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
     </div>

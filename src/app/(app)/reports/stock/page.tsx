@@ -17,12 +17,12 @@ import 'jspdf-autotable';
 import { format } from 'date-fns';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import { id } from 'date-fns/locale';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 
 (jsPDF as any).autoTableSetDefaults({
     headStyles: { fillColor: [15, 23, 42] },
     styles: { font: 'helvetica' },
 });
-
 
 export default function StockReportsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,6 +30,7 @@ export default function StockReportsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     const qProducts = query(collection(db, 'products'), orderBy('name'));
@@ -125,7 +126,6 @@ export default function StockReportsPage() {
         head: [['Produk', 'Kategori', 'Stok', 'Harga Pokok', 'Total Nilai']],
         body: tableData,
         theme: 'striped',
-        headStyles: { fillColor: [22, 22, 22] },
         styles: { cellPadding: 2, fontSize: 8 },
         columnStyles: {
             2: { halign: 'right' },
@@ -134,13 +134,9 @@ export default function StockReportsPage() {
         }
     });
 
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 14, doc.internal.pageSize.getHeight() - 10);
-    }
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 14, doc.internal.pageSize.getHeight() - 10);
     
     doc.save(`laporan-stok-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
@@ -150,94 +146,121 @@ export default function StockReportsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Stok</h1>
-        <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
-            <Download className="mr-2 h-4 w-4"/>
-            Ekspor PDF
-        </Button>
-      </div>
-      
+    <Dialog onOpenChange={(open) => !open && setSelectedProduct(null)}>
       <div className="flex flex-col gap-6">
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-            <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Nilai Persediaan</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">Rp {totalInventoryValue.toLocaleString('id-ID')}</div>
-                <p className="text-xs text-muted-foreground">Berdasarkan harga pokok produk</p>
-            </CardContent>
-            </Card>
-            <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Unit Persediaan</CardTitle>
-                <Archive className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{totalStockCount.toLocaleString('id-ID')}</div>
-                <p className="text-xs text-muted-foreground">Jumlah semua item di gudang</p>
-            </CardContent>
-            </Card>
+         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Stok</h1>
+          <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
+              <Download className="mr-2 h-4 w-4"/>
+              Ekspor PDF
+          </Button>
         </div>
+        
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+              <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Nilai Persediaan</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">Rp {totalInventoryValue.toLocaleString('id-ID')}</div>
+                  <p className="text-xs text-muted-foreground">Berdasarkan harga pokok produk</p>
+              </CardContent>
+              </Card>
+              <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Unit Persediaan</CardTitle>
+                  <Archive className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{totalStockCount.toLocaleString('id-ID')}</div>
+                  <p className="text-xs text-muted-foreground">Jumlah semua item di gudang</p>
+              </CardContent>
+              </Card>
+          </div>
 
-        <Card>
-            <CardHeader>
-            <CardTitle>Rincian Nilai Persediaan</CardTitle>
-            <CardDescription>Daftar semua produk beserta stok dan nilainya saat ini.</CardDescription>
-            <div className="flex items-center gap-4 pt-4">
-                <Input
-                    placeholder="Cari nama produk..."
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
-                />
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter kategori" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {categoryOptions.map(cat => (
-                        <SelectItem key={cat} value={cat}>
-                        {cat === 'all' ? 'Semua Kategori' : cat}
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-                </div>
-            </CardHeader>
-            <CardContent>
-            <Table>
-                <TableHeader>
-                <TableRow>
-                    <TableHead>Produk</TableHead>
-                    <TableHead>Kategori</TableHead>
-                    <TableHead className="text-right">Stok</TableHead>
-                    <TableHead className="text-right">Harga Pokok</TableHead>
-                    <TableHead className="text-right">Total Nilai</TableHead>
-                </TableRow>
-                </TableHeader>
-                <TableBody>
-                {filteredProducts.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center h-24">Tidak ada produk ditemukan.</TableCell></TableRow>
-                ) : (
-                    filteredProducts.map(p => (
-                    <TableRow key={p.id}>
-                        <TableCell className="font-medium">{p.name}</TableCell>
-                        <TableCell><Badge variant="outline">{p.category}</Badge></TableCell>
-                        <TableCell className="text-right font-mono">{p.stock}</TableCell>
-                        <TableCell className="text-right font-mono">Rp {(p.cost || 0).toLocaleString('id-ID')}</TableCell>
-                        <TableCell className="text-right font-bold font-mono">Rp {((p.cost || 0) * p.stock).toLocaleString('id-ID')}</TableCell>
-                    </TableRow>
-                    ))
-                )}
-                </TableBody>
-            </Table>
-            </CardContent>
-        </Card>
+          <Card>
+              <CardHeader>
+              <CardTitle>Rincian Nilai Persediaan</CardTitle>
+              <CardDescription>Daftar semua produk beserta stok dan nilainya saat ini.</CardDescription>
+              <div className="flex items-center gap-4 pt-4">
+                  <Input
+                      placeholder="Cari nama produk..."
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      className="max-w-sm"
+                  />
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter kategori" />
+                      </SelectTrigger>
+                      <SelectContent>
+                      {categoryOptions.map(cat => (
+                          <SelectItem key={cat} value={cat}>
+                          {cat === 'all' ? 'Semua Kategori' : cat}
+                          </SelectItem>
+                      ))}
+                      </SelectContent>
+                  </Select>
+                  </div>
+              </CardHeader>
+              <CardContent>
+              <Table>
+                  <TableHeader>
+                  <TableRow>
+                      <TableHead>Produk</TableHead>
+                      <TableHead>Kategori</TableHead>
+                      <TableHead className="text-right">Stok</TableHead>
+                      <TableHead className="text-right">Harga Pokok</TableHead>
+                      <TableHead className="text-right">Total Nilai</TableHead>
+                  </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                  {filteredProducts.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center h-24">Tidak ada produk ditemukan.</TableCell></TableRow>
+                  ) : (
+                      filteredProducts.map(p => (
+                      <TableRow key={p.id}>
+                          <TableCell>
+                             <DialogTrigger asChild>
+                               <Button variant="link" className="p-0 h-auto font-medium" onClick={() => setSelectedProduct(p)}>
+                                 {p.name}
+                               </Button>
+                             </DialogTrigger>
+                          </TableCell>
+                          <TableCell><Badge variant="outline">{p.category}</Badge></TableCell>
+                          <TableCell className="text-right font-mono">{p.stock}</TableCell>
+                          <TableCell className="text-right font-mono">Rp {(p.cost || 0).toLocaleString('id-ID')}</TableCell>
+                          <TableCell className="text-right font-bold font-mono">Rp {((p.cost || 0) * p.stock).toLocaleString('id-ID')}</TableCell>
+                      </TableRow>
+                      ))
+                  )}
+                  </TableBody>
+              </Table>
+              </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+      {selectedProduct && (
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Detail Produk: {selectedProduct.name}</DialogTitle>
+                <DialogDescription>SKU: {selectedProduct.sku || 'N/A'}</DialogDescription>
+            </DialogHeader>
+            <div className="text-sm">
+                <p><strong>Stok Saat Ini:</strong> {selectedProduct.stock} {selectedProduct.baseUnit}</p>
+                <p><strong>Harga Pokok:</strong> Rp {(selectedProduct.cost || 0).toLocaleString('id-ID')}</p>
+                <p className="font-semibold mt-4">Satuan Jual:</p>
+                <ul>
+                    {selectedProduct.units.map(u => (
+                        <li key={u.name}>- {u.name} (1 = {u.conversionRate} {selectedProduct.baseUnit}): Rp {u.price.toLocaleString('id-ID')}</li>
+                    ))}
+                </ul>
+                <p className="mt-4 text-center text-muted-foreground">Riwayat pergerakan stok belum tersedia.</p>
+            </div>
+        </DialogContent>
+      )}
+    </Dialog>
   );
 }

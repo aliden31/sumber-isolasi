@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 
 (jsPDF as any).autoTableSetDefaults({
     headStyles: { fillColor: [15, 23, 42] },
@@ -43,6 +44,7 @@ export default function PurchasingReportPage() {
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   });
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -156,102 +158,138 @@ export default function PurchasingReportPage() {
         head: [['Tanggal', 'No. PO', 'Pemasok', 'Status', 'Total']],
         body: tableData,
         theme: 'striped',
-        headStyles: { fillColor: [22, 22, 22] },
         styles: { cellPadding: 2, fontSize: 8 },
         columnStyles: {
             4: { halign: 'right' },
         }
     });
-
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 14, doc.internal.pageSize.getHeight() - 10);
-    }
+    
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 14, doc.internal.pageSize.getHeight() - 10);
     
     doc.save(`laporan-pembelian-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Pembelian</h1>
-         <div className="flex gap-2">
-            <DateRangePicker onSelect={setDateRange} />
-            <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
-                <Download className="mr-2 h-4 w-4"/>
-                Ekspor PDF
-            </Button>
-        </div>
-      </div>
-      
-      {loading ? (
-        <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <MetricCard title="Total Nilai Pembelian" value={metrics.totalValue} format="currency" icon={DollarSign} />
-            <MetricCard title="Total Pesanan (PO)" value={metrics.totalOrders} icon={ShoppingCart} />
-            <MetricCard title="Jumlah Pemasok" value={metrics.supplierCount} icon={Truck} />
+    <Dialog onOpenChange={(open) => !open && setSelectedPO(null)}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Pembelian</h1>
+           <div className="flex gap-2">
+              <DateRangePicker onSelect={setDateRange} />
+              <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
+                  <Download className="mr-2 h-4 w-4"/>
+                  Ekspor PDF
+              </Button>
           </div>
+        </div>
+        
+        {loading ? (
+          <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricCard title="Total Nilai Pembelian" value={metrics.totalValue} format="currency" icon={DollarSign} />
+              <MetricCard title="Total Pesanan (PO)" value={metrics.totalOrders} icon={ShoppingCart} />
+              <MetricCard title="Jumlah Pemasok" value={metrics.supplierCount} icon={Truck} />
+            </div>
 
-          <Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Total Pembelian per Pemasok</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ChartContainer config={{}} className="min-h-[250px] w-full">
+                        <BarChart data={top5Suppliers} layout="vertical" margin={{ left: 20 }}>
+                             <XAxis type="number" hide />
+                             <YAxis dataKey="supplierName" type="category" tickLine={false} axisLine={false} stroke="hsl(var(--foreground))" fontSize={12} width={150} />
+                             <Tooltip content={<ChartTooltipContent indicator="dot" />} />
+                             <Bar dataKey="totalValue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Total Pembelian"/>
+                        </BarChart>
+                    </ChartContainer>
+                </CardContent>
+            </Card>
+
+            <Card>
               <CardHeader>
-                  <CardTitle>Total Pembelian per Pemasok</CardTitle>
+                <CardTitle>Riwayat Pesanan Pembelian</CardTitle>
+                <CardDescription>
+                  Daftar pesanan pembelian untuk periode yang dipilih.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                  <ChartContainer config={{}} className="min-h-[250px] w-full">
-                      <BarChart data={top5Suppliers} layout="vertical" margin={{ left: 20 }}>
-                           <XAxis type="number" hide />
-                           <YAxis dataKey="supplierName" type="category" tickLine={false} axisLine={false} stroke="hsl(var(--foreground))" fontSize={12} width={150} />
-                           <Tooltip content={<ChartTooltipContent indicator="dot" />} />
-                           <Bar dataKey="totalValue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Total Pembelian"/>
-                      </BarChart>
-                  </ChartContainer>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>No. PO</TableHead>
+                      <TableHead>Pemasok</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {purchaseOrders.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center h-24 text-muted-foreground">Tidak ada pesanan pembelian.</TableCell></TableRow>
+                    ) : (
+                      purchaseOrders.map(po => (
+                        <TableRow key={po.id}>
+                            <TableCell>{format(po.date, "dd MMM yyyy", { locale: id })}</TableCell>
+                            <TableCell>
+                              <DialogTrigger asChild>
+                                <Button variant="link" className="p-0 h-auto font-mono text-xs" onClick={() => setSelectedPO(po)}>
+                                  {po.id}
+                                </Button>
+                              </DialogTrigger>
+                            </TableCell>
+                            <TableCell>{po.supplierName}</TableCell>
+                            <TableCell><Badge variant={po.status === 'Completed' ? 'secondary' : (po.status === 'Draft' ? 'outline' : 'default')}>{po.status}</Badge></TableCell>
+                            <TableCell className="text-right font-mono">Rp {po.total.toLocaleString('id-ID')}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
-          </Card>
+            </Card>
+          </div>
+        )}
+      </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Riwayat Pesanan Pembelian</CardTitle>
-              <CardDescription>
-                Daftar pesanan pembelian untuk periode yang dipilih.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>No. PO</TableHead>
-                    <TableHead>Pemasok</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+      {selectedPO && (
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detail PO: #{selectedPO.id}</DialogTitle>
+            <DialogDescription>
+              Pemasok: {selectedPO.supplierName} | Tanggal: {format(selectedPO.date, "dd MMM yyyy")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produk</TableHead>
+                  <TableHead className="text-center">Kuantitas</TableHead>
+                  <TableHead className="text-right">Harga</TableHead>
+                  <TableHead className="text-right">Subtotal</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedPO.items.map(item => (
+                  <TableRow key={item.productId}>
+                    <TableCell>{item.productName}</TableCell>
+                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell className="text-right font-mono">Rp {item.cost.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-right font-mono">Rp {(item.cost * item.quantity).toLocaleString('id-ID')}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {purchaseOrders.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center h-24 text-muted-foreground">Tidak ada pesanan pembelian.</TableCell></TableRow>
-                  ) : (
-                    purchaseOrders.map(po => (
-                      <TableRow key={po.id}>
-                          <TableCell>{format(po.date, "dd MMM yyyy", { locale: id })}</TableCell>
-                          <TableCell className="font-mono text-xs">{po.id}</TableCell>
-                          <TableCell>{po.supplierName}</TableCell>
-                          <TableCell><Badge variant={po.status === 'Completed' ? 'secondary' : (po.status === 'Draft' ? 'outline' : 'default')}>{po.status}</Badge></TableCell>
-                          <TableCell className="text-right font-mono">Rp {po.total.toLocaleString('id-ID')}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
       )}
-    </div>
+    </Dialog>
   );
 }
 
@@ -285,5 +323,3 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
-
-    
