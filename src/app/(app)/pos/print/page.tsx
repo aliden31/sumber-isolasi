@@ -85,7 +85,7 @@ export default function PrintReceiptPage() {
 
       {receipt && (
          <Dialog open={!!receipt} onOpenChange={() => setReceipt(null)}>
-          <DialogContent className="max-w-[80mm] print:max-w-full print:shadow-none print:border-none print:p-0">
+          <DialogContent className="print:shadow-none print:border-none print:p-0">
              <DialogHeader>
                 <DialogTitle className="sr-only">Struk Transaksi</DialogTitle>
                 <DialogDescription className="sr-only">Cetak ulang struk untuk transaksi #{receipt.id}</DialogDescription>
@@ -137,9 +137,14 @@ export default function PrintReceiptPage() {
 
       <style jsx global>{`
         @media print {
-           body {
+          @page {
+            size: 80mm;
+            margin: 0;
+          }
+          body {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            margin: 0;
           }
           body * {
             visibility: hidden;
