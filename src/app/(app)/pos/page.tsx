@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useTransition, useEffect } from 'react';
-import { PlusCircle, MinusCircle, X, Search, Printer, DollarSign, Loader2, ParkingSquare } from 'lucide-react';
+import { PlusCircle, MinusCircle, X, Search, Printer, DollarSign, Loader2, ParkingSquare, ChevronsUpDown, Check } from 'lucide-react';
 import type { Product, CartItem, Transaction, NewTransaction, TransactionItem, NewParkedTransaction } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,22 @@ import { createTransaction, parkTransaction } from './actions';
 import { collection, getDocs, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function POSPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -222,7 +238,19 @@ export default function POSPage() {
   };
 
   const printReceipt = () => {
-    window.print();
+    const receiptElement = document.getElementById('printable-area');
+    if (!receiptElement || !receipt) return;
+    
+    html2canvas(receiptElement).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: [80, canvas.height * 80 / canvas.width] // width 80mm, height adjusted to aspect ratio
+        });
+        pdf.addImage(imgData, 'PNG', 0, 0, 80, canvas.height * 80 / canvas.width);
+        pdf.save(`struk-${receipt.id}.pdf`);
+    });
   };
   
   const getProductName = (productId: string) => {
@@ -234,19 +262,11 @@ export default function POSPage() {
       <div className="lg:col-span-3 flex flex-col gap-4">
         <Card className="flex-1 flex flex-col">
           <CardHeader>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Cari produk..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            </div>
+             <ProductPicker products={products} onSelect={addToCart} />
           </CardHeader>
           <CardContent className="flex-1 h-0 overflow-y-auto">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredProducts.map(product => (
+              {products.map(product => (
                 <Card key={product.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => addToCart(product)}>
                   <CardContent className="p-3 sm:p-4 flex flex-col items-center justify-center text-center">
                     <p className="font-semibold text-xs sm:text-sm">{product.name}</p>
@@ -373,12 +393,12 @@ export default function POSPage() {
 
       {receipt && (
         <Dialog open={!!receipt} onOpenChange={() => setReceipt(null)}>
-          <DialogContent className="print:shadow-none print:border-none print:p-0">
+          <DialogContent>
              <DialogHeader>
                 <DialogTitle className="sr-only">Struk Transaksi</DialogTitle>
                 <DialogDescription className="sr-only">Struk untuk transaksi #{receipt.id}</DialogDescription>
             </DialogHeader>
-            <div className="printable-area font-mono text-xs p-2">
+            <div id="printable-area" className="font-mono text-xs p-2">
               <div className="text-center space-y-1 mb-4">
                 <h2 className="text-base font-bold font-headline">Toko Kilat</h2>
                 <p>{new Date(receipt.date).toLocaleString('id-ID')}</p>
@@ -414,7 +434,7 @@ export default function POSPage() {
               
               <p className="text-center mt-4">Terima kasih telah berbelanja!</p>
             </div>
-            <DialogFooter className="print:hidden">
+            <DialogFooter>
               <Button onClick={printReceipt} className="w-full">
                 <Printer className="mr-2 h-4 w-4"/> Cetak Struk
               </Button>
@@ -423,37 +443,59 @@ export default function POSPage() {
         </Dialog>
       )}
 
-      <style jsx global>{`
-        @media print {
-          @page {
-            size: 80mm;
-            margin: 0;
-          }
-          body {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-            margin: 0;
-          }
-          body * {
-            visibility: hidden;
-          }
-          .printable-area, .printable-area * {
-            visibility: visible;
-          }
-          .printable-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            border: none;
-            font-size: 10px !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
+    
+function ProductPicker({ products, onSelect }: { products: Product[], onSelect: (product: Product) => void }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+        >
+          Cari & tambah produk...
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput placeholder="Cari produk..." onValueChange={setValue} />
+          <CommandList>
+            <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+            <CommandGroup>
+              {products.map((product) => (
+                <CommandItem
+                  key={product.id}
+                  value={product.name}
+                  onSelect={() => {
+                    onSelect(product);
+                    setOpen(false);
+                  }}
+                  disabled={product.stock <= 0}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === product.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {product.name} (Stok: {product.stock})
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 
     
