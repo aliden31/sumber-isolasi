@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -10,9 +10,12 @@ import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
+import { Button } from '@/components/ui/button';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 type ReportRow = {
   description: string;
@@ -52,6 +55,8 @@ export default function CashFlowPage() {
     to: new Date(),
   });
   const [loading, setLoading] = useState(true);
+  const reportRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     const unsubAccounts = onSnapshot(query(collection(db, 'coa'), orderBy('code')), (snapshot) => {
@@ -193,6 +198,24 @@ export default function CashFlowPage() {
     return report;
   }, [journals, accounts, cashAccountIds, allTimeJournals, dateRange]);
 
+  const handleExportPDF = () => {
+    const input = reportRef.current;
+    if (!input) return;
+
+    html2canvas(input, { scale: 2 }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      const height = pdfWidth / ratio;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
+      pdf.save(`laporan-arus-kas-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    });
+  };
+
   const renderSection = (title: string, rows: ReportRow[], total: number) => (
     <>
       <TableRow className="font-bold bg-muted/30">
@@ -215,9 +238,15 @@ export default function CashFlowPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Arus Kas</h1>
-        <DateRangePicker onSelect={setDateRange} />
+        <div className="flex gap-2">
+            <DateRangePicker onSelect={setDateRange} />
+            <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
+                <Download className="mr-2 h-4 w-4"/>
+                Ekspor PDF
+            </Button>
+        </div>
       </div>
-      <Card>
+      <Card ref={reportRef}>
         <CardHeader>
           <CardTitle>Laporan Arus Kas (Metode Tidak Langsung)</CardTitle>
            <CardDescription>
