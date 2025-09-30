@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter
 } from '@/components/ui/card';
 import {
   Table,
@@ -25,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, Upload } from 'lucide-react';
+import { Download, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { collection, onSnapshot, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -34,16 +35,29 @@ import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type LedgerEntry = {
   id: string;
   date: Date;
   ref: string;
   desc: string;
-  debit: number;
-  credit: number;
-  balance: number;
+  amount: number; // Positive for debit, negative for credit
 };
+
+type BankStatementItem = {
+    id: string;
+    date: Date;
+    description: string;
+    amount: number;
+}
+
+// Mock data for bank statement
+const MOCK_BANK_STATEMENT: BankStatementItem[] = [
+    { id: 'bank-1', date: new Date(), description: 'Setoran Tunai', amount: 500000 },
+    { id: 'bank-2', date: new Date(), description: 'Biaya Admin', amount: -6500 },
+    { id: 'bank-3', date: new Date(), description: 'Transfer ke Supplier ABC', amount: -250000 },
+]
 
 export default function BankReconciliationPage() {
   const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
@@ -51,6 +65,9 @@ export default function BankReconciliationPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [loading, setLoading] = useState(false);
+  
+  const [clearedLedgerIds, setClearedLedgerIds] = useState<Set<string>>(new Set());
+  const [clearedBankIds, setClearedBankIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const q = query(collection(db, 'coa'), where('type', '==', 'Kas & Bank'));
@@ -91,8 +108,8 @@ export default function BankReconciliationPage() {
   }, [selectedAccountId, dateRange]);
 
 
-  const ledgerEntries = useMemo(() => {
-    if (!selectedAccountId) return [];
+  const { ledgerEntries, closingBalance } = useMemo(() => {
+    if (!selectedAccountId) return { ledgerEntries: [], closingBalance: 0 };
     let runningBalance = 0;
     const entries: LedgerEntry[] = [];
 
@@ -100,21 +117,53 @@ export default function BankReconciliationPage() {
       .forEach(journal => {
         journal.entries.forEach(entry => {
           if (entry.accountId === selectedAccountId) {
-            runningBalance += entry.debit - entry.credit;
+            const amount = entry.debit - entry.credit;
+            runningBalance += amount;
             entries.push({
-              id: `${journal.id}-${entry.accountId}`,
+              id: `${journal.id}-${entry.accountId}-${Math.random()}`,
               date: journal.date,
               ref: journal.refNumber,
               desc: journal.description,
-              debit: entry.debit,
-              credit: entry.credit,
-              balance: runningBalance,
+              amount: amount,
             });
           }
         });
       });
-    return entries.reverse();
+    return { ledgerEntries: entries, closingBalance: runningBalance };
   }, [journals, selectedAccountId]);
+  
+  const handleToggleCleared = (id: string, type: 'ledger' | 'bank') => {
+      const updater = (prev: Set<string>) => {
+          const newSet = new Set(prev);
+          if (newSet.has(id)) {
+              newSet.delete(id);
+          } else {
+              newSet.add(id);
+          }
+          return newSet;
+      }
+      if (type === 'ledger') setClearedLedgerIds(updater);
+      if (type === 'bank') setClearedBankIds(updater);
+  }
+
+  const { unclearedLedger, unclearedBank, difference } = useMemo(() => {
+      const clearedLedgerTotal = ledgerEntries
+        .filter(e => clearedLedgerIds.has(e.id))
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      const clearedBankTotal = MOCK_BANK_STATEMENT
+        .filter(e => clearedBankIds.has(e.id))
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      const unclearedLedger = closingBalance - clearedLedgerTotal;
+      const unclearedBank = 0 - clearedBankTotal; // Assuming starting bank balance 0 for mock
+
+      return {
+          unclearedLedger,
+          unclearedBank,
+          difference: unclearedLedger - unclearedBank,
+      }
+  }, [clearedLedgerIds, clearedBankIds, ledgerEntries, closingBalance]);
   
   return (
     <div className="flex flex-col gap-6">
@@ -134,7 +183,7 @@ export default function BankReconciliationPage() {
         <CardHeader>
           <CardTitle className="font-headline">Proses Rekonsiliasi</CardTitle>
           <CardDescription>
-            Pilih akun bank dan periode, lalu unggah laporan koran untuk memulai.
+            Pilih akun bank dan periode, lalu centang transaksi yang cocok antara catatan Anda dan laporan koran.
           </CardDescription>
           <div className="grid md:grid-cols-2 gap-4 pt-4">
              <Select onValueChange={setSelectedAccountId} disabled={loading}>
@@ -155,7 +204,7 @@ export default function BankReconciliationPage() {
         <CardContent>
            <div className="grid md:grid-cols-2 gap-8">
                 <div>
-                    <h3 className="font-semibold mb-2">Transaksi di Pembukuan</h3>
+                    <h3 className="font-semibold mb-2">Transaksi di Pembukuan (Buku Besar)</h3>
                     <div className="border rounded-md max-h-[500px] overflow-y-auto">
                         <Table>
                             <TableHeader>
@@ -172,12 +221,12 @@ export default function BankReconciliationPage() {
                                 ) : ledgerEntries.length === 0 ? (
                                      <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Pilih akun & tanggal.</TableCell></TableRow>
                                 ) : ledgerEntries.map(entry => (
-                                    <TableRow key={entry.id}>
-                                        <TableCell><Checkbox /></TableCell>
+                                    <TableRow key={entry.id} data-state={clearedLedgerIds.has(entry.id) && 'selected'}>
+                                        <TableCell><Checkbox checked={clearedLedgerIds.has(entry.id)} onCheckedChange={() => handleToggleCleared(entry.id, 'ledger')} /></TableCell>
                                         <TableCell>{format(entry.date, 'dd/MM')}</TableCell>
                                         <TableCell className="text-xs">{entry.desc}</TableCell>
-                                        <TableCell className={`text-right font-mono text-xs ${entry.debit > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {entry.debit > 0 ? `+${entry.debit.toLocaleString('id-ID')}` : `-${entry.credit.toLocaleString('id-ID')}`}
+                                        <TableCell className={`text-right font-mono text-xs ${entry.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {entry.amount.toLocaleString('id-ID')}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -187,12 +236,62 @@ export default function BankReconciliationPage() {
                 </div>
                  <div>
                     <h3 className="font-semibold mb-2">Transaksi di Laporan Koran</h3>
-                    <div className="border rounded-md max-h-[500px] overflow-y-auto flex items-center justify-center text-center text-muted-foreground min-h-[200px]">
-                        <p>Unggah laporan koran untuk melihat transaksi bank di sini.</p>
+                     <div className="border rounded-md max-h-[500px] overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-10"></TableHead>
+                                    <TableHead>Tanggal</TableHead>
+                                    <TableHead>Deskripsi</TableHead>
+                                    <TableHead className="text-right">Jumlah</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                             <TableBody>
+                                 {MOCK_BANK_STATEMENT.length === 0 ? (
+                                     <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Unggah laporan koran.</TableCell></TableRow>
+                                ) : MOCK_BANK_STATEMENT.map(entry => (
+                                    <TableRow key={entry.id} data-state={clearedBankIds.has(entry.id) && 'selected'}>
+                                        <TableCell><Checkbox checked={clearedBankIds.has(entry.id)} onCheckedChange={() => handleToggleCleared(entry.id, 'bank')} /></TableCell>
+                                        <TableCell>{format(entry.date, 'dd/MM')}</TableCell>
+                                        <TableCell className="text-xs">{entry.description}</TableCell>
+                                        <TableCell className={`text-right font-mono text-xs ${entry.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {entry.amount.toLocaleString('id-ID')}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </div>
                 </div>
            </div>
         </CardContent>
+        <CardFooter className="flex-col items-start gap-4">
+            <h3 className="font-semibold">Ringkasan Rekonsiliasi</h3>
+            <div className="w-full grid md:grid-cols-3 gap-4">
+                <Card className="p-4">
+                    <p className="text-sm text-muted-foreground">Saldo Akhir Pembukuan</p>
+                    <p className="font-bold text-lg">Rp {closingBalance.toLocaleString('id-ID')}</p>
+                </Card>
+                 <Card className="p-4">
+                    <p className="text-sm text-muted-foreground">Item Belum Clear</p>
+                     <p className="font-bold text-lg">Rp {(unclearedLedger - unclearedBank).toLocaleString('id-ID')}</p>
+                </Card>
+                 <Card className="p-4">
+                    <p className="text-sm text-muted-foreground">Saldo Disesuaikan</p>
+                    <p className="font-bold text-lg">Rp {(closingBalance - (unclearedLedger - unclearedBank)).toLocaleString('id-ID')}</p>
+                </Card>
+            </div>
+            {difference !== 0 && (
+                 <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Tidak Seimbang</AlertTitle>
+                    <AlertDescription>
+                        Masih ada selisih sebesar Rp {difference.toLocaleString('id-ID')} antara pembukuan dan laporan koran. Mohon periksa kembali.
+                    </AlertDescription>
+                </Alert>
+            )}
+            <Button disabled={difference !== 0}>Selesaikan Rekonsiliasi (Segera Hadir)</Button>
+        </CardFooter>
        </Card>
     </div>
   );
@@ -203,3 +302,5 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
+
+    
