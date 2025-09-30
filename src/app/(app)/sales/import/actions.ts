@@ -76,6 +76,7 @@ export async function importMarketplaceTransactions(
         fee: 0,
         netTotal: 0,
         customerName: row.nama_pembeli || `Pelanggan ${row.channel}`,
+        customerAddress: row.alamat_lengkap,
         channel: row.channel,
         date: new Date(row.tanggal_order),
       };
@@ -106,21 +107,28 @@ export async function importMarketplaceTransactions(
     const batch = writeBatch(db);
     
     // --- 1. Handle Customer Creation ---
-    const uniqueCustomerNames = [...new Set(Object.values(groupedByOrder).map(o => o.customerName))] as string[];
+    const uniqueCustomers = Object.values(groupedByOrder).reduce((acc, order) => {
+        if (order.customerName) {
+            acc[order.customerName] = order.customerAddress || '';
+        }
+        return acc;
+    }, {} as {[name: string]: string});
+    
     const customersRef = collection(db, 'customers');
-    const existingCustomersSnap = await getDocs(query(customersRef, where('name', 'in', uniqueCustomerNames)));
+    const existingCustomersSnap = await getDocs(query(customersRef, where('name', 'in', Object.keys(uniqueCustomers))));
     const existingCustomerNames = new Set(existingCustomersSnap.docs.map(d => d.data().name));
     
-    const newCustomers = uniqueCustomerNames.filter(name => !existingCustomerNames.has(name));
-
-    for (const name of newCustomers) {
-      const newCustomerRef = doc(customersRef);
-      const newCustomerData: NewCustomer = {
-        name,
-        email: '',
-        phone: '',
-      };
-      batch.set(newCustomerRef, newCustomerData);
+    for (const name in uniqueCustomers) {
+        if (!existingCustomerNames.has(name)) {
+            const newCustomerRef = doc(customersRef);
+            const newCustomerData: NewCustomer = {
+                name,
+                email: '',
+                phone: '',
+                address: uniqueCustomers[name],
+            };
+            batch.set(newCustomerRef, newCustomerData);
+        }
     }
     revalidatePath('/(app)/customers');
 

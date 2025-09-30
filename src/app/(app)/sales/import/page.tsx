@@ -55,6 +55,8 @@ const COLUMN_MAPPINGS: { [key: string]: keyof MappedRow | 'harga_awal_produk' } 
   'marketplace': 'channel',
   'channel': 'channel',
   'nama pembeli': 'nama_pembeli',
+  'alamat pengiriman': 'alamat_lengkap',
+  'alamat': 'alamat_lengkap',
   'sku gudang': 'sku',
   'sku induk': 'sku',
   'informasi sku': 'sku',
@@ -164,6 +166,7 @@ export default function ImportMarketplacePage() {
                     const nomor_order = String(getVal(['nomor pesanan', 'order id', 'no. pesanan']) || '');
                     const channel = String(getVal(['marketplace', 'channel']) || 'N/A');
                     const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
+                    const alamat_lengkap = String(getVal(['alamat pengiriman', 'alamat']) || '');
                     const sku = String(getVal(['sku gudang', 'sku induk', 'informasi sku']) || '');
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
@@ -201,7 +204,7 @@ export default function ImportMarketplacePage() {
                     return {
                         id: `${nomor_order}-${rowIndex}`,
                         tanggal_order: tanggal_order_formatted,
-                        nomor_order, channel, nama_pembeli, sku, qty, unit_price,
+                        nomor_order, channel, nama_pembeli, alamat_lengkap, sku, qty, unit_price,
                         cost, subtotal, shipping, fee, discount, net_total,
                         mappedProduct
                     };
@@ -285,20 +288,19 @@ export default function ImportMarketplacePage() {
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted">
                             <TableRow>
+                                <TableHead>Toko Marketplace</TableHead>
                                 <TableHead>SKU Laporan</TableHead>
                                 <TableHead className="min-w-[200px]">Produk Terpetakan</TableHead>
-                                <TableHead>Qty</TableHead>
-                                <TableHead>Harga Satuan</TableHead>
-                                <TableHead>Harga Modal</TableHead>
-                                <TableHead className="text-right">Subtotal</TableHead>
-                                <TableHead className="text-right">Diskon</TableHead>
-                                <TableHead className="text-right">Fee</TableHead>
+                                <TableHead>Alamat</TableHead>
                                 <TableHead className="text-right">Total Bersih</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {parsedData.map((row) => (
                                 <TableRow key={row.id}>
+                                    <TableCell>
+                                      <Badge variant="secondary">{row.channel}</Badge>
+                                    </TableCell>
                                     <TableCell className="text-xs">{row.sku}</TableCell>
                                     <TableCell>
                                         <ProductMappingCell
@@ -307,12 +309,7 @@ export default function ImportMarketplacePage() {
                                             onMap={(p) => handleProductMapping(row.id, p)}
                                         />
                                     </TableCell>
-                                    <TableCell>{row.qty}</TableCell>
-                                    <TableCell className="text-right font-mono">Rp {row.unit_price.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-right font-mono">Rp {row.cost.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-right font-mono">Rp {row.subtotal.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-right font-mono text-destructive">Rp {row.discount.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-right font-mono text-destructive">Rp {row.fee.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-xs max-w-[200px] truncate">{row.alamat_lengkap}</TableCell>
                                     <TableCell className="text-right font-bold font-mono">Rp {row.net_total.toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
                             ))}
@@ -389,4 +386,3 @@ function ProductMappingCell({ product, allProducts, onMap }: { product: Product 
         </Popover>
     );
 }
-
