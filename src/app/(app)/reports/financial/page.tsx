@@ -172,6 +172,8 @@ export default function FinancialReportsPage() {
         }
     }
 
+    doc.setTextColor(0, 0, 0); // Set text color to black
+
     // Header
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
@@ -189,7 +191,7 @@ export default function FinancialReportsPage() {
     const formatCurrency = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
     const drawLine = () => {
         y += 2;
-        doc.setDrawColor(180, 180, 180);
+        doc.setDrawColor(0, 0, 0); // Set line color to black
         doc.line(15, y, 195, y);
         y += 4;
     };
@@ -248,7 +250,7 @@ export default function FinancialReportsPage() {
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
-        doc.setTextColor(150);
+        doc.setTextColor(150, 150, 150); // Muted color for footer
         doc.text(`Halaman ${i} dari ${pageCount}`, doc.internal.pageSize.getWidth() - 15, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
         doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 15, doc.internal.pageSize.getHeight() - 10);
     }
@@ -320,4 +322,5 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
+
 
