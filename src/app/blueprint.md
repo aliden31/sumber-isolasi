@@ -6,6 +6,10 @@ Berikut adalah daftar lengkap fitur aplikasi, beserta status implementasinya.
 
 Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik.
 
+### Modul: Dashboard
+- **Ringkasan Cepat**: Menampilkan ringkasan total penjualan harian, total piutang usaha, total utang usaha, dan jumlah produk dengan stok menipis.
+- **Grafik Penjualan**: Visualisasi tren penjualan selama 7 hari terakhir.
+
 ### Modul: Kasir (POS)
 - **Transaksi Baru**: Antarmuka kasir utama untuk penjualan.
 - **Transaksi Terparkir**: Menyimpan dan melanjutkan sesi keranjang belanja.
@@ -13,7 +17,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Cetak Ulang Struk**: Mencari dan mencetak kembali struk transaksi.
 
 ### Modul: Penjualan
-- **Riwayat Penjualan**: Melihat daftar lengkap semua transaksi.
+- **Riwayat Penjualan**: Melihat daftar lengkap semua transaksi dengan paginasi.
 - **Buat Invoice (Input Manual)**: Membuat penjualan kredit/piutang untuk pelanggan.
 - **Piutang Usaha**: Mengelola dan mencatat pelunasan piutang dari pelanggan.
 - **Retur Penjualan**: Memproses pengembalian barang dari penjualan kredit (non-POS).
@@ -69,6 +73,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 
 Fitur-fitur berikut masih berupa halaman *placeholder* atau dalam tahap pengembangan aktif.
 
-- **Laporan Arus Kas**: Laporan keuangan untuk melacak pergerakan kas.
-- **Rekonsiliasi Bank**: Fungsionalitas inti (unggah laporan koran, pencocokan otomatis) belum ada.
-- **Pengguna & Hak Akses**: Manajemen pengguna dan peran (role) untuk membatasi akses.
+- **Impor Penjualan dari Marketplace**: Antarmuka untuk mengunggah laporan dari Tokopedia, Shopee, dll. Logika pemrosesan file belum ada.
+- **Laporan Arus Kas**: Laporan keuangan untuk melacak pergerakan kas. Halaman *placeholder* sudah ada.
+- **Rekonsiliasi Bank**: Antarmuka untuk mencocokkan transaksi bank sudah ada, namun fungsionalitas inti (unggah laporan koran, pencocokan otomatis) belum ada.
+- **Pengguna & Hak Akses**: Antarmuka untuk menampilkan pengguna sudah ada dengan data statis. Manajemen peran dan integrasi dengan Firebase Auth belum diimplementasikan.
