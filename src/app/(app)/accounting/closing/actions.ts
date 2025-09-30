@@ -1,115 +1,90 @@
 
 "use server";
 
-import { collection, query, where, Timestamp, getDocs, writeBatch } from "firebase/firestore";
+import { collection, query, where, Timestamp, getDocs, writeBatch, doc, getDoc, addDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAccountingSettings } from "@/app/(app)/settings/accounting/actions";
 import { addJournalEntry } from "@/app/(app)/accounting/journal/actions";
 import type { JournalEntry, NewJournal, Account, Journal } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 const createResponse = (error: string | null = null, extraMessage: string | null = null) => ({ error, extraMessage });
 
-async function createReversingEntries(year: number, month: number) {
-    const reversingDate = new Date(year, month, 1); // Reversing entry is for the 1st day of the next month.
+async function createReversingEntries(year: number, month: number, batch: FirebaseFirestore.WriteBatch): Promise<{ id: string | null, message: string | null }> {
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    
+    const reversingDate = new Date(nextYear, nextMonth - 1, 1);
     const periodStartDate = new Date(year, month - 1, 1);
     const periodEndDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-    // Define account types that typically require reversing entries (accruals and some deferrals)
-    const accrualAccountTypes = ['Kewajiban Jangka Pendek', 'Aset Lancar'];
-    const accrualAccountNames = ['Utang Gaji', 'Pendapatan Diterima di Muka', 'Sewa Dibayar di Muka', 'Asuransi Dibayar di Muka'];
     
-    // Find all adjusting journal entries in the period that are NOT closing entries
     const journalsCol = collection(db, "journals");
     const journalsQuery = query(
         journalsCol,
         where("date", ">=", Timestamp.fromDate(periodStartDate)),
         where("date", "<=", Timestamp.fromDate(periodEndDate)),
-        where("description", "not-in", ["Jurnal Penutup", "Jurnal Penyesuaian"]) // A common convention is to label adjustments
+        where("description", "==", "Jurnal Penyesuaian") // Target adjustments specifically
     );
     const journalsSnapshot = await getDocs(journalsQuery);
+
+    if (journalsSnapshot.empty) return { id: null, message: null };
     
-    const entriesToReverse: JournalEntry[] = [];
+    const reversingJournalEntries: JournalEntry[] = [];
+    let total = 0;
 
-    for (const doc of journalsSnapshot.docs) {
-        const journal = doc.data() as Journal;
-        if (journal.description.includes('Jurnal Penutup')) continue;
-
-        for (const entry of journal.entries) {
-            const accountDoc = await getDoc(collection(db, "coa"), entry.accountId);
-            if (!accountDoc.exists()) continue;
-            
-            const account = accountDoc.data() as Account;
-
-            // Check if the account is an accrual/deferral type that needs reversing
-            if (accrualAccountTypes.includes(account.type) && accrualAccountNames.some(name => account.name.includes(name))) {
-                 // Reverse the entry
-                 entriesToReverse.push({
-                     accountId: entry.accountId,
-                     accountName: entry.accountName,
-                     debit: entry.credit,
-                     credit: entry.debit
-                 });
-            }
-        }
-    }
-
-    if (entriesToReverse.length > 0) {
-        // To ensure the reversing journal is balanced, we must process full journals, not individual entries.
-        // For simplicity here, we assume the found entries are part of a simple two-leg journal.
-        // A more robust solution would group entries by journal ID and reverse the entire journal.
-        
-        // Let's find pairs to ensure balance
-        const reversingJournalEntries: JournalEntry[] = [];
-        let total = 0;
-
-        journalsSnapshot.docs.forEach(doc => {
-            const journal = doc.data() as Journal;
-             if (journal.description.includes('Jurnal Penutup')) return;
-            const hasReversibleEntry = journal.entries.some(async entry => {
-                 const accountDoc = await getDoc(collection(db, "coa"), entry.accountId);
-                 const account = accountDoc.data() as Account;
-                 return accrualAccountTypes.includes(account.type) && accrualAccountNames.some(name => account.name.includes(name));
+    for (const journalDoc of journalsSnapshot.docs) {
+        const journal = journalDoc.data() as Journal;
+        journal.entries.forEach(entry => {
+            reversingJournalEntries.push({
+                accountId: entry.accountId,
+                accountName: entry.accountName,
+                debit: entry.credit,
+                credit: entry.debit
             });
-
-            if (hasReversibleEntry) {
-                journal.entries.forEach(entry => {
-                    reversingJournalEntries.push({
-                        accountId: entry.accountId,
-                        accountName: entry.accountName,
-                        debit: entry.credit, // reverse
-                        credit: entry.debit  // reverse
-                    });
-                });
-                total += journal.total;
-            }
         });
-
-        if (reversingJournalEntries.length > 0) {
-            const reversingJournal: NewJournal = {
-                date: reversingDate,
-                description: `Jurnal Pembalik untuk Periode ${getMonthName(month)} ${year}`,
-                refNumber: `JPB-${year}-${month}`,
-                entries: reversingJournalEntries,
-                total: total,
-            };
-            await addJournalEntry(reversingJournal);
-            return `Jurnal pembalik untuk ${getMonthName(month)} ${year} berhasil dibuat.`;
-        }
+        total += journal.total;
     }
 
-    return null;
+    if (reversingJournalEntries.length > 0) {
+        const newReversingJournalRef = doc(journalsCol);
+        const reversingJournal: NewJournal = {
+            date: reversingDate,
+            description: `Jurnal Pembalik untuk Periode ${getMonthName(month)} ${year}`,
+            refNumber: `JPB-${year}-${month}`,
+            entries: reversingJournalEntries,
+            total: total,
+        };
+        batch.set(newReversingJournalRef, {...reversingJournal, date: Timestamp.fromDate(reversingDate) });
+        return { 
+            id: newReversingJournalRef.id,
+            message: `Jurnal pembalik untuk ${getMonthName(month)} ${year} berhasil dibuat.`
+        };
+    }
+
+    return { id: null, message: null };
 }
 
 
 export async function performPeriodClosing({ year, month }: { year: number, month: number }) {
+    const settings = await getAccountingSettings();
+    const { incomeSummaryAccountId, retainedEarningsAccountId } = settings;
+
+    if (!incomeSummaryAccountId || !retainedEarningsAccountId) {
+        return createResponse("Akun Ikhtisar Laba Rugi atau Laba Ditahan belum diatur di Pengaturan Akuntansi.");
+    }
+    
+    // Check if period is already closed
+    const closingHistoryQuery = query(collection(db, 'periodClosings'), where('year', '==', year), where('month', '==', month));
+    const historySnapshot = await getDocs(closingHistoryQuery);
+    if (!historySnapshot.empty) {
+        return createResponse(`Periode ${getMonthName(month)} ${year} sudah ditutup sebelumnya.`);
+    }
+
+    const batch = writeBatch(db);
+    const journalsCol = collection(db, 'journals');
+    const closingJournalIds: string[] = [];
+
     try {
-        const settings = await getAccountingSettings();
-        const { incomeSummaryAccountId, retainedEarningsAccountId } = settings;
-
-        if (!incomeSummaryAccountId || !retainedEarningsAccountId) {
-            throw new Error("Akun Ikhtisar Laba Rugi atau Laba Ditahan belum diatur di Pengaturan Akuntansi.");
-        }
-
         const accountTypesToClose = ['Pendapatan', 'Pendapatan Lainnya', 'Beban Pokok Penjualan', 'Beban Operasional', 'Beban Lainnya'];
         const accountsCol = collection(db, "coa");
         const accountsQuery = query(accountsCol, where("type", "in", accountTypesToClose));
@@ -122,20 +97,19 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
 
         const startDate = new Date(year, month - 1, 1);
         const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-        const journalsCol = collection(db, "journals");
-        const journalsQuery = query(
-            journalsCol,
-            where("date", ">=", Timestamp.fromDate(startDate)),
-            where("date", "<=", Timestamp.fromDate(endDate))
-        );
+        
+        const journalsQuery = query(journalsCol, where("date", ">=", Timestamp.fromDate(startDate)), where("date", "<=", Timestamp.fromDate(endDate)));
         const journalsSnapshot = await getDocs(journalsQuery);
         
         const accountBalances: { [accountId: string]: number } = {};
+        accounts.forEach(acc => accountBalances[acc.id] = 0);
+
         journalsSnapshot.docs.forEach(doc => {
             const journal = doc.data();
             journal.entries.forEach((entry: JournalEntry) => {
-                if (accountBalances[entry.accountId] === undefined) accountBalances[entry.accountId] = 0;
-                accountBalances[entry.accountId] += entry.debit - entry.credit;
+                if (accountBalances[entry.accountId] !== undefined) {
+                     accountBalances[entry.accountId] += (accountIsDebitNormal(accounts.find(a => a.id === entry.accountId)?.type) ? entry.debit - entry.credit : entry.credit - entry.debit);
+                }
             });
         });
 
@@ -151,8 +125,8 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
             const isRevenueType = account.type.includes('Pendapatan');
 
             if (isRevenueType) {
-                closingEntries1.push({ accountId: account.id, accountName: account.name, debit: -balance, credit: 0 });
-                totalRevenue += -balance;
+                closingEntries1.push({ accountId: account.id, accountName: account.name, debit: balance, credit: 0 });
+                totalRevenue += balance;
             } else { 
                 closingEntries1.push({ accountId: account.id, accountName: account.name, debit: 0, credit: balance });
                 totalExpenses += balance;
@@ -165,12 +139,14 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
 
         const netIncome = totalRevenue - totalExpenses;
 
-        if (netIncome > 0) { 
-            closingEntries1.push({ accountId: incomeSummaryAccountId, accountName: 'Ikhtisar Laba Rugi', debit: 0, credit: netIncome });
-        } else if (netIncome < 0) { 
-            closingEntries1.push({ accountId: incomeSummaryAccountId, accountName: 'Ikhtisar Laba Rugi', debit: -netIncome, credit: 0 });
-        }
+        closingEntries1.push({
+            accountId: incomeSummaryAccountId,
+            accountName: 'Ikhtisar Laba Rugi',
+            debit: netIncome < 0 ? -netIncome : 0,
+            credit: netIncome > 0 ? netIncome : 0
+        });
         
+        const newClosingJournal1Ref = doc(journalsCol);
         const closingJournal1: NewJournal = {
             date: closingDate,
             description: `Jurnal Penutup Pendapatan & Beban - ${getMonthName(month)} ${year}`,
@@ -178,11 +154,13 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
             entries: closingEntries1,
             total: totalRevenue > totalExpenses ? totalRevenue : totalExpenses,
         };
-        await addJournalEntry(closingJournal1);
+        batch.set(newClosingJournal1Ref, {...closingJournal1, date: Timestamp.fromDate(closingDate)});
+        closingJournalIds.push(newClosingJournal1Ref.id);
 
         if (netIncome !== 0) {
+            const newClosingJournal2Ref = doc(journalsCol);
             const closingJournal2: NewJournal = {
-                date: new Date(closingDate.getTime() + 1000), // 1 second later
+                date: new Date(closingDate.getTime() + 1000),
                 description: `Jurnal Penutup Ikhtisar L/R ke Laba Ditahan - ${getMonthName(month)} ${year}`,
                 refNumber: `JNP-2-${year}-${month}`,
                 entries: [
@@ -191,11 +169,25 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
                 ],
                 total: Math.abs(netIncome),
             }
-            await addJournalEntry(closingJournal2);
+            batch.set(newClosingJournal2Ref, {...closingJournal2, date: Timestamp.fromDate(new Date(closingDate.getTime() + 1000))});
+            closingJournalIds.push(newClosingJournal2Ref.id);
         }
         
-        // After successful closing, create reversing entries for the next period
-        const reversingMessage = await createReversingEntries(year, month);
+        const { id: reversingJournalId, message: reversingMessage } = await createReversingEntries(year, month, batch);
+        
+        const closingHistoryRef = doc(collection(db, 'periodClosings'));
+        batch.set(closingHistoryRef, {
+            year, month,
+            closedAt: Timestamp.now(),
+            closingJournalIds,
+            ...(reversingJournalId && { reversingJournalId }),
+        });
+
+        await batch.commit();
+
+        revalidatePath("/(app)/accounting/closing");
+        revalidatePath("/(app)/accounting/ledger");
+        revalidatePath("/(app)/reports/financial");
 
         return createResponse(null, reversingMessage);
 
@@ -205,6 +197,49 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
     }
 }
 
+
+export async function deletePeriodClosing(id: string) {
+    try {
+        const closingDocRef = doc(db, 'periodClosings', id);
+        const closingDocSnap = await getDoc(closingDocRef);
+        
+        if (!closingDocSnap.exists()) {
+            throw new Error("Catatan tutup buku tidak ditemukan.");
+        }
+
+        const closingData = closingDocSnap.data();
+        const batch = writeBatch(db);
+
+        // Delete associated journals
+        if (closingData.closingJournalIds && Array.isArray(closingData.closingJournalIds)) {
+            closingData.closingJournalIds.forEach((journalId: string) => {
+                batch.delete(doc(db, 'journals', journalId));
+            });
+        }
+        if (closingData.reversingJournalId) {
+            batch.delete(doc(db, 'journals', closingData.reversingJournalId));
+        }
+
+        // Delete the closing record itself
+        batch.delete(closingDocRef);
+
+        await batch.commit();
+        
+        revalidatePath("/(app)/accounting/closing");
+        return createResponse();
+
+    } catch(e) {
+        console.error("Error deleting period closing:", e);
+        return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
+    }
+}
+
+
 const getMonthName = (month: number) => {
     return new Date(2000, month - 1, 1).toLocaleString('id-ID', { month: 'long' });
 }
+const accountIsDebitNormal = (type: string = '') => {
+    return type.includes('Aset') || type.includes('Beban');
+}
+
+    
