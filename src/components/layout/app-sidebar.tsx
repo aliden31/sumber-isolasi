@@ -76,9 +76,11 @@ import {
   SidebarMenuSubItem,
   SidebarTrigger,
   useSidebar,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
 import { TokoKilatLogo } from "../icons/logo";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { ThemeToggle } from "./theme-toggle";
 
 const navItems = [
   {
@@ -268,6 +270,9 @@ export function AppSidebar() {
           )}
         </SidebarMenu>
       </SidebarContent>
+       <SidebarFooter>
+        <ThemeToggle />
+      </SidebarFooter>
     </Sidebar>
   );
 }
