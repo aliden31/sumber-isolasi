@@ -68,5 +68,5 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 Fitur-fitur berikut masih berupa halaman *placeholder* dan belum memiliki fungsionalitas penuh.
 
 - **Impor Penjualan**: Kemampuan untuk mengunggah data penjualan secara massal dari file CSV/Excel.
-- **Rekonsiliasi Bank**: Alat untuk mencocokkan transaksi internal dengan laporan koran dari bank.
+- **Rekonsiliasi Bank**: Alat untuk mencocokkan transaksi internal dengan laporan koran dari bank. (UI Dasar Selesai)
 - **Pengguna & Hak Akses**: Manajemen pengguna dan peran (role) untuk membatasi akses.
