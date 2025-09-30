@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { useState, useMemo, useTransition, useEffect } from 'react';
 import { PlusCircle, MinusCircle, X, Save, Loader2, Plus, Send, Eye } from 'lucide-react';
-import type { Product, Supplier, PurchaseOrderItem, NewPurchaseOrder, PurchaseOrder, PurchaseRequest } from '@/lib/types';
+import type { Product, Supplier, PurchaseOrderItem, NewPurchaseOrder, PurchaseOrder, PurchaseRequest, ProductUnit } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
@@ -143,13 +144,19 @@ function NewPurchaseOrderForm({ onBack }: { onBack: () => void }) {
     if (pr) {
       const itemPromises = pr.items.map(async item => {
           const productDoc = await getDoc(doc(db, "products", item.productId));
+          if (!productDoc.exists()) return null;
           const productData = productDoc.data() as Product;
+          const baseUnit = productData.units.find(u => u.name === productData.baseUnit) || productData.units[0];
+          
           return {
-              ...item,
-              cost: productData.cost || 0
-          }
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              cost: baseUnit?.cost || 0,
+              unit: baseUnit?.name || 'N/A'
+          } as PurchaseOrderItem;
       });
-      const resolvedItems = await Promise.all(itemPromises);
+      const resolvedItems = (await Promise.all(itemPromises)).filter(Boolean) as PurchaseOrderItem[];
       setItems(resolvedItems);
     } else {
       setItems([]);
@@ -158,6 +165,13 @@ function NewPurchaseOrderForm({ onBack }: { onBack: () => void }) {
   
   const addItem = (product: Product) => {
     if (selectedPR) return; // Disable adding items manually if a PR is selected
+    
+    const baseUnit = product.units.find(u => u.name === product.baseUnit) || product.units[0];
+    if (!baseUnit) {
+        toast({ title: 'Satuan dasar tidak ditemukan untuk produk ini', variant: 'destructive' });
+        return;
+    }
+
     setItems(prev => {
       const existingItem = prev.find(item => item.productId === product.id);
       if (existingItem) {
@@ -169,7 +183,8 @@ function NewPurchaseOrderForm({ onBack }: { onBack: () => void }) {
         productId: product.id, 
         productName: product.name, 
         quantity: 1, 
-        cost: product.cost || 0 
+        cost: baseUnit.cost,
+        unit: baseUnit.name,
       }];
     });
   };
