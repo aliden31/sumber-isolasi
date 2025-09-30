@@ -34,6 +34,8 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
   const [accountsReceivableAccountId, setAccountsReceivableAccountId] = useState(initialData.accountsReceivableAccountId || '');
   const [accountsPayableAccountId, setAccountsPayableAccountId] = useState(initialData.accountsPayableAccountId || '');
   const [accruedPayableAccountId, setAccruedPayableAccountId] = useState(initialData.accruedPayableAccountId || '');
+  const [retainedEarningsAccountId, setRetainedEarningsAccountId] = useState(initialData.retainedEarningsAccountId || '');
+  const [incomeSummaryAccountId, setIncomeSummaryAccountId] = useState(initialData.incomeSummaryAccountId || '');
 
 
   const handleSaveChanges = () => {
@@ -47,6 +49,8 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
         accountsReceivableAccountId,
         accountsPayableAccountId,
         accruedPayableAccountId,
+        retainedEarningsAccountId,
+        incomeSummaryAccountId,
       });
 
       if (result.error) {
@@ -182,6 +186,38 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
           </SelectContent>
         </Select>
       </div>
+      
+      <Separator />
+      <h3 className="text-lg font-medium">Tutup Buku</h3>
+      
+       <div className="space-y-2">
+        <Label>Akun Ikhtisar Laba Rugi</Label>
+        <Select value={incomeSummaryAccountId} onValueChange={setIncomeSummaryAccountId} disabled={isPending}>
+          <SelectTrigger>
+            <SelectValue placeholder="Pilih akun ikhtisar laba rugi..." />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.filter(a => a.type === 'Ekuitas').map(acc => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+       <div className="space-y-2">
+        <Label>Akun Laba Ditahan</Label>
+        <Select value={retainedEarningsAccountId} onValueChange={setRetainedEarningsAccountId} disabled={isPending}>
+          <SelectTrigger>
+            <SelectValue placeholder="Pilih akun laba ditahan..." />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.filter(a => a.type === 'Ekuitas').map(acc => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
 
       <div className="flex justify-end pt-4">
         <Button onClick={handleSaveChanges} disabled={isPending}>

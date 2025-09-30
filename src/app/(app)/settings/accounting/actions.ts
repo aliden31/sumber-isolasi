@@ -14,6 +14,8 @@ export type AccountingSettings = {
   accountsReceivableAccountId?: string;
   accountsPayableAccountId?: string;
   accruedPayableAccountId?: string; // Goods Received Not Invoiced
+  retainedEarningsAccountId?: string;
+  incomeSummaryAccountId?: string;
 };
 
 const settingsDocRef = doc(db, "settings", "accounting");

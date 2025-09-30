@@ -26,6 +26,7 @@ export const COA_SEED_DATA: NewAccount[] = [
   // 3. Ekuitas
   { code: '3-10101', name: 'Modal Disetor', type: 'Ekuitas' },
   { code: '3-10201', name: 'Laba Ditahan', type: 'Ekuitas' },
+  { code: '3-10301', name: 'Ikhtisar Laba Rugi', type: 'Ekuitas' },
 
   // 4. Pendapatan
   { code: '4-10101', name: 'Pendapatan Penjualan Produk', type: 'Pendapatan' },

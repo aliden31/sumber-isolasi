@@ -62,6 +62,8 @@ export async function seedInitialAccounts() {
         salesRevenueAccountId: docRefs['Pendapatan Penjualan Produk'],
         cogsAccountId: docRefs['Beban Pokok Penjualan'],
         inventoryAccountId: docRefs['Persediaan Barang Dagang'],
+        retainedEarningsAccountId: docRefs['Laba Ditahan'],
+        incomeSummaryAccountId: docRefs['Ikhtisar Laba Rugi'],
     };
 
     if (Object.values(settingsData).some(id => !id)) {
