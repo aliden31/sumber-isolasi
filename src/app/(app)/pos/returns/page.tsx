@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,17 @@ import { useToast } from '@/hooks/use-toast';
 import { getTransaction, processSalesReturn } from '../actions';
 import type { Transaction, TransactionItem, NewSalesReturn } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 type ReturnItem = TransactionItem & { returnQuantity: number };
 
@@ -18,10 +29,23 @@ export default function POSReturnsPage() {
   const [isSearching, startSearching] = useTransition();
   const [isProcessing, startProcessing] = useTransition();
 
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [originalTx, setOriginalTx] = useState<Transaction | null>(null);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   
   const { toast } = useToast();
+
+  useEffect(() => {
+    const q = query(collection(db, 'transactions'), orderBy('date', 'desc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+        setAllTransactions(snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date.toDate()
+        } as Transaction)))
+    });
+    return () => unsub();
+  }, []);
 
   const handleSearch = () => {
     if (!txId) {
@@ -69,6 +93,7 @@ export default function POSReturnsPage() {
         quantity: item.returnQuantity,
         price: item.price,
         cost: item.cost,
+        unit: item.unit
       }));
 
     if (itemsToReturn.length === 0) {
@@ -104,20 +129,29 @@ export default function POSReturnsPage() {
       <Card className="max-w-xl mx-auto w-full">
         <CardHeader>
           <CardTitle>Cari Transaksi Asli</CardTitle>
-          <CardDescription>Masukkan ID transaksi dari struk pelanggan untuk memulai proses retur.</CardDescription>
+          <CardDescription>Pilih transaksi dari struk pelanggan untuk memulai proses retur.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
             <Label htmlFor="tx-id">ID Transaksi</Label>
             <div className="flex gap-2">
-              <Input
-                id="tx-id"
-                placeholder="Masukkan ID transaksi"
+              <Select
                 value={txId}
-                onChange={(e) => setTxId(e.target.value)}
+                onValueChange={setTxId}
                 disabled={isSearching || !!originalTx}
-              />
-              <Button onClick={handleSearch} disabled={isSearching || !!originalTx}>
+              >
+                  <SelectTrigger id="tx-id">
+                      <SelectValue placeholder="Pilih ID transaksi..."/>
+                  </SelectTrigger>
+                  <SelectContent>
+                      {allTransactions.map(tx => (
+                          <SelectItem key={tx.id} value={tx.id}>
+                              {tx.id} - {format(tx.date, "dd MMM yyyy, HH:mm", {locale: id})} - Rp {tx.total.toLocaleString('id-ID')}
+                          </SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+              <Button onClick={handleSearch} disabled={isSearching || !!originalTx || !txId}>
                 {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
             </div>

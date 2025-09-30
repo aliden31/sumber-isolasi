@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,16 @@ import { getTransaction, processSalesReturn } from '@/app/(app)/pos/actions';
 import type { Transaction, TransactionItem, NewSalesReturn } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
+import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { id } from 'date-fns/locale';
 
 type ReturnItem = TransactionItem & { returnQuantity: number };
 
@@ -19,10 +29,27 @@ export default function SalesReturnsPage() {
   const [isSearching, startSearching] = useTransition();
   const [isProcessing, startProcessing] = useTransition();
 
+  const [creditTransactions, setCreditTransactions] = useState<Transaction[]>([]);
   const [originalTx, setOriginalTx] = useState<Transaction | null>(null);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   
   const { toast } = useToast();
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'transactions'), 
+      where('paymentMethod', '==', 'Kredit'),
+      orderBy('date', 'desc')
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+        setCreditTransactions(snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date.toDate()
+        } as Transaction)))
+    });
+    return () => unsub();
+  }, []);
 
   const handleSearch = () => {
     if (!txId) {
@@ -31,7 +58,7 @@ export default function SalesReturnsPage() {
     }
     startSearching(async () => {
       const result = await getTransaction(txId);
-      if (result.error || result.data?.paymentMethod === 'Tunai') {
+      if (result.error || result.data?.paymentMethod !== 'Kredit') {
         toast({ title: 'Transaksi tidak ditemukan atau bukan transaksi kredit', description: result.error || 'Hanya transaksi kredit yang bisa diretur di halaman ini.', variant: 'destructive' });
         setOriginalTx(null);
         setReturnItems([]);
@@ -70,6 +97,7 @@ export default function SalesReturnsPage() {
         quantity: item.returnQuantity,
         price: item.price,
         cost: item.cost,
+        unit: item.unit
       }));
 
     if (itemsToReturn.length === 0) {
@@ -117,20 +145,29 @@ export default function SalesReturnsPage() {
         <Card className="max-w-xl mx-auto w-full">
             <CardHeader>
             <CardTitle>Cari Invoice Penjualan</CardTitle>
-            <CardDescription>Masukkan ID transaksi/invoice untuk memulai proses retur.</CardDescription>
+            <CardDescription>Pilih invoice penjualan kredit untuk memulai proses retur.</CardDescription>
             </CardHeader>
             <CardContent>
             <div className="space-y-2">
                 <Label htmlFor="tx-id">ID Transaksi / Invoice</Label>
                 <div className="flex gap-2">
-                <Input
-                    id="tx-id"
-                    placeholder="Masukkan ID..."
+                <Select
                     value={txId}
-                    onChange={(e) => setTxId(e.target.value)}
+                    onValueChange={setTxId}
                     disabled={isSearching}
-                />
-                <Button onClick={handleSearch} disabled={isSearching}>
+                >
+                    <SelectTrigger id="tx-id">
+                        <SelectValue placeholder="Pilih invoice..."/>
+                    </SelectTrigger>
+                    <SelectContent>
+                        {creditTransactions.map(tx => (
+                            <SelectItem key={tx.id} value={tx.id}>
+                                {tx.id} - {tx.customerName} - Rp {tx.total.toLocaleString('id-ID')}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Button onClick={handleSearch} disabled={isSearching || !txId}>
                     {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 </Button>
                 </div>
