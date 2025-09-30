@@ -4,6 +4,7 @@
 
 
 
+
 export type ProductUnit = {
   name: string; // e.g., 'Pcs', 'Box', 'Lusin'
   price: number;
@@ -380,4 +381,3 @@ export type MappedRow = ParsedRow & {
     id: string;
     mappedProduct: Product | null;
 };
-

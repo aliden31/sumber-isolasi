@@ -42,7 +42,7 @@ export async function importMarketplaceTransactions(
     marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
-    bankAccountId, // Defaulting to bank for marketplace payouts
+    accountsReceivableAccountId,
   } = settings;
 
   const requiredAccountIds = [
@@ -51,7 +51,7 @@ export async function importMarketplaceTransactions(
     marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
-    bankAccountId,
+    accountsReceivableAccountId,
   ];
 
   if (requiredAccountIds.some((id) => !id)) {
@@ -71,13 +71,12 @@ export async function importMarketplaceTransactions(
         discount: 0,
         fee: 0,
         netTotal: 0,
-        customerName: row.nama_pembeli,
+        customerName: row.nama_pembeli || `Pelanggan ${row.channel}`,
         date: new Date(row.tanggal_order),
       };
     }
     
-    // Use cost from mapped product if available, otherwise from the report
-    const cost = row.mappedProduct.cost || row.cost || 0;
+    const cost = row.cost || row.mappedProduct.cost || 0;
     const itemSubtotal = row.unit_price * row.qty;
 
     acc[orderId].items.push({
@@ -106,7 +105,7 @@ export async function importMarketplaceTransactions(
       const newId = generateDocumentId('MKT');
       const newTxRef = doc(db, 'transactions', newId);
 
-      // 1. Create Transaction Document
+      // 1. Create Transaction Document as a Credit Sale (Invoice)
       const newTransaction: NewTransaction = {
         date: Timestamp.fromDate(order.date),
         items: order.items,
@@ -114,10 +113,10 @@ export async function importMarketplaceTransactions(
         discount: order.discount,
         fee: order.fee,
         netTotal: order.netTotal,
-        paymentMethod: 'Transfer', // Marketplace sales are treated as transfers
+        paymentMethod: 'Kredit', // Treat as credit sale
         customerId: `MKT-${order.customerName}`,
         customerName: order.customerName,
-        status: 'Lunas'
+        status: 'Belum Lunas' // To be settled upon marketplace payout
       };
       batch.set(newTxRef, newTransaction);
 
@@ -134,19 +133,17 @@ export async function importMarketplaceTransactions(
         }
       }
 
-
-      // 3. Create Journal Entries
-      const journalDescription = `Penjualan Marketplace #${orderId}`;
+      // 3. Create Journal Entries for the Invoice
+      const journalDescription = `Invoice Marketplace #${orderId}`;
       const journalEntries: JournalEntry[] = [];
       
       // Debit entries
-      if (order.netTotal > 0) journalEntries.push({ accountId: bankAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
+      if (order.netTotal > 0) journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
       if (order.discount > 0) journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
       if (order.fee > 0) journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
 
       // Credit sales revenue
       journalEntries.push({ accountId: salesRevenueAccountId!, accountName: '', debit: 0, credit: order.total });
-
 
       const newJournal: NewJournal = {
         date: order.date,
@@ -165,7 +162,7 @@ export async function importMarketplaceTransactions(
       if (order.totalCost > 0) {
           const cogsJournal: NewJournal = {
             date: order.date,
-            description: `HPP untuk Penjualan Marketplace #${orderId}`,
+            description: `HPP untuk Marketplace #${orderId}`,
             refNumber: newId,
             entries: [
                 { accountId: cogsAccountId!, accountName: '', debit: order.totalCost, credit: 0 },
@@ -187,6 +184,7 @@ export async function importMarketplaceTransactions(
     revalidatePath('/(app)/products');
     revalidatePath('/(app)/dashboard');
     revalidatePath('/(app)/accounting/ledger');
+    revalidatePath('/(app)/sales/receivables');
 
     return createResponse(null, `${Object.keys(groupedByOrder).length}`);
   } catch (e) {
@@ -196,4 +194,3 @@ export async function importMarketplaceTransactions(
     );
   }
 }
-
