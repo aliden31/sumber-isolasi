@@ -1,4 +1,3 @@
-
 import type { Product } from '@/lib/types';
 import {
   Table,
@@ -9,7 +8,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ProductRowActions } from './product-actions';
+import { ProductFormDialog, ProductRowActions } from './product-actions';
+import { Button } from '../ui/button';
 
 interface ProductTableProps {
   data: Product[];
@@ -34,7 +34,13 @@ export function ProductTable({ data }: ProductTableProps) {
             const baseUnit = product.units?.find(u => u.conversionRate === 1) || product.units?.[0];
             return (
               <TableRow key={product.id}>
-                <TableCell className="font-medium">{product.name}</TableCell>
+                <TableCell className="font-medium">
+                   <ProductFormDialog product={product}>
+                      <Button variant="link" className="p-0 h-auto font-medium text-left">
+                        {product.name}
+                      </Button>
+                  </ProductFormDialog>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">{product.category}</Badge>
                 </TableCell>

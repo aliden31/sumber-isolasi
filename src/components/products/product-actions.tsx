@@ -172,7 +172,7 @@ export function ProductRowActions({ product }: { product: Product }) {
 }
 
 
-function ProductFormDialog({ children, product }: { children: React.ReactNode, product?: Product }) {
+export function ProductFormDialog({ children, product }: { children: React.ReactNode, product?: Product }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
