@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
   DialogTrigger
 } from '@/components/ui/dialog';
@@ -122,9 +123,20 @@ function TaxFormDialog({ children, tax }: { children: React.ReactNode, tax?: Tax
       }
     });
   };
+  
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isPending) return;
+    if (!isOpen) {
+      setName(tax?.name || '');
+      setRate(tax?.rate || 0);
+      setDescription(tax?.description || '');
+    }
+    setOpen(isOpen);
+  };
+
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {isDropdownItem ? <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><Edit className="mr-2 h-4 w-4" /> Edit</div> : children}
       </DialogTrigger>
