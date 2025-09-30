@@ -32,6 +32,30 @@ const createResponse = (
   id: string | null = null
 ) => ({ error, id });
 
+// Helper function to query in chunks
+async function queryInChunks<T>(
+  ref: any,
+  field: string,
+  values: string[],
+  chunkSize: number = 30
+): Promise<T[]> {
+  if (values.length === 0) return [];
+  const chunks: string[][] = [];
+  for (let i = 0; i < values.length; i += chunkSize) {
+    chunks.push(values.slice(i, i + chunkSize));
+  }
+
+  const results: T[] = [];
+  for (const chunk of chunks) {
+    const q = query(ref, where(field, 'in', chunk));
+    const snapshot = await getDocs(q);
+    snapshot.forEach(doc => {
+      results.push(doc.data() as T);
+    });
+  }
+  return results;
+}
+
 export async function importMarketplaceTransactions(
   transactions: MappedRow[]
 ) {
@@ -115,8 +139,10 @@ export async function importMarketplaceTransactions(
     }, {} as {[name: string]: string});
     
     const customersRef = collection(db, 'customers');
-    const existingCustomersSnap = await getDocs(query(customersRef, where('name', 'in', Object.keys(uniqueCustomers))));
-    const existingCustomerNames = new Set(existingCustomersSnap.docs.map(d => d.data().name));
+    const customerNames = Object.keys(uniqueCustomers);
+    
+    const existingCustomers = await queryInChunks<NewCustomer>(customersRef, 'name', customerNames);
+    const existingCustomerNames = new Set(existingCustomers.map(c => c.name));
     
     for (const name in uniqueCustomers) {
         if (!existingCustomerNames.has(name)) {
