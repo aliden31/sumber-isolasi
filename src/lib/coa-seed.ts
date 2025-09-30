@@ -41,6 +41,7 @@ export const COA_SEED_DATA: NewAccount[] = [
   { code: '6-10301', name: 'Beban Listrik, Air, & Telepon', type: 'Beban Operasional' },
   { code: '6-10401', name: 'Beban Pemasaran', type: 'Beban Operasional' },
   { code: '6-10501', name: 'Beban Penyusutan Peralatan', type: 'Beban Operasional' },
+  { code: '6-10601', name: 'Beban Marketplace', type: 'Beban Operasional' },
   { code: '6-10999', name: 'Beban Operasional Lainnya', type: 'Beban Operasional' },
 
   // 8. Pendapatan & Beban Lainnya

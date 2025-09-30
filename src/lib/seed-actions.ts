@@ -62,6 +62,8 @@ export async function seedInitialAccounts() {
         accountsPayableAccountId: docRefs['Utang Usaha'],
         accruedPayableAccountId: docRefs['Utang Barang Diterima'],
         salesRevenueAccountId: docRefs['Pendapatan Penjualan Produk'],
+        salesDiscountAccountId: docRefs['Diskon Penjualan'],
+        marketplaceFeeAccountId: docRefs['Beban Marketplace'],
         cogsAccountId: docRefs['Beban Pokok Penjualan'],
         inventoryAccountId: docRefs['Persediaan Barang Dagang'],
         retainedEarningsAccountId: docRefs['Laba Ditahan'],
