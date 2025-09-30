@@ -30,7 +30,7 @@ type ParsedRow = {
 };
 
 // Expanded mapping to handle various column names from different marketplaces
-const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow } = {
+const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow | 'harga_awal_produk' } = {
   'waktu pesanan dibuat': 'tanggal_order',
   'tanggal order': 'tanggal_order',
   'nomor pesanan': 'nomor_order',
@@ -45,6 +45,8 @@ const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow } = {
   'jumlah': 'qty',
   'jumlah produk dibeli': 'qty',
   'kuantitas': 'qty',
+  'harga asli produk': 'harga_awal_produk', // Prioritize original price
+  'harga awal': 'harga_awal_produk',
   'harga satuan': 'unit_price',
   'harga jual (rp)': 'unit_price',
   'subtotal produk': 'subtotal',
@@ -54,6 +56,7 @@ const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow } = {
   'biaya pengelolaan': 'fee', // This will be added to other fees
   'biaya transaksi': 'fee',   // This will be added to other fees
   'diskon penjual': 'discount', // This will be added to other discounts
+  'diskon dari penjual': 'discount',
   'diskon marketplace': 'discount', // This will be added to other discounts
   'voucher': 'discount',
   'total pesanan': 'net_total', // This will be used in calculation
@@ -85,7 +88,8 @@ export default function ImportMarketplacePage() {
   const normalizeNumber = (value: any): number => {
     if (typeof value === 'number') return value;
     if (typeof value === 'string') {
-        return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
+        // Remove currency symbols, thousands separators, and then parse
+        return parseFloat(value.replace(/[^0-9,.-]+/g, '').replace(',', '.')) || 0;
     }
     return 0;
   }
@@ -131,7 +135,12 @@ export default function ImportMarketplacePage() {
                     const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
                     const sku = String(getVal(['nama produk', 'sku induk', 'informasi sku']) || '');
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
-                    const unit_price = normalizeNumber(getVal(['harga satuan', 'harga jual (rp)']));
+                    
+                    // Prioritize original price over discounted price for unit price
+                    const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
+                    const harga_satuan = normalizeNumber(getVal(['harga satuan', 'harga jual (rp)']));
+                    const unit_price = harga_awal > 0 ? harga_awal : harga_satuan;
+
                     const subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)']));
                     const shipping = normalizeNumber(getVal(['ongkos kirim', 'biaya pengiriman']));
 
@@ -140,12 +149,12 @@ export default function ImportMarketplacePage() {
                     const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
                     const fee = fee_pengelolaan + fee_transaksi;
                     
-                    const diskon_penjual = normalizeNumber(getVal(['diskon penjual']));
+                    const diskon_penjual = normalizeNumber(getVal(['diskon penjual', 'diskon dari penjual']));
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace']));
                     const voucher = normalizeNumber(getVal(['voucher']));
                     const discount = diskon_penjual + diskon_marketplace + voucher;
                     
-                    // Correct Net Total Calculation
+                    // Correct Net Total Calculation: subtotal + shipping - discount
                     const net_total = subtotal + shipping - discount;
 
                     let tanggal_order_formatted = 'N/A';
@@ -278,4 +287,3 @@ export default function ImportMarketplacePage() {
   );
 }
 
-    
