@@ -55,7 +55,8 @@ import {
   Coins,
   SlidersHorizontal,
   DatabaseZap,
-  Wrench
+  Wrench,
+  Scale
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -162,6 +163,7 @@ const navItems = [
       { href: "/reports/purchasing", label: "Pembelian", icon: FileText },
       { href: "/reports/stock", label: "Stok", icon: FileText },
       { href: "/reports/financial", label: "Laba Rugi", icon: FileText },
+      { href: "/reports/balance-sheet", label: "Neraca", icon: Scale },
     ],
   },
     {
