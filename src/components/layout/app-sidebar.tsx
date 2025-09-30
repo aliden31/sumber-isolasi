@@ -226,8 +226,8 @@ export function AppSidebar() {
                     <SidebarMenuSub>
                       {item.subItems.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.href}>
-                          <Link href={subItem.href || "#"} passHref>
-                             <SidebarMenuSubButton
+                           <SidebarMenuSubButton
+                              href={subItem.href || "#"}
                               isActive={isActive(subItem.href || "#")}
                             >
                               {subItem.icon && <subItem.icon />}
@@ -243,7 +243,6 @@ export function AppSidebar() {
                                 </Tooltip>
                               )}
                             </SidebarMenuSubButton>
-                          </Link>
                         </SidebarMenuSubItem>
                       ))}
                     </SidebarMenuSub>
