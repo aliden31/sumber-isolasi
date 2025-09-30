@@ -99,13 +99,19 @@ export default function StockOpnamePage() {
     }).filter(item => item.difference !== 0);
   }, [opnameItems]);
 
+  const hasCountedItems = useMemo(() => {
+    return opnameItems.some(item => item.physicalCount !== null);
+  }, [opnameItems]);
+
+
   const totalAdjustmentValue = useMemo(() => {
     return processedItems.reduce((sum, item) => sum + item.differenceValue, 0);
   }, [processedItems]);
 
   const handleSave = () => {
     if (processedItems.length === 0) {
-        toast({ title: "Tidak ada perubahan", description: "Tidak ada selisih stok yang perlu disesuaikan.", variant: "default" });
+        toast({ title: "Tidak ada perubahan", description: "Tidak ada selisih stok yang perlu disesuaikan. Opname dicatat tanpa jurnal.", variant: "default" });
+        resetForm();
         return;
     }
     if (!opnameDate) {
@@ -119,10 +125,14 @@ export default function StockOpnamePage() {
             toast({ title: "Gagal menyimpan penyesuaian", description: result.error, variant: "destructive" });
         } else {
             toast({ title: "Penyesuaian stok berhasil", description: "Stok produk dan jurnal akuntansi telah diperbarui." });
-            setOpnameItems(products.map(p => ({ product: p, physicalCount: null })));
-            setNotes('');
+            resetForm();
         }
     })
+  }
+
+  const resetForm = () => {
+    setOpnameItems(products.map(p => ({ product: p, physicalCount: null })));
+    setNotes('');
   }
 
   return (
@@ -220,7 +230,7 @@ export default function StockOpnamePage() {
                     <p>Nilai ini akan dijurnal sebagai penyesuaian HPP/persediaan.</p>
                 </div>
             </div>
-            <Button onClick={handleSave} disabled={isPending || processedItems.length === 0}>
+            <Button onClick={handleSave} disabled={isPending || !hasCountedItems}>
                 {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Simpan Penyesuaian
             </Button>
