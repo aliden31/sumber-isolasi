@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx';
 
 const HEADER_MAP: Record<string, keyof NewProduct | 'hargaJual'> = {
   'nama produk': 'name',
-  'sku': 'sku',
+  'sku gudang': 'sku',
   'kategori': 'category',
   'harga modal': 'cost',
   'harga jual': 'hargaJual',
@@ -176,7 +176,7 @@ export default function ImportProductsPage() {
                         <TableHeader className="sticky top-0 bg-muted">
                             <TableRow>
                                 <TableHead>Nama Produk</TableHead>
-                                <TableHead>SKU</TableHead>
+                                <TableHead>SKU GUDANG</TableHead>
                                 <TableHead>Kategori</TableHead>
                                 <TableHead className="text-right">Harga Modal</TableHead>
                                 <TableHead className="text-right">Harga Jual</TableHead>
@@ -216,5 +216,7 @@ export default function ImportProductsPage() {
     </div>
   );
 }
+
+    
 
     
