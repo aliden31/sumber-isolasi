@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { getCompanySettings } from '@/app/(app)/settings/actions';
 
 
 type ReportRow = {
@@ -158,22 +158,118 @@ export default function BalanceSheetPage() {
     return report;
   }, [journals, accounts]);
   
-  const handleExportPDF = () => {
-    const input = reportRef.current;
-    if (!input) return;
-
-    html2canvas(input, { scale: 2 }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const height = pdfWidth / ratio;
-
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
-      pdf.save(`laporan-neraca-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  const handleExportPDF = async () => {
+    const doc = new jsPDF();
+    const settings = await getCompanySettings();
+    const companyName = settings.companyName || 'Toko Kilat';
+    
+    let y = 15;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const addPageIfNeeded = () => {
+        if (y > pageHeight - 20) {
+            doc.addPage();
+            y = 15;
+        }
+    }
+    const formatCurrency = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+    const drawLine = (yPos: number) => doc.line(15, yPos, 195, yPos);
+    
+    // Header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName, 105, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Laporan Posisi Keuangan', 105, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(10);
+    const dateStr = `Per ${reportDate ? format(reportDate, 'd MMMM yyyy', { locale: id }) : ''}`;
+    doc.text(dateStr, 105, y, { align: 'center' });
+    y += 10;
+    
+    // ASET
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ASET', 15, y);
+    y += 6;
+    
+    const renderPdfSection = (title: string, data: ReportRow[], total: number) => {
+        if (data.length === 0) return;
+        doc.setFont('helvetica', 'bold');
+        doc.text(title, 20, y);
+        y += 6;
+        doc.setFont('helvetica', 'normal');
+        data.forEach(row => {
+            doc.text(row.accountName, 25, y);
+            doc.text(formatCurrency(row.amount), 100, y, { align: 'right' });
+            y += 5;
+            addPageIfNeeded();
+        });
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Total ${title}`, 25, y);
+        doc.text(formatCurrency(total), 110, y, { align: 'right' });
+        y += 7;
+    }
+    
+    renderPdfSection("Aset Lancar", reportData.currentAssets, reportData.currentAssets.reduce((s, r) => s + r.amount, 0));
+    renderPdfSection("Aset Tetap", reportData.fixedAssets, reportData.fixedAssets.reduce((s, r) => s + r.amount, 0));
+    
+    drawLine(y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text("TOTAL ASET", 15, y);
+    doc.text(formatCurrency(reportData.totalAssets), 195, y, { align: 'right' });
+    y += 10;
+    addPageIfNeeded();
+    
+    // KEWAJIBAN & EKUITAS
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KEWAJIBAN DAN EKUITAS', 15, y);
+    y += 6;
+    
+    renderPdfSection("Kewajiban Jangka Pendek", reportData.shortTermLiabilities, reportData.shortTermLiabilities.reduce((s, r) => s + r.amount, 0));
+    renderPdfSection("Kewajiban Jangka Panjang", reportData.longTermLiabilities, reportData.longTermLiabilities.reduce((s, r) => s + r.amount, 0));
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Ekuitas', 20, y);
+    y+=6;
+    doc.setFont('helvetica', 'normal');
+    reportData.equity.forEach(row => {
+        doc.text(row.accountName, 25, y);
+        doc.text(formatCurrency(row.amount), 100, y, { align: 'right' });
+        y += 5;
+        addPageIfNeeded();
     });
+    doc.text('Laba Ditahan', 25, y);
+    doc.text(formatCurrency(reportData.retainedEarnings), 100, y, { align: 'right' });
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Ekuitas', 25, y);
+    doc.text(formatCurrency(reportData.totalEquity), 110, y, { align: 'right' });
+    y += 7;
+    addPageIfNeeded();
+
+    drawLine(y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text("TOTAL KEWAJIBAN DAN EKUITAS", 15, y);
+    doc.text(formatCurrency(reportData.totalLiabilities + reportData.totalEquity), 195, y, { align: 'right' });
+
+    // Footer
+    const pageCount = doc.internal.pages.length;
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Halaman ${i} dari ${pageCount}`, doc.internal.pageSize.getWidth() - 15, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+        doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 15, doc.internal.pageSize.getHeight() - 10);
+    }
+
+    doc.save(`laporan-neraca-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   const renderSection = (title: string, rows: ReportRow[], total: number) => (
@@ -278,3 +374,6 @@ export default function BalanceSheetPage() {
     </div>
   );
 }
+
+
+    
