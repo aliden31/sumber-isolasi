@@ -124,9 +124,19 @@ function WarehouseFormDialog({ children, warehouse }: { children: React.ReactNod
       }
     });
   };
+  
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isPending) return;
+    if (!isOpen) {
+      setName(warehouse?.name || '');
+      setAddress(warehouse?.address || '');
+      setIsDefault(warehouse?.isDefault || false);
+    }
+    setOpen(isOpen);
+  }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {isDropdownItem ? <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><Edit className="mr-2 h-4 w-4" /> Edit</div> : children}
       </DialogTrigger>
