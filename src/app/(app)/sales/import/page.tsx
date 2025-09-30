@@ -309,6 +309,7 @@ export default function ImportMarketplacePage() {
                                 <TableHead>Toko Marketplace</TableHead>
                                 <TableHead>SKU Laporan</TableHead>
                                 <TableHead className="min-w-[200px]">Produk Terpetakan</TableHead>
+                                <TableHead className="text-center">Kuantitas</TableHead>
                                 <TableHead>Alamat</TableHead>
                                 <TableHead className="text-right">Total Bersih</TableHead>
                             </TableRow>
@@ -328,6 +329,7 @@ export default function ImportMarketplacePage() {
                                             onMap={(p) => handleProductMapping(row.sku, p)}
                                         />
                                     </TableCell>
+                                    <TableCell className="text-center">{row.qty}</TableCell>
                                     <TableCell className="text-xs max-w-[200px] truncate">{row.alamat_lengkap}</TableCell>
                                     <TableCell className="text-right font-bold font-mono">Rp {row.net_total.toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
@@ -405,4 +407,5 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
 
