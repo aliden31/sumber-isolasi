@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -32,10 +32,13 @@ import { collection, onSnapshot, query, orderBy, where, Timestamp } from 'fireba
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import Papa from 'papaparse';
+import { useToast } from '@/hooks/use-toast';
+
 
 type LedgerEntry = {
   id: string;
@@ -52,13 +55,6 @@ type BankStatementItem = {
     amount: number;
 }
 
-// Mock data for bank statement
-const MOCK_BANK_STATEMENT: BankStatementItem[] = [
-    { id: 'bank-1', date: new Date(), description: 'Setoran Tunai', amount: 500000 },
-    { id: 'bank-2', date: new Date(), description: 'Biaya Admin', amount: -6500 },
-    { id: 'bank-3', date: new Date(), description: 'Transfer ke Supplier ABC', amount: -250000 },
-]
-
 export default function BankReconciliationPage() {
   const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
   const [journals, setJournals] = useState<Journal[]>([]);
@@ -68,6 +64,11 @@ export default function BankReconciliationPage() {
   
   const [clearedLedgerIds, setClearedLedgerIds] = useState<Set<string>>(new Set());
   const [clearedBankIds, setClearedBankIds] = useState<Set<string>>(new Set());
+
+  const [bankStatementItems, setBankStatementItems] = useState<BankStatementItem[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
 
   useEffect(() => {
     const q = query(collection(db, 'coa'), where('type', '==', 'Kas & Bank'));
@@ -151,19 +152,58 @@ export default function BankReconciliationPage() {
         .filter(e => clearedLedgerIds.has(e.id))
         .reduce((sum, e) => sum + e.amount, 0);
 
-      const clearedBankTotal = MOCK_BANK_STATEMENT
+      const clearedBankTotal = bankStatementItems
         .filter(e => clearedBankIds.has(e.id))
         .reduce((sum, e) => sum + e.amount, 0);
 
       const unclearedLedger = closingBalance - clearedLedgerTotal;
-      const unclearedBank = 0 - clearedBankTotal; // Assuming starting bank balance 0 for mock
+      const unclearedBank = 0 - clearedBankTotal; // Assuming starting bank balance 0 for now
 
       return {
           unclearedLedger,
           unclearedBank,
           difference: unclearedLedger - unclearedBank,
       }
-  }, [clearedLedgerIds, clearedBankIds, ledgerEntries, closingBalance]);
+  }, [clearedLedgerIds, clearedBankIds, ledgerEntries, closingBalance, bankStatementItems]);
+  
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        try {
+          const parsedData = results.data.map((row: any, index: number) => {
+            // This is a common format, might need adjustment
+            // Assumes columns: 'Tanggal', 'Deskripsi', 'Jumlah'
+            const date = parse(row.Tanggal, 'dd/MM/yyyy', new Date());
+            const amount = parseFloat(row.Jumlah.replace(/[^0-9\.-]+/g, ""));
+            
+            if (isNaN(date.getTime()) || isNaN(amount)) {
+                throw new Error(`Baris ${index + 2} tidak valid.`);
+            }
+
+            return {
+              id: `bank-${index}`,
+              date: date,
+              description: row.Deskripsi,
+              amount: amount,
+            };
+          });
+          setBankStatementItems(parsedData);
+          toast({ title: 'Berhasil', description: `${parsedData.length} transaksi bank berhasil di-parse.` });
+        } catch(e) {
+          const err = e as Error;
+          toast({ title: 'Gagal Parse File', description: `Format CSV tidak sesuai. ${err.message}`, variant: 'destructive' });
+        }
+      },
+      error: (error: any) => {
+        toast({ title: 'Gagal Membaca File', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
   
   return (
     <div className="flex flex-col gap-6">
@@ -183,7 +223,7 @@ export default function BankReconciliationPage() {
         <CardHeader>
           <CardTitle className="font-headline">Proses Rekonsiliasi</CardTitle>
           <CardDescription>
-            Pilih akun bank dan periode, lalu centang transaksi yang cocok antara catatan Anda dan laporan koran.
+            Pilih akun bank dan periode, lalu unggah laporan koran (format CSV) dan centang transaksi yang cocok.
           </CardDescription>
           <div className="grid md:grid-cols-2 gap-4 pt-4">
              <Select onValueChange={setSelectedAccountId} disabled={loading}>
@@ -196,9 +236,16 @@ export default function BankReconciliationPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button disabled>
-                <Upload className="mr-2 h-4 w-4" /> Unggah Laporan Koran (Segera Hadir)
+            <Button onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" /> Unggah Laporan Koran (.csv)
             </Button>
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept=".csv"
+                onChange={handleFileUpload}
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -247,9 +294,9 @@ export default function BankReconciliationPage() {
                                 </TableRow>
                             </TableHeader>
                              <TableBody>
-                                 {MOCK_BANK_STATEMENT.length === 0 ? (
+                                 {bankStatementItems.length === 0 ? (
                                      <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Unggah laporan koran.</TableCell></TableRow>
-                                ) : MOCK_BANK_STATEMENT.map(entry => (
+                                ) : bankStatementItems.map(entry => (
                                     <TableRow key={entry.id} data-state={clearedBankIds.has(entry.id) && 'selected'}>
                                         <TableCell><Checkbox checked={clearedBankIds.has(entry.id)} onCheckedChange={() => handleToggleCleared(entry.id, 'bank')} /></TableCell>
                                         <TableCell>{format(entry.date, 'dd/MM')}</TableCell>
@@ -302,5 +349,3 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
-
-    
