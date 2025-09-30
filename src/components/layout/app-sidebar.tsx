@@ -108,6 +108,7 @@ const navItems = [
       { href: "/sales/manual-input", label: "Buat Invoice", icon: FileDigit },
       { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
       { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
+      { href: "/sales/import", label: "Import Marketplace", icon: Download, isDev: true },
     ],
   },
   {
@@ -143,7 +144,7 @@ const navItems = [
       { href: "/cash/in", label: "Kas Masuk", icon: Banknote },
       { href: "/cash/out", label: "Kas Keluar", icon: LogOut },
       { href: "/cash/transfer", label: "Transfer Antar Kas", icon: ArrowRightLeft },
-      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw },
+      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw, isDev: true },
     ],
   },
   {
