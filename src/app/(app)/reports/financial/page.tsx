@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { getCompanySettings } from '@/app/(app)/settings/actions';
 
 
 type ReportRow = {
@@ -157,22 +158,102 @@ export default function FinancialReportsPage() {
     </>
   );
   
-  const handleExportPDF = () => {
-    const input = reportRef.current;
-    if (!input) return;
+  const handleExportPDF = async () => {
+    const doc = new jsPDF();
+    const settings = await getCompanySettings();
+    const companyName = settings.companyName || 'Toko Kilat';
+    
+    let y = 15;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const addPageIfNeeded = () => {
+        if (y > pageHeight - 20) {
+            doc.addPage();
+            y = 15;
+        }
+    }
 
-    html2canvas(input, { scale: 2 }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const height = pdfWidth / ratio;
+    // Header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName, 105, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Laporan Laba Rugi', 105, y, { align: 'center' });
+    y += 5;
+    const dateStr = `Untuk Periode yang Berakhir pada ${dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : ''}`;
+    doc.setFontSize(10);
+    doc.text(dateStr, 105, y, { align: 'center' });
+    y += 10;
+    
+    const formatCurrency = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+    const drawLine = () => {
+        y += 2;
+        doc.setDrawColor(180, 180, 180);
+        doc.line(15, y, 195, y);
+        y += 4;
+    };
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
-      pdf.save(`laporan-laba-rugi-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Pendapatan', 15, y);
+    y += 7;
+    doc.setFont('helvetica', 'normal');
+    reportData.revenues.forEach(row => {
+        addPageIfNeeded();
+        doc.text(row.accountName, 20, y);
+        doc.text(formatCurrency(row.amount), 195, y, { align: 'right' });
+        y += 6;
     });
+
+    drawLine();
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Pendapatan', 15, y);
+    doc.text(formatCurrency(reportData.totalRevenue), 195, y, { align: 'right' });
+    y += 10;
+
+    doc.text('Beban Pokok Penjualan', 15, y);
+    y += 7;
+    doc.setFont('helvetica', 'normal');
+    reportData.cogs.forEach(row => {
+        addPageIfNeeded();
+        doc.text(row.accountName, 20, y);
+        doc.text(`(${formatCurrency(row.amount)})`, 195, y, { align: 'right' });
+        y += 6;
+    });
+    
+    drawLine();
+    doc.setFont('helvetica', 'bold');
+    doc.text('Laba Kotor', 15, y);
+    doc.text(formatCurrency(reportData.grossProfit), 195, y, { align: 'right' });
+    y += 10;
+
+    doc.text('Beban Operasional', 15, y);
+    y += 7;
+    doc.setFont('helvetica', 'normal');
+     reportData.expenses.forEach(row => {
+        addPageIfNeeded();
+        doc.text(row.accountName, 20, y);
+        doc.text(`(${formatCurrency(row.amount)})`, 195, y, { align: 'right' });
+        y += 6;
+    });
+    
+    drawLine();
+    doc.setFont('helvetica', 'bold');
+    doc.text('Laba Bersih', 15, y);
+    doc.text(formatCurrency(reportData.netIncome), 195, y, { align: 'right' });
+    y += 10;
+
+    // Footer
+    const pageCount = doc.internal.pages.length;
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Halaman ${i} dari ${pageCount}`, doc.internal.pageSize.getWidth() - 15, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+        doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 15, doc.internal.pageSize.getHeight() - 10);
+    }
+    
+    doc.save(`laporan-laba-rugi-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   return (
@@ -239,3 +320,4 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
+
