@@ -149,7 +149,7 @@ export default function ImportMarketplacePage() {
                     const nomor_order = String(getVal(['nomor pesanan', 'order id', 'no. pesanan']) || '');
                     const channel = String(getVal(['marketplace', 'channel']) || 'N/A');
                     const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
-                    const sku = String(getVal(['sku induk', 'informasi sku']) || getVal(['nama produk']) || '');
+                    const sku = String(getVal(['sku induk', 'informasi sku']) || '');
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
                     const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
@@ -163,7 +163,7 @@ export default function ImportMarketplacePage() {
                     const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
                     const fee = fee_pengelolaan + fee_transaksi;
                     
-                    const diskon_penjual = normalizeNumber(getVal(['diskon penjual', 'diskon dari penjual']));
+                    const diskon_penjual = normalizeNumber(getVal(['diskon dari penjual', 'diskon penjual']));
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
                     const voucher_toko = normalizeNumber(getVal(['voucher toko']));
                     const discount = diskon_marketplace + voucher_toko;
