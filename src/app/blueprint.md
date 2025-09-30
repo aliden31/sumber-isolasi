@@ -21,7 +21,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Buat Invoice (Input Manual)**: Membuat penjualan kredit/piutang untuk pelanggan.
 - **Piutang Usaha**: Mengelola dan mencatat pelunasan piutang dari pelanggan.
 - **Retur Penjualan**: Memproses pengembalian barang dari penjualan kredit (non-POS).
-- **Impor Penjualan dari Marketplace**: Antarmuka untuk mengunggah dan mem-parsing laporan dari Tokopedia, Shopee, dll. sudah ada. Logika untuk menyimpan ke database dan rekonsiliasi belum ada.
+- **Impor Penjualan dari Marketplace**: Antarmuka untuk mengunggah dan mem-parsing laporan dari Tokopedia, Shopee, dll. Logika untuk menyimpan ke database dan rekonsiliasi sudah ada.
 
 ### Modul: Pembelian (Alur Penuh)
 - **Permintaan Pembelian (PR)**: Membuat permintaan pembelian internal sebelum menjadi PO.

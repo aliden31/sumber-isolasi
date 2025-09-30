@@ -20,16 +20,28 @@ type ReportRow = {
 };
 
 type CashFlowReport = {
-  operatingActivities: ReportRow[];
-  investingActivities: ReportRow[];
-  financingActivities: ReportRow[];
+  netIncome: number;
+  adjustments: ReportRow[];
   netCashFromOperating: number;
+  
+  investingActivities: ReportRow[];
   netCashFromInvesting: number;
+
+  financingActivities: ReportRow[];
   netCashFromFinancing: number;
+
   netCashChange: number;
   beginningCash: number;
   endingCash: number;
 };
+
+const isAsset = (type: string) => type.startsWith('Aset') || type.startsWith('Kas');
+const isLiability = (type: string) => type.startsWith('Kewajiban');
+const isEquity = (type: string) => type.startsWith('Ekuitas');
+const isRevenue = (type: string) => type.startsWith('Pendapatan');
+const isExpense = (type: string) => type.startsWith('Beban');
+const isContraAsset = (type: string) => type.startsWith('Akumulasi');
+
 
 export default function CashFlowPage() {
   const [journals, setJournals] = useState<Journal[]>([]);
@@ -46,7 +58,6 @@ export default function CashFlowPage() {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
     });
     
-    // Fetch all journals for beginning balance calculation
     const allJournalsQuery = query(collection(db, 'journals'), orderBy('date', 'asc'));
     const unsubAllJournals = onSnapshot(allJournalsQuery, (snapshot) => {
         setAllTimeJournals(snapshot.docs.map(doc => ({...doc.data(), date: doc.data().date.toDate()} as Journal)));
@@ -87,80 +98,97 @@ export default function CashFlowPage() {
 
   const reportData: CashFlowReport = useMemo(() => {
     const report: CashFlowReport = {
-      operatingActivities: [], investingActivities: [], financingActivities: [],
-      netCashFromOperating: 0, netCashFromInvesting: 0, netCashFromFinancing: 0,
-      netCashChange: 0, beginningCash: 0, endingCash: 0,
+      netIncome: 0, adjustments: [], netCashFromOperating: 0,
+      investingActivities: [], netCashFromInvesting: 0,
+      financingActivities: [], netCashFromFinancing: 0,
+      netCashChange: 0, beginningCash: 0, endingCash: 0
     };
+
+    if (!dateRange?.from) return report;
     
-    // Calculate Beginning Cash Balance
-    const beginningJournals = allTimeJournals.filter(j => dateRange?.from && j.date < dateRange.from);
-    let beginningCash = 0;
-    beginningJournals.forEach(j => {
-        j.entries.forEach(e => {
-            if (cashAccountIds.includes(e.accountId)) {
-                beginningCash += e.debit - e.credit;
-            }
-        })
+    const calculateBalances = (journalList: Journal[]) => {
+        const balances: { [key: string]: number } = {};
+        accounts.forEach(acc => { balances[acc.id] = 0; });
+        journalList.forEach(journal => {
+            journal.entries.forEach(entry => {
+                const account = accounts.find(a => a.id === entry.accountId);
+                if (account) {
+                   const balanceEffect = (isAsset(account.type) || isExpense(account.type)) && !isContraAsset(account.type)
+                        ? entry.debit - entry.credit
+                        : entry.credit - entry.debit;
+                   balances[entry.accountId] += balanceEffect;
+                }
+            })
+        });
+        return balances;
+    }
+
+    const beginningJournals = allTimeJournals.filter(j => j.date < dateRange.from!);
+    const beginningBalances = calculateBalances(beginningJournals);
+    report.beginningCash = cashAccountIds.reduce((sum, id) => sum + (beginningBalances[id] || 0), 0);
+
+    const endingBalances = calculateBalances(allTimeJournals.filter(j => j.date <= (dateRange.to || dateRange.from!)));
+    report.endingCash = cashAccountIds.reduce((sum, id) => sum + (endingBalances[id] || 0), 0);
+    
+    const currentBalances = calculateBalances(journals);
+
+    // Calculate Net Income for the period
+    let netIncome = 0;
+    accounts.forEach(acc => {
+        if (isRevenue(acc.type)) netIncome += currentBalances[acc.id] || 0;
+        if (isExpense(acc.type)) netIncome -= currentBalances[acc.id] || 0;
     });
-    report.beginningCash = beginningCash;
+    report.netIncome = netIncome;
 
-    const operatingInflows: { [key: string]: number } = {};
-    const operatingOutflows: { [key: string]: number } = {};
+    // Adjustments for Operating Activities (Indirect Method)
+    const operatingAdjustments: ReportRow[] = [];
+    accounts.forEach(acc => {
+        const beginningBalance = beginningBalances[acc.id] || 0;
+        const endingBalance = endingBalances[acc.id] || 0;
+        const change = endingBalance - beginningBalance;
 
+        if (change === 0) return;
+
+        // Depreciation & Amortization (non-cash expense)
+        if (isContraAsset(acc.type)) {
+            operatingAdjustments.push({ description: `Penambahan ${acc.name}`, amount: change });
+        }
+        // Changes in Working Capital
+        else if (acc.type === 'Aset Lancar' && acc.type !== 'Kas & Bank') {
+            operatingAdjustments.push({ description: `Kenaikan ${acc.name}`, amount: -change }); // Increase in asset is cash outflow
+        } else if (acc.type === 'Kewajiban Jangka Pendek') {
+            operatingAdjustments.push({ description: `Kenaikan ${acc.name}`, amount: change }); // Increase in liability is cash inflow
+        }
+    });
+
+    report.adjustments = operatingAdjustments;
+    report.netCashFromOperating = report.netIncome + operatingAdjustments.reduce((sum, adj) => sum + adj.amount, 0);
+
+    // Direct cash movements for Investing and Financing
     journals.forEach(journal => {
-      let cashEffect = 0;
-      const nonCashEntries: { account: Account, amount: number }[] = [];
-      
-      journal.entries.forEach(entry => {
-        if (cashAccountIds.includes(entry.accountId)) {
-          cashEffect += entry.debit - entry.credit;
-        } else {
-          const account = accounts.find(a => a.id === entry.accountId);
-          if (account) {
-            nonCashEntries.push({ account, amount: entry.credit - entry.debit });
-          }
-        }
-      });
+        const cashEntry = journal.entries.find(e => cashAccountIds.includes(e.accountId));
+        if (!cashEntry) return; // Skip non-cash transaction
 
-      if (cashEffect === 0) return; // Skip non-cash transactions
+        const cashAmount = cashEntry.debit - cashEntry.credit;
+        const contraEntries = journal.entries.filter(e => !cashAccountIds.includes(e.accountId));
 
-      nonCashEntries.forEach(nce => {
-        const { account, amount } = nce;
-        const targetAmount = amount + (cashEffect / nonCashEntries.length); // Distribute cash effect
-        
-        // Classify based on account type
-        if (['Pendapatan', 'Aset Lancar', 'Kewajiban Jangka Pendek'].includes(account.type)) { // Operating
-            if (targetAmount > 0) { // Inflow
-                const desc = `Penerimaan dari ${account.name}`;
-                operatingInflows[desc] = (operatingInflows[desc] || 0) + targetAmount;
-            } else { // Outflow
-                 const desc = `Pembayaran untuk ${account.name}`;
-                operatingOutflows[desc] = (operatingOutflows[desc] || 0) + targetAmount;
+        contraEntries.forEach(contra => {
+            const contraAccount = accounts.find(a => a.id === contra.accountId);
+            if (!contraAccount) return;
+            
+            const contraAmount = contra.debit - contra.credit;
+
+            if (contraAccount.type === 'Aset Tetap') {
+                report.investingActivities.push({ description: contraAmount > 0 ? `Pembelian ${contraAccount.name}` : `Penjualan ${contraAccount.name}`, amount: -cashAmount });
+            } else if (contraAccount.type === 'Kewajiban Jangka Panjang' || contraAccount.type === 'Ekuitas') {
+                report.financingActivities.push({ description: contraAmount < 0 ? `Penerimaan dari ${contraAccount.name}` : `Pembayaran ke ${contraAccount.name}`, amount: cashAmount });
             }
-        } else if (['Beban Pokok Penjualan', 'Beban Operasional'].includes(account.type)) { // Operating Outflow
-            const desc = `Pembayaran ${account.name}`;
-            operatingOutflows[desc] = (operatingOutflows[desc] || 0) - targetAmount;
-        } else if (account.type.includes('Aset Tetap')) { // Investing
-            const desc = amount < 0 ? `Pembelian ${account.name}` : `Penjualan ${account.name}`;
-            report.investingActivities.push({ description: desc, amount: -targetAmount });
-        } else if (account.type.includes('Ekuitas') || account.type.includes('Kewajiban Jangka Panjang')) { // Financing
-            const desc = amount < 0 ? `Penerimaan dari ${account.name}` : `Pembayaran ${account.name}`;
-            report.financingActivities.push({ description: desc, amount: -targetAmount });
-        }
-      });
+        });
     });
 
-    report.operatingActivities = [
-        ...Object.entries(operatingInflows).map(([desc, amt]) => ({ description: desc, amount: amt })),
-        ...Object.entries(operatingOutflows).map(([desc, amt]) => ({ description: desc, amount: amt }))
-    ];
-
-    report.netCashFromOperating = report.operatingActivities.reduce((sum, act) => sum + act.amount, 0);
-    report.netCashFromInvesting = report.investingActivities.reduce((sum, act) => sum + act.amount, 0);
-    report.netCashFromFinancing = report.financingActivities.reduce((sum, act) => sum + act.amount, 0);
-
+    report.netCashFromInvesting = report.investingActivities.reduce((sum, inv) => sum + inv.amount, 0);
+    report.netCashFromFinancing = report.financingActivities.reduce((sum, fin) => sum + fin.amount, 0);
     report.netCashChange = report.netCashFromOperating + report.netCashFromInvesting + report.netCashFromFinancing;
-    report.endingCash = report.beginningCash + report.netCashChange;
 
     return report;
   }, [journals, accounts, cashAccountIds, allTimeJournals, dateRange]);
@@ -177,7 +205,7 @@ export default function CashFlowPage() {
         </TableRow>
       ))}
       <TableRow className="font-semibold border-t">
-        <TableCell>Arus Kas Bersih dari {title}</TableCell>
+        <TableCell>Arus Kas Bersih dari {title.replace('Arus Kas dari ', '')}</TableCell>
         <TableCell className="text-right font-mono">{total.toLocaleString('id-ID')}</TableCell>
       </TableRow>
     </>
@@ -191,7 +219,7 @@ export default function CashFlowPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Laporan Arus Kas</CardTitle>
+          <CardTitle>Laporan Arus Kas (Metode Tidak Langsung)</CardTitle>
            <CardDescription>
             Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}
           </CardDescription>
@@ -203,14 +231,24 @@ export default function CashFlowPage() {
             <Table>
                 <TableHeader><TableRow><TableHead>Deskripsi</TableHead><TableHead className="text-right">Jumlah (Rp)</TableHead></TableRow></TableHeader>
                 <TableBody>
-                    {renderSection("Aktivitas Operasi", reportData.operatingActivities, reportData.netCashFromOperating)}
-                    {renderSection("Aktivitas Investasi", reportData.investingActivities, reportData.netCashFromInvesting)}
-                    {renderSection("Aktivitas Pendanaan", reportData.financingActivities, reportData.netCashFromFinancing)}
+                    <TableRow className="font-bold bg-muted/30"><TableCell colSpan={2}>Arus Kas dari Aktivitas Operasi</TableCell></TableRow>
+                    <TableRow><TableCell className="pl-8">Laba Bersih</TableCell><TableCell className="text-right font-mono">{reportData.netIncome.toLocaleString('id-ID')}</TableCell></TableRow>
+                    <TableRow><TableCell className="pl-8 font-semibold text-muted-foreground">Penyesuaian untuk rekonsiliasi:</TableCell><TableCell></TableCell></TableRow>
+                    {reportData.adjustments.map((row, i) => (
+                        <TableRow key={`adj-${i}`}>
+                            <TableCell className="pl-12">{row.description}</TableCell>
+                            <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
+                        </TableRow>
+                    ))}
+                    <TableRow className="font-semibold border-t"><TableCell>Arus Kas Bersih dari Aktivitas Operasi</TableCell><TableCell className="text-right font-mono">{reportData.netCashFromOperating.toLocaleString('id-ID')}</TableCell></TableRow>
+
+                    {renderSection("Arus Kas dari Aktivitas Investasi", reportData.investingActivities, reportData.netCashFromInvesting)}
+                    {renderSection("Arus Kas dari Aktivitas Pendanaan", reportData.financingActivities, reportData.netCashFromFinancing)}
                 </TableBody>
                 <TableFooter>
                     <TableRow className="font-bold text-base"><TableCell>Kenaikan (Penurunan) Bersih Kas</TableCell><TableCell className="text-right font-mono">{reportData.netCashChange.toLocaleString('id-ID')}</TableCell></TableRow>
-                    <TableRow><TableCell>Saldo Kas Awal Periode</TableCell><TableCell className="text-right font-mono">{reportData.beginningCash.toLocaleString('id-ID')}</TableCell></TableRow>
-                    <TableRow className="font-bold text-lg bg-secondary/50 hover:bg-secondary"><TableCell>Saldo Kas Akhir Periode</TableCell><TableCell className="text-right font-mono">{reportData.endingCash.toLocaleString('id-ID')}</TableCell></TableRow>
+                    <TableRow><TableCell>Saldo Kas dan Setara Kas, Awal Periode</TableCell><TableCell className="text-right font-mono">{reportData.beginningCash.toLocaleString('id-ID')}</TableCell></TableRow>
+                    <TableRow className="font-bold text-lg bg-secondary/50 hover:bg-secondary"><TableCell>Saldo Kas dan Setara Kas, Akhir Periode</TableCell><TableCell className="text-right font-mono">{reportData.endingCash.toLocaleString('id-ID')}</TableCell></TableRow>
                 </TableFooter>
             </Table>
           )}
@@ -225,5 +263,3 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
-
-    

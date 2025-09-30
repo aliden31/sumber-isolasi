@@ -109,7 +109,7 @@ const navItems = [
       { href: "/sales/manual-input", label: "Buat Invoice", icon: FileDigit },
       { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
       { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
-      { href: "/sales/import", label: "Import Marketplace", icon: Download, isDev: true },
+      { href: "/sales/import", label: "Import Marketplace", icon: Download, isDev: false },
     ],
   },
   {
@@ -167,7 +167,7 @@ const navItems = [
       { href: "/reports/stock", label: "Stok", icon: FileText },
       { href: "/reports/financial", label: "Laba Rugi", icon: FileText },
       { href: "/reports/balance-sheet", label: "Neraca", icon: Scale },
-      { href: "/reports/cash-flow", label: "Arus Kas", icon: AreaChart, isDev: true },
+      { href: "/reports/cash-flow", label: "Arus Kas", icon: AreaChart },
     ],
   },
     {
