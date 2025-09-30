@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { collection, addDoc, doc, updateDoc, Timestamp, runTransaction, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewPurchaseOrder, NewGoodsReceipt, Product, JournalEntry, NewJournal, GoodsReceipt, NewSupplierInvoice, NewPurchasePayment, SupplierInvoice, NewPurchaseRequest, PurchaseRequest } from "@/lib/types";
+import type { NewPurchaseOrder, NewGoodsReceipt, Product, JournalEntry, NewJournal, GoodsReceipt, NewSupplierInvoice, NewPurchasePayment, SupplierInvoice, NewPurchaseRequest, PurchaseRequest, PurchaseOrder } from "@/lib/types";
 import { addJournalEntry } from "@/app/(app)/accounting/journal/actions";
 import { getAccountingSettings } from "@/app/(app)/settings/accounting/actions";
 
