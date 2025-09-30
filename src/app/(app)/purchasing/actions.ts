@@ -2,21 +2,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, addDoc, doc, updateDoc, Timestamp, runTransaction, writeBatch } from "firebase/firestore";
+import { collection, doc, updateDoc, Timestamp, runTransaction, writeBatch, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewPurchaseOrder, NewGoodsReceipt, Product, JournalEntry, NewJournal, GoodsReceipt, NewSupplierInvoice, NewPurchasePayment, SupplierInvoice, NewPurchaseRequest, PurchaseRequest, PurchaseOrder, NewPurchaseReturn } from "@/lib/types";
+import type { NewPurchaseOrder, NewGoodsReceipt, Product, JournalEntry, NewJournal, NewSupplierInvoice, NewPurchasePayment, NewPurchaseRequest, PurchaseRequest, PurchaseOrder, NewPurchaseReturn } from "@/lib/types";
 import { addJournalEntry } from "@/app/(app)/accounting/journal/actions";
 import { getAccountingSettings } from "@/app/(app)/settings/accounting/actions";
+import { generateDocumentId } from "@/lib/utils";
 
 const createResponse = (error: string | null = null, id: string | null = null) => ({ error, id });
 
 export async function addPurchaseRequest(prData: NewPurchaseRequest) {
   try {
     const prCol = collection(db, "purchaseRequests");
+    const newId = generateDocumentId('PR');
     const prWithTimestamp = { ...prData, date: Timestamp.fromDate(prData.date as Date) };
-    const docRef = await addDoc(prCol, prWithTimestamp);
+    await setDoc(doc(prCol, newId), prWithTimestamp);
     revalidatePath("/(app)/purchasing/request");
-    return createResponse(null, docRef.id);
+    return createResponse(null, newId);
   } catch (e) {
     return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
   }
@@ -36,10 +38,11 @@ export async function updatePurchaseRequestStatus(prId: string, status: Purchase
 export async function addPurchaseOrder(poData: NewPurchaseOrder) {
   try {
     const poCol = collection(db, "purchaseOrders");
+    const newId = generateDocumentId('PO');
     const poWithTimestamp = { ...poData, date: Timestamp.fromDate(poData.date as Date) };
-    const docRef = await addDoc(poCol, poWithTimestamp);
+    await setDoc(doc(poCol, newId), poWithTimestamp);
     revalidatePath("/(app)/purchasing/order");
-    return createResponse(null, docRef.id);
+    return createResponse(null, newId);
   } catch (e) {
     return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
   }
@@ -62,7 +65,8 @@ export async function addGoodsReceipt(grData: NewGoodsReceipt, poId: string) {
     try {
         const newGRRef = await runTransaction(db, async (transaction) => {
             const grCol = collection(db, "goodsReceipts");
-            const newDocRef = doc(grCol);
+            const newId = generateDocumentId('GRN');
+            const newDocRef = doc(grCol, newId);
 
             // --- 1. Perform all reads first ---
             const productReads = grData.items.map(item => {
@@ -140,7 +144,8 @@ export async function addSupplierInvoice(invoiceData: NewSupplierInvoice) {
         const batch = writeBatch(db);
         
         const invoiceCol = collection(db, "supplierInvoices");
-        const newInvoiceRef = doc(invoiceCol);
+        const newId = generateDocumentId('SINV');
+        const newInvoiceRef = doc(invoiceCol, newId);
         batch.set(newInvoiceRef, { ...invoiceData, date: Timestamp.fromDate(invoiceData.date as Date), status: 'Unpaid' });
 
         const grRef = doc(db, "goodsReceipts", invoiceData.goodsReceiptId);
@@ -183,7 +188,8 @@ export async function paySupplierInvoice(paymentData: NewPurchasePayment) {
         const batch = writeBatch(db);
 
         const paymentCol = collection(db, "purchasePayments");
-        const newPaymentRef = doc(paymentCol);
+        const newId = generateDocumentId('PPAY');
+        const newPaymentRef = doc(paymentCol, newId);
         batch.set(newPaymentRef, { ...paymentData, date: Timestamp.fromDate(paymentData.date as Date) });
 
         const invoiceRef = doc(db, "supplierInvoices", paymentData.invoiceId);
@@ -225,7 +231,8 @@ export async function processPurchaseReturn(returnData: NewPurchaseReturn) {
     try {
         const newReturnRef = await runTransaction(db, async (transaction) => {
             const returnsCol = collection(db, "purchaseReturns");
-            const newDocRef = doc(returnsCol);
+            const newId = generateDocumentId('PRT');
+            const newDocRef = doc(returnsCol, newId);
             
             // 1. Update product stock
             for (const item of returnData.items) {

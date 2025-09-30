@@ -7,27 +7,23 @@ import {
   doc, 
   Timestamp,
   runTransaction,
-  addDoc,
   getDoc,
-  query,
-  where,
-  getDocs,
-  limit,
-  writeBatch,
-  updateDoc
+  writeBatch
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewTransaction, Product, JournalEntry, NewJournal, NewParkedTransaction, NewSalesReturn, Transaction, Customer } from "@/lib/types";
+import type { NewTransaction, Product, JournalEntry, NewJournal, NewParkedTransaction, NewSalesReturn, Transaction } from "@/lib/types";
 import { addJournalEntry } from "../accounting/journal/actions";
 import { getAccountingSettings } from "../settings/accounting/actions";
+import { generateDocumentId } from "@/lib/utils";
 
 // Helper function to return a consistent response shape
 const createResponse = (error: string | null = null, id: string | null = null) => ({ error, id });
 
 export async function parkTransaction(parkedData: NewParkedTransaction) {
     try {
+        const id = generateDocumentId('PARK');
         const parkedCol = collection(db, 'parkedTransactions');
-        await addDoc(parkedCol, {
+        await setDoc(doc(parkedCol, id), {
             ...parkedData,
             createdAt: Timestamp.fromDate(parkedData.createdAt as Date)
         });
@@ -63,7 +59,8 @@ export async function createTransaction(transactionData: NewTransaction, isPOS: 
         const productsCol = collection(db, 'products');
         const transactionsCol = collection(db, "transactions");
 
-        const newDocRef = doc(transactionsCol);
+        const newId = generateDocumentId('INV');
+        const newDocRef = doc(transactionsCol, newId);
 
         let totalCost = 0;
 
@@ -96,8 +93,8 @@ export async function createTransaction(transactionData: NewTransaction, isPOS: 
     });
 
     const { totalCost } = newTransactionRef;
-    const { total, paymentMethod, customerId, customerName } = transactionData;
-    const description = `Penjualan ${isPOS ? 'POS' : 'Manual'} #${newTransactionRef.ref.id}${customerName ? ` kepada ${customerName}`: ''}`;
+    const { total, paymentMethod } = transactionData;
+    const description = `Penjualan ${isPOS ? 'POS' : 'Manual'} #${newTransactionRef.ref.id}`;
 
     const settings = await getAccountingSettings();
     
@@ -162,38 +159,33 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
   try {
     const returnRef = await runTransaction(db, async (t) => {
         const returnsCol = collection(db, 'salesReturns');
-        const newReturnRef = doc(returnsCol);
+        const newReturnId = generateDocumentId('SR'); // SR for Sales Return
+        const newReturnRef = doc(returnsCol, newReturnId);
 
         let totalCost = 0;
-        const productUpdates: { ref: any, newStock: number }[] = [];
-        const productReads: Promise<any>[] = [];
         
         // --- 1. Perform all reads first ---
-
-        // Read original transaction
         const originalTxRef = doc(db, 'transactions', returnData.originalTransactionId);
         const originalTxSnap = await t.get(originalTxRef);
 
-        // Read all products involved in the return
-        for (const item of returnData.items) {
-            const productRef = doc(db, 'products', item.productId);
-            const productSnap = await t.get(productRef);
+        const productReads = returnData.items.map(item => t.get(doc(db, 'products', item.productId)));
+        const productSnaps = await Promise.all(productReads);
+        
+        // --- 2. Perform all writes now ---
+        for(let i = 0; i < productSnaps.length; i++) {
+            const productSnap = productSnaps[i];
+            const item = returnData.items[i];
+            
             if (!productSnap.exists()) {
                 throw new Error(`Produk dengan ID ${item.productId} tidak ditemukan.`);
             }
             const productData = productSnap.data() as Product;
             totalCost += (productData.cost || 0) * item.quantity;
-            productUpdates.push({ ref: productRef, newStock: productData.stock + item.quantity });
-        }
-
-        // --- 2. Perform all writes now ---
-        
-        // Update product stocks
-        for (const update of productUpdates) {
-            t.update(update.ref, { stock: update.newStock });
+            
+            const newStock = productData.stock + item.quantity;
+            t.update(productSnap.ref, { stock: newStock });
         }
         
-        // If the original transaction was credit and not yet paid, update its total
         if (originalTxSnap.exists()) {
             const originalTxData = originalTxSnap.data() as Transaction;
             if (originalTxData.status === 'Belum Lunas') {
@@ -201,7 +193,6 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
             }
         }
         
-        // Create the new sales return document
         const returnWithTimestamp = {
           ...returnData,
           date: Timestamp.fromDate(new Date()),
@@ -300,7 +291,7 @@ export async function settleReceivable(transaction: Transaction, paymentAccountI
         const newJournal: NewJournal = {
             date: new Date(),
             description,
-            refNumber: `PELUNASAN-${transaction.id}`,
+            refNumber: `PEL-${transaction.id}`,
             entries: journalEntries,
             total: transaction.total,
         };
