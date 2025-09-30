@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Transaction, ProductSalesSummary, SalesMetric, SalesTrendData, Product } from '@/lib/types';
@@ -11,9 +11,12 @@ import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, DollarSign, ShoppingCart, Package, TrendingUp } from 'lucide-react';
+import { Loader2, DollarSign, ShoppingCart, Package, TrendingUp, Download } from 'lucide-react';
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { ChartTooltip, ChartTooltipContent, ChartContainer } from "@/components/ui/chart";
+import { Button } from '@/components/ui/button';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function SalesReportPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -23,6 +26,7 @@ export default function SalesReportPage() {
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   });
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -46,7 +50,7 @@ export default function SalesReportPage() {
     const transUnsub = onSnapshot(q, (snapshot) => {
         setTransactions(snapshot.docs.map(doc => {
             const data = doc.data();
-            return { id: doc.id, ...data, date: data.date.toDate() } as Transaction;
+            return { id: doc.id, ...data, date: doc.data().toDate() } as Transaction;
         }));
         setLoading(false);
     }, (error) => {
@@ -116,17 +120,56 @@ export default function SalesReportPage() {
     return [...productSummary].sort((a,b) => b.quantitySold - a.quantitySold).slice(0, 5);
   }, [productSummary]);
 
+  const handleExportPDF = () => {
+    const input = reportRef.current;
+    if (!input) return;
+
+    html2canvas(input, { scale: 2 }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      const width = pdfWidth;
+      const height = width / ratio;
+
+      // If content is larger than one page, split it
+      let position = 0;
+      let heightLeft = height;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, width, height);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - height;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, width, height);
+        heightLeft -= pdfHeight;
+      }
+      
+      pdf.save(`laporan-penjualan-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Penjualan</h1>
-        <DateRangePicker onSelect={setDateRange} />
+        <div className="flex gap-2">
+            <DateRangePicker onSelect={setDateRange} />
+            <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
+                <Download className="mr-2 h-4 w-4"/>
+                Ekspor PDF
+            </Button>
+        </div>
       </div>
       
       {loading ? (
         <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>
       ) : (
-        <>
+        <div ref={reportRef} className="flex flex-col gap-6">
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard title="Penjualan Kotor" value={metrics.grossSales} format="currency" icon={DollarSign} />
             <MetricCard title="Total Transaksi" value={metrics.totalTransactions} icon={ShoppingCart} />
@@ -198,7 +241,7 @@ export default function SalesReportPage() {
               </Table>
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
     </div>
   );
