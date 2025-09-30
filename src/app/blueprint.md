@@ -1,40 +1,72 @@
-# Blueprint Fitur Belum Selesai
+# Blueprint & Status Pengembangan
 
-Berikut adalah daftar lengkap fitur yang telah direncanakan namun saat ini masih berupa halaman *placeholder* dan belum memiliki fungsionalitas penuh. Beberapa fitur seperti Input Penjualan Manual (Piutang) dan Retur Penjualan Non-POS telah diimplementasikan.
+Berikut adalah daftar lengkap fitur aplikasi, beserta status implementasinya.
 
-## 1. Modul: Pembelian (Seluruh Alur Kerja)
-Ini adalah modul terbesar yang belum diimplementasikan. Seluruh siklus pembelian, mulai dari permintaan internal hingga pembayaran utang, belum berfungsi.
-- **Permintaan Pembelian (PR)**: Fitur untuk membuat permintaan pembelian internal sebelum menjadi PO.
-- **Pesanan Pembelian (PO)**: Fitur untuk membuat dan melacak status pesanan resmi ke pemasok.
-- **Penerimaan Barang (GRN)**: Fitur untuk mencatat barang yang diterima, menambah stok, dan membuat jurnal persediaan.
-- **Faktur Pemasok**: Fitur untuk mencatat tagihan dari pemasok dan mengakui utang usaha.
-- **Utang Usaha (Accounts Payable)**: Halaman untuk mengelola dan mencatat pembayaran semua utang kepada pemasok.
-- **Retur Pembelian**: Alur untuk memproses pengembalian barang ke pemasok.
+## ✅ Fitur Selesai
 
-## 2. Modul: Produk & Stok (Fitur Lanjutan)
-Manajemen inventaris yang lebih canggih belum tersedia.
-- **Kategori Produk**: Halaman khusus untuk mengelola (CRUD) kategori produk secara terpusat.
-- **Manajemen Multi-Gudang**: Fungsionalitas untuk membuat dan mengelola stok di beberapa lokasi atau gudang.
-- **Transfer Stok**: Fitur untuk mencatat perpindahan barang antar gudang.
-- **Penyesuaian Stok (Stock Opname)**: Alat untuk rekonsiliasi stok fisik dengan data sistem dan membuat jurnal penyesuaian.
-- **Notifikasi Stok**: Sistem peringatan otomatis untuk produk yang stoknya menipis berdasarkan batas minimum yang ditetapkan.
+Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik.
 
-## 3. Modul: Penjualan (Fitur Lanjutan)
+### Modul: Kasir (POS)
+- **Transaksi Baru**: Antarmuka kasir utama untuk penjualan.
+- **Transaksi Terparkir**: Menyimpan dan melanjutkan sesi keranjang belanja.
+- **Retur Kasir**: Memproses pengembalian barang dari transaksi tunai/langsung.
+- **Cetak Ulang Struk**: Mencari dan mencetak kembali struk transaksi.
+
+### Modul: Penjualan
+- **Riwayat Penjualan**: Melihat daftar lengkap semua transaksi.
+- **Buat Invoice (Input Manual)**: Membuat penjualan kredit/piutang untuk pelanggan.
+- **Piutang Usaha**: Mengelola dan mencatat pelunasan piutang dari pelanggan.
+- **Retur Penjualan**: Memproses pengembalian barang dari penjualan kredit (non-POS).
+
+### Modul: Pembelian (Alur Penuh)
+- **Permintaan Pembelian (PR)**: Membuat permintaan pembelian internal sebelum menjadi PO.
+- **Pesanan Pembelian (PO)**: Membuat dan melacak status pesanan resmi ke pemasok.
+- **Penerimaan Barang (GRN)**: Mencatat barang yang diterima, menambah stok, dan membuat jurnal.
+- **Faktur Pemasok**: Mencatat tagihan dari pemasok dan mengakui utang usaha.
+- **Utang Usaha (Accounts Payable)**: Mengelola dan mencatat pembayaran utang kepada pemasok.
+- **Retur Pembelian**: Memproses pengembalian barang ke pemasok.
+
+### Modul: Produk & Stok
+- **Master Produk**: Manajemen data produk (CRUD).
+- **Kategori Produk**: Manajemen kategori produk (CRUD).
+- **Gudang**: Manajemen daftar gudang (CRUD).
+- **Notifikasi Stok**: Dasbor untuk melihat produk yang stoknya menipis.
+- **Estimasi Stok (AI)**: Alat bantu AI untuk memprediksi kebutuhan stok.
+
+### Modul: Kas & Bank
+- **Kas Masuk**: Mencatat pemasukan di luar penjualan (misal: setoran modal).
+- **Kas Keluar**: Mencatat pengeluaran operasional (misal: bayar listrik).
+- **Transfer Antar Kas**: Mencatat perpindahan dana antar rekening kas/bank.
+
+### Modul: Akuntansi
+- **Bagan Akun (COA)**: Manajemen daftar akun akuntansi (CRUD) dan seeding.
+- **Jurnal Umum**: Input manual untuk transaksi jurnal.
+- **Buku Besar**: Melihat riwayat transaksi per akun.
+- **Tutup Buku**: Proses akuntansi akhir periode untuk menutup akun temporer.
+
+### Modul: Laporan
+- **Laporan Penjualan**: Analisis performa penjualan, produk terlaris, dan tren.
+- **Laporan Pembelian**: Analisis aktivitas pembelian dan pemasok.
+- **Laporan Stok**: Rincian stok dan valuasi persediaan.
+- **Laporan Laba Rugi**: Laporan keuangan untuk mengukur profitabilitas.
+
+### Modul: Master Data & Pengaturan
+- **Pelanggan**: Manajemen data pelanggan (CRUD).
+- **Pemasok**: Manajemen data pemasok (CRUD).
+- **Pajak**: Manajemen tarif pajak (CRUD).
+- **Mata Uang**: Manajemen mata uang (CRUD).
+- **Profil Perusahaan**: Mengatur informasi dasar perusahaan.
+- **Pengaturan Akuntansi**: Memetakan akun untuk jurnal otomatis.
+- **Data & Reset**: Fitur untuk menghapus data transaksional atau master.
+
+---
+
+## 🚧 Fitur Dalam Pengembangan
+
+Fitur-fitur berikut masih berupa halaman *placeholder* dan belum memiliki fungsionalitas penuh.
+
 - **Impor Penjualan**: Kemampuan untuk mengunggah data penjualan secara massal dari file CSV/Excel.
-
-## 4. Modul: Kas & Bank
+- **Transfer Stok**: Fitur untuk mencatat perpindahan barang antar gudang.
+- **Penyesuaian Stok (Stock Opname)**: Alat untuk rekonsiliasi stok fisik dengan data sistem.
 - **Rekonsiliasi Bank**: Alat untuk mencocokkan transaksi internal dengan laporan koran dari bank.
-
-## 5. Modul: Akuntansi
-- **Tutup Buku**: Proses akuntansi di akhir periode untuk menutup akun pendapatan/beban dan memindahkan laba/rugi ke ekuitas.
-
-## 6. Modul: Laporan (Laporan Detail)
-Meskipun Laporan Laba Rugi sudah ada, laporan-laporan analitis berikut masih berupa placeholder.
-- **Laporan Penjualan**: Analisis mendalam tentang performa penjualan, produk terlaris, penjualan per kategori, dll.
-- **Laporan Pembelian**: Analisis terperinci mengenai aktivitas pembelian dan performa pemasok.
-- **Laporan Stok**: Termasuk Laporan Valuasi Persediaan (menghitung total nilai stok) dan Kartu Stok (melacak riwayat pergerakan per item).
-
-## 7. Modul: Master Data & Pengaturan (Fitur Tambahan)
-- **Pengguna & Hak Akses**: Manajemen pengguna dan peran (role) untuk membatasi akses ke fitur tertentu.
-- **Pajak**: Pengelolaan jenis dan tarif pajak untuk transaksi.
-- **Mata Uang**: Pengelolaan berbagai mata uang dan kursnya untuk transaksi valuta asing.
+- **Pengguna & Hak Akses**: Manajemen pengguna dan peran (role) untuk membatasi akses.
