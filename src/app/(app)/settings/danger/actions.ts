@@ -1,4 +1,3 @@
-
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -28,60 +27,32 @@ async function deleteCollection(collectionName: string, batch: FirebaseFirestore
     });
 }
 
-export async function deleteTransactionalData() {
-  try {
-    const batch = writeBatch(db);
-    for (const colName of COLLECTIONS.TRANSACTIONAL) {
-        await deleteCollection(colName, batch);
+export async function handleCustomDelete(options: { transactional: boolean, master: boolean, coa: boolean }) {
+    try {
+        const batch = writeBatch(db);
+        if (options.transactional) {
+            for (const colName of COLLECTIONS.TRANSACTIONAL) {
+                await deleteCollection(colName, batch);
+            }
+        }
+        if (options.master) {
+            for (const colName of COLLECTIONS.MASTER) {
+                await deleteCollection(colName, batch);
+            }
+        }
+        if (options.coa) {
+            for (const colName of COLLECTIONS.ACCOUNTING) {
+                await deleteCollection(colName, batch);
+            }
+        }
+        await batch.commit();
+        revalidateAllPaths();
+        return createResponse();
+    } catch(e) {
+        return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
     }
-    await batch.commit();
-    revalidateAllPaths();
-    return createResponse();
-  } catch (e) {
-    return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
-  }
 }
 
-export async function deleteMasterData() {
-  try {
-    const batch = writeBatch(db);
-    for (const colName of COLLECTIONS.MASTER) {
-        await deleteCollection(colName, batch);
-    }
-    await batch.commit();
-    revalidateAllPaths();
-    return createResponse();
-  } catch (e) {
-    return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
-  }
-}
-
-export async function deleteCoaData() {
-  try {
-    const batch = writeBatch(db);
-    await deleteCollection("coa", batch);
-    await batch.commit();
-    revalidateAllPaths();
-    return createResponse();
-  } catch (e) {
-    return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
-  }
-}
-
-export async function deleteAllData() {
-   try {
-    const batch = writeBatch(db);
-    const allCollections = [...COLLECTIONS.TRANSACTIONAL, ...COLLECTIONS.MASTER, ...COLLECTIONS.ACCOUNTING];
-    for (const colName of allCollections) {
-        await deleteCollection(colName, batch);
-    }
-    await batch.commit();
-    revalidateAllPaths();
-    return createResponse();
-  } catch (e) {
-    return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
-  }
-}
 
 // Helper to revalidate all relevant paths after deletion
 function revalidateAllPaths() {
