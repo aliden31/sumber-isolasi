@@ -5,25 +5,29 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, Timestamp, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import Link from 'next/link';
 
 type ReportRow = {
   description: string;
   amount: number;
+  sourceId?: string | string[]; 
+  sourceType?: 'journal' | 'account' | 'report';
 };
 
 type CashFlowReport = {
-  netIncome: number;
+  netIncome: ReportRow;
   adjustments: ReportRow[];
   netCashFromOperating: number;
   
@@ -63,7 +67,7 @@ export default function CashFlowPage() {
     
     const allJournalsQuery = query(collection(db, 'journals'), orderBy('date', 'asc'));
     const unsubAllJournals = onSnapshot(allJournalsQuery, (snapshot) => {
-        setAllTimeJournals(snapshot.docs.map(doc => ({...doc.data(), date: doc.data().date.toDate()} as Journal)));
+        setAllTimeJournals(snapshot.docs.map(doc => ({...doc.data(), id: doc.id, date: doc.data().date.toDate()} as Journal)));
     });
 
     return () => {
@@ -85,7 +89,7 @@ export default function CashFlowPage() {
     const q = query(collection(db, 'journals'), where("date", ">=", from), where("date", "<=", to), orderBy('date', 'asc'));
     
     const unsubJournals = onSnapshot(q, (snapshot) => {
-        setJournals(snapshot.docs.map(doc => ({...doc.data(), date: doc.data().date.toDate()} as Journal)));
+        setJournals(snapshot.docs.map(doc => ({...doc.data(), id: doc.id, date: doc.data().date.toDate()} as Journal)));
         setLoading(false);
     }, (error) => {
         console.error("Error fetching journals:", error);
@@ -101,7 +105,8 @@ export default function CashFlowPage() {
 
   const reportData: CashFlowReport = useMemo(() => {
     const report: CashFlowReport = {
-      netIncome: 0, adjustments: [], netCashFromOperating: 0,
+      netIncome: { description: 'Laba Bersih', amount: 0, sourceType: 'report' }, 
+      adjustments: [], netCashFromOperating: 0,
       investingActivities: [], netCashFromInvesting: 0,
       financingActivities: [], netCashFromFinancing: 0,
       netCashChange: 0, beginningCash: 0, endingCash: 0
@@ -144,9 +149,8 @@ export default function CashFlowPage() {
         if (isRevenue(acc.type)) netIncome += currentBalances[acc.id] || 0;
         if (isExpense(acc.type)) netIncome -= currentBalances[acc.id] || 0;
     });
-    report.netIncome = netIncome;
+    report.netIncome.amount = netIncome;
 
-    const operatingAdjustments: ReportRow[] = [];
     accounts.forEach(acc => {
         const beginningBalanceForPeriod = calculateBalances(allTimeJournals.filter(j => j.date < dateRange.from!));
         const endingBalanceForPeriod = calculateBalances(allTimeJournals.filter(j => j.date <= endOfDayToDate));
@@ -156,17 +160,16 @@ export default function CashFlowPage() {
         if (change === 0) return;
 
         if (isContraAsset(acc.type)) {
-            operatingAdjustments.push({ description: `Penambahan ${acc.name}`, amount: change });
+            report.adjustments.push({ description: `Penambahan ${acc.name}`, amount: change, sourceId: acc.id, sourceType: 'account' });
         }
-        else if (acc.type === 'Aset Lancar' && acc.type !== 'Kas & Bank') {
-            operatingAdjustments.push({ description: `Kenaikan ${acc.name}`, amount: -change });
+        else if (acc.type === 'Aset Lancar' && !cashAccountIds.includes(acc.id)) {
+            report.adjustments.push({ description: `(Kenaikan) Penurunan ${acc.name}`, amount: -change, sourceId: acc.id, sourceType: 'account' });
         } else if (acc.type === 'Kewajiban Jangka Pendek') {
-            operatingAdjustments.push({ description: `Kenaikan ${acc.name}`, amount: change });
+            report.adjustments.push({ description: `Kenaikan (Penurunan) ${acc.name}`, amount: change, sourceId: acc.id, sourceType: 'account' });
         }
     });
 
-    report.adjustments = operatingAdjustments.filter(adj => adj.amount !== 0);
-    report.netCashFromOperating = report.netIncome + report.adjustments.reduce((sum, adj) => sum + adj.amount, 0);
+    report.netCashFromOperating = report.netIncome.amount + report.adjustments.reduce((sum, adj) => sum + adj.amount, 0);
 
     journals.forEach(journal => {
         const cashEntry = journal.entries.find(e => cashAccountIds.includes(e.accountId));
@@ -182,9 +185,9 @@ export default function CashFlowPage() {
             const contraAmount = contra.debit - contra.credit;
 
             if (contraAccount.type === 'Aset Tetap') {
-                report.investingActivities.push({ description: contraAmount > 0 ? `Pembelian ${contraAccount.name}` : `Penjualan ${contraAccount.name}`, amount: -cashAmount });
+                report.investingActivities.push({ description: journal.description, amount: -cashAmount, sourceId: journal.id, sourceType: 'journal' });
             } else if (contraAccount.type === 'Kewajiban Jangka Panjang' || (contraAccount.type === 'Ekuitas' && !contraAccount.name.toLowerCase().includes('laba'))) {
-                report.financingActivities.push({ description: contraAmount < 0 ? `Penerimaan dari ${contraAccount.name}` : `Pembayaran ke ${contraAccount.name}`, amount: cashAmount });
+                report.financingActivities.push({ description: journal.description, amount: cashAmount, sourceId: journal.id, sourceType: 'journal' });
             }
         });
     });
@@ -245,7 +248,7 @@ export default function CashFlowPage() {
     }
     
     renderPdfSection('Arus Kas dari Aktivitas Operasi', [
-        { description: 'Laba Bersih', amount: reportData.netIncome },
+        reportData.netIncome,
         ...reportData.adjustments
     ], reportData.netCashFromOperating);
     
@@ -284,10 +287,7 @@ export default function CashFlowPage() {
         <TableCell colSpan={2}>{title}</TableCell>
       </TableRow>
       {rows.map((row, index) => (
-        <TableRow key={index}>
-          <TableCell className="pl-8">{row.description}</TableCell>
-          <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
-        </TableRow>
+        <ReportRowComponent key={`${row.description}-${index}`} row={row} />
       ))}
       <TableRow className="font-semibold border-t">
         <TableCell>Arus Kas Bersih dari {title.replace('Arus Kas dari ', '')}</TableCell>
@@ -323,13 +323,10 @@ export default function CashFlowPage() {
                 <TableHeader><TableRow><TableHead>Deskripsi</TableHead><TableHead className="text-right">Jumlah (Rp)</TableHead></TableRow></TableHeader>
                 <TableBody>
                     <TableRow className="font-bold bg-muted/30"><TableCell colSpan={2}>Arus Kas dari Aktivitas Operasi</TableCell></TableRow>
-                    <TableRow><TableCell className="pl-8">Laba Bersih</TableCell><TableCell className="text-right font-mono">{reportData.netIncome.toLocaleString('id-ID')}</TableCell></TableRow>
+                    <ReportRowComponent row={reportData.netIncome} isSubRow={true}/>
                     <TableRow><TableCell className="pl-8 font-semibold text-muted-foreground">Penyesuaian untuk rekonsiliasi:</TableCell><TableCell></TableCell></TableRow>
                     {reportData.adjustments.map((row, i) => (
-                        <TableRow key={`adj-${i}`}>
-                            <TableCell className="pl-12">{row.description}</TableCell>
-                            <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
-                        </TableRow>
+                        <ReportRowComponent key={`adj-${i}`} row={row} isSubRow={true} isSubSubRow={true} />
                     ))}
                     <TableRow className="font-semibold border-t"><TableCell>Arus Kas Bersih dari Aktivitas Operasi</TableCell><TableCell className="text-right font-mono">{reportData.netCashFromOperating.toLocaleString('id-ID')}</TableCell></TableRow>
 
@@ -349,8 +346,106 @@ export default function CashFlowPage() {
   );
 }
 
+function ReportRowComponent({ row, isSubRow = false, isSubSubRow = false }: { row: ReportRow, isSubRow?: boolean, isSubSubRow?: boolean }) {
+  const [journal, setJournal] = useState<Journal | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const handleClick = async () => {
+    if (row.sourceType === 'journal' && typeof row.sourceId === 'string') {
+      const docRef = doc(db, 'journals', row.sourceId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setJournal({ id: docSnap.id, ...docSnap.data(), date: docSnap.data().date.toDate() } as Journal);
+        setIsDialogOpen(true);
+      }
+    }
+  };
+
+  const getLink = () => {
+    if (row.sourceType === 'account' && typeof row.sourceId === 'string') {
+        return `/accounting/ledger?accountId=${row.sourceId}`;
+    }
+    if (row.sourceType === 'report') {
+        return '/reports/financial';
+    }
+    return '#';
+  };
+
+  const isClickable = row.sourceType === 'journal';
+  const isLink = row.sourceType === 'account' || row.sourceType === 'report';
+
+  const cellContent = (
+      <TableCell className={cn(isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "", (isClickable || isLink) && "cursor-pointer hover:underline")}>
+          {row.description}
+          {(isClickable || isLink) && <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground"/>}
+      </TableCell>
+  );
+
+  return (
+    <>
+      <TableRow onClick={isClickable ? handleClick : undefined} className={cn(isClickable && "cursor-pointer")}>
+        {isLink ? (
+            <Link href={getLink()} passHref legacyBehavior>
+                <td colSpan={1} className={cn("p-0")}>
+                    <div className={cn("flex items-center", isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "pl-4", "py-4")}>
+                        {row.description}
+                        <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground"/>
+                    </div>
+                </td>
+            </Link>
+        ) : (
+             <TableCell className={cn(isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "", isClickable && "group")}>
+                {row.description}
+                {isClickable && <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground group-hover:text-primary"/>}
+            </TableCell>
+        )}
+        <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
+      </TableRow>
+
+      <JournalDetailDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} journal={journal} />
+    </>
+  );
+}
+
+function JournalDetailDialog({ open, onOpenChange, journal }: { open: boolean, onOpenChange: (open: boolean) => void, journal: Journal | null }) {
+    if (!journal) return null;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Detail Jurnal: {journal.id}</DialogTitle>
+                    <DialogDescription>{journal.description}</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Akun</TableHead>
+                                <TableHead className="text-right">Debit</TableHead>
+                                <TableHead className="text-right">Kredit</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {journal.entries.map((entry, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{entry.accountName}</TableCell>
+                                    <TableCell className="text-right">{entry.debit > 0 ? entry.debit.toLocaleString('id-ID') : '-'}</TableCell>
+                                    <TableCell className="text-right">{entry.credit > 0 ? entry.credit.toLocaleString('id-ID') : '-'}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 declare module '@/components/ui/date-range-picker' {
     interface DateRangePickerProps {
         onSelect?: (date?: DateRange) => void;
     }
 }
+
+    
