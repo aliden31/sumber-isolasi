@@ -150,7 +150,9 @@ export type PurchaseRequest = {
   status: 'Draft' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Processed';
 };
 
-export type NewPurchaseRequest = Omit<PurchaseRequest, 'id'>;
+export type NewPurchaseRequest = Omit<PurchaseRequest, 'id' | 'date'> & {
+    date: Date | any;
+};
 
 
 export type PurchaseOrderItem = {
@@ -171,7 +173,9 @@ export type PurchaseOrder = {
   purchaseRequestId?: string;
 };
 
-export type NewPurchaseOrder = Omit<PurchaseOrder, 'id'>;
+export type NewPurchaseOrder = Omit<PurchaseOrder, 'id' | 'date'> & {
+    date: Date | any;
+};
 
 export type GoodsReceiptItem = {
     productId: string;
@@ -220,7 +224,9 @@ export type PurchasePayment = {
     paymentAccountId: string; // ID of the cash/bank account
 }
 
-export type NewPurchasePayment = Omit<PurchasePayment, 'id'>;
+export type NewPurchasePayment = Omit<PurchasePayment, 'id' | 'date'> & {
+    date: Date | any;
+};
 
 
 export type Account = {
