@@ -9,6 +9,9 @@ import {
   writeBatch,
   getDocs,
   getDoc,
+  query,
+  where,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type {
@@ -17,6 +20,7 @@ import type {
   JournalEntry,
   NewJournal,
   MappedRow,
+  NewCustomer,
 } from '@/lib/types';
 import { addJournalEntry } from '@/app/(app)/accounting/journal/actions';
 import { getAccountingSettings } from '@/app/(app)/settings/accounting/actions';
@@ -42,7 +46,7 @@ export async function importMarketplaceTransactions(
     marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
-    bankAccountId, // Menggunakan akun bank/kas, bukan piutang
+    bankAccountId,
   } = settings;
 
   const requiredAccountIds = [
@@ -51,7 +55,7 @@ export async function importMarketplaceTransactions(
     marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
-    bankAccountId, // Memastikan akun bank sudah di-set
+    bankAccountId,
   ];
 
   if (requiredAccountIds.some((id) => !id)) {
@@ -99,13 +103,33 @@ export async function importMarketplaceTransactions(
 
   try {
     const batch = writeBatch(db);
+    
+    // --- 1. Handle Customer Creation ---
+    const uniqueCustomerNames = [...new Set(Object.values(groupedByOrder).map(o => o.customerName))] as string[];
+    const customersRef = collection(db, 'customers');
+    const existingCustomersSnap = await getDocs(query(customersRef, where('name', 'in', uniqueCustomerNames)));
+    const existingCustomerNames = new Set(existingCustomersSnap.docs.map(d => d.data().name));
+    
+    const newCustomers = uniqueCustomerNames.filter(name => !existingCustomerNames.has(name));
 
+    for (const name of newCustomers) {
+      const newCustomerRef = doc(customersRef);
+      const newCustomerData: NewCustomer = {
+        name,
+        email: '',
+        phone: '',
+      };
+      batch.set(newCustomerRef, newCustomerData);
+    }
+    revalidatePath('/(app)/customers');
+
+
+    // --- 2. Handle Transactions and Journals ---
     for (const orderId in groupedByOrder) {
       const order = groupedByOrder[orderId];
       const newId = generateDocumentId('MKT');
       const newTxRef = doc(db, 'transactions', newId);
 
-      // 1. Create Transaction Document as a Paid Sale
       const newTransaction: NewTransaction = {
         date: Timestamp.fromDate(order.date),
         items: order.items,
@@ -113,14 +137,12 @@ export async function importMarketplaceTransactions(
         discount: order.discount,
         fee: order.fee,
         netTotal: order.netTotal,
-        paymentMethod: 'Transfer', // Dianggap sebagai transfer bank
-        customerId: `MKT-${order.customerName}`,
+        paymentMethod: 'Transfer',
         customerName: order.customerName,
-        status: 'Lunas' // Langsung dianggap lunas
+        status: 'Lunas'
       };
       batch.set(newTxRef, newTransaction);
 
-      // 2. Update Stock for each item
       const productRefs = order.items.map((item: any) => doc(db, 'products', item.productId));
       const productSnaps = await Promise.all(productRefs.map(ref => getDoc(ref)));
 
@@ -133,16 +155,13 @@ export async function importMarketplaceTransactions(
         }
       }
 
-      // 3. Create Journal Entries for the Sale
       const journalDescription = `Penjualan Marketplace #${orderId}`;
       const journalEntries: JournalEntry[] = [];
       
-      // Debit entries
       if (order.netTotal > 0) journalEntries.push({ accountId: bankAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
       if (order.discount > 0) journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
       if (order.fee > 0) journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
 
-      // Credit sales revenue
       journalEntries.push({ accountId: salesRevenueAccountId!, accountName: '', debit: 0, credit: order.total });
 
       const newJournal: NewJournal = {
@@ -158,7 +177,6 @@ export async function importMarketplaceTransactions(
         date: Timestamp.fromDate(newJournal.date as Date),
       });
       
-      // Journal for COGS
       if (order.totalCost > 0) {
           const cogsJournal: NewJournal = {
             date: order.date,
@@ -184,7 +202,6 @@ export async function importMarketplaceTransactions(
     revalidatePath('/(app)/products');
     revalidatePath('/(app)/dashboard');
     revalidatePath('/(app)/accounting/ledger');
-    revalidatePath('/(app)/sales/receivables');
 
     return createResponse(null, `${Object.keys(groupedByOrder).length}`);
   } catch (e) {
