@@ -16,7 +16,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
 
-type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop' | 'bigseller' | 'generic';
+type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop' | 'lazada' | 'bigseller' | 'generic';
 
 type ParsedRow = {
   tanggal_order: string;
@@ -149,7 +149,7 @@ export default function ImportMarketplacePage() {
                     const nomor_order = String(getVal(['nomor pesanan', 'order id', 'no. pesanan']) || '');
                     const channel = String(getVal(['marketplace', 'channel']) || 'N/A');
                     const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
-                    const sku = String(getVal(['sku induk', 'informasi sku']) || '');
+                    const sku = String(getVal(['sku gudang', 'sku induk', 'informasi sku']) || '');
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
                     const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
@@ -180,7 +180,7 @@ export default function ImportMarketplacePage() {
                     }
                     
                     // --- Product Mapping ---
-                    const mappedProduct = products.find(p => p.sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
+                    const mappedProduct = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
 
                     return {
                         tanggal_order: tanggal_order_formatted,
