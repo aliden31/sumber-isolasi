@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, Timestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewJournal } from "@/lib/types";
+import type { NewJournal, Account } from "@/lib/types";
 
 const createResponse = (error: string | null = null, id: string | null = null) => ({ error, id });
 
@@ -11,15 +11,25 @@ export async function addJournalEntry(journalData: NewJournal) {
   try {
     const journalsCol = collection(db, "journals");
 
-    // Ensure all entries have accountName, even if empty
-    const entriesWithNames = journalData.entries.map(entry => ({
-        ...entry,
-        accountName: entry.accountName || 'Nama Akun Belum Ada',
-    }));
-
+    // Fetch account names dynamically instead of relying on passed values
+    const entriesWithFetchedNames = await Promise.all(
+      journalData.entries.map(async (entry) => {
+        if (entry.accountName) return entry; // Use provided name if it exists
+        try {
+          const accountRef = doc(db, "coa", entry.accountId);
+          const accountSnap = await getDoc(accountRef);
+          const accountName = accountSnap.exists() ? (accountSnap.data() as Account).name : 'Akun Tidak Ditemukan';
+          return { ...entry, accountName };
+        } catch (e) {
+            console.error(`Failed to fetch account name for ID ${entry.accountId}`, e);
+            return { ...entry, accountName: 'Gagal Mengambil Nama Akun' };
+        }
+      })
+    );
+    
     const journalWithTimestamp = {
       ...journalData,
-      entries: entriesWithNames,
+      entries: entriesWithFetchedNames,
       date: Timestamp.fromDate(journalData.date as Date),
     };
 
