@@ -1,9 +1,11 @@
+
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppShell } from "@/components/layout/app-shell";
 
 export default function AppLayout({
   children,
@@ -12,19 +14,21 @@ export default function AppLayout({
 }) {
   return (
     <SidebarProvider>
-    <TooltipProvider>
-      <div className="flex min-h-screen flex-col">
-        <AppHeader />
-        <div className="flex flex-1">
-          <AppSidebar />
+      <TooltipProvider>
+        <AppShell>
           <main className="flex-1 bg-background p-4 md:p-6 lg:p-8">
-             <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-                {children}
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              }
+            >
+              {children}
             </Suspense>
           </main>
-        </div>
-      </div>
-    </TooltipProvider>
+        </AppShell>
+      </TooltipProvider>
     </SidebarProvider>
   );
 }

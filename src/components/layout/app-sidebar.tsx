@@ -186,7 +186,7 @@ const navItems = [
   },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ companyName }: { companyName?: string }) {
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href;
@@ -200,7 +200,7 @@ export function AppSidebar() {
        <SidebarHeader className="flex items-center gap-2">
         <TokoKilatLogo className="size-8" />
         <span className="text-lg font-headline font-semibold text-primary">
-          Toko Kilat
+          {companyName || 'Toko Kilat'}
         </span>
       </SidebarHeader>
         <SidebarContent>

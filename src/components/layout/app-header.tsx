@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { TokoKilatLogo } from '@/components/icons/logo';
 
-export function AppHeader() {
+export function AppHeader({ companyName }: { companyName?: string }) {
   const { isMobile } = useSidebar();
   return (
     <header
@@ -19,7 +19,7 @@ export function AppHeader() {
       <div className="flex items-center gap-2">
         <TokoKilatLogo className="size-7" />
         <span className="text-lg font-headline font-semibold text-primary">
-          Toko Kilat
+          {companyName || 'Toko Kilat'}
         </span>
       </div>
     </header>
