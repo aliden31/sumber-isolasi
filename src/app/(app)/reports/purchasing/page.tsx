@@ -133,7 +133,7 @@ export default function PurchasingReportPage() {
               <CardDescription>
                 Daftar pesanan pembelian untuk periode yang dipilih.
               </CardDescription>
-            </Header>
+            </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
@@ -199,3 +199,5 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
+
+    
