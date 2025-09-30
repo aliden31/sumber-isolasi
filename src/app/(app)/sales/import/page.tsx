@@ -59,6 +59,7 @@ const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow | 'harga_awal_produk' } 
   'diskon dari penjual': 'discount',
   'diskon marketplace': 'discount', // This will be added to other discounts
   'voucher': 'discount',
+  'voucher toko': 'discount', // Added store voucher
   'total pesanan': 'net_total', // This will be used in calculation
   'total perkiraan jumlah pelepasan': 'net_total',
 };
@@ -150,8 +151,8 @@ export default function ImportMarketplacePage() {
                     const fee = fee_pengelolaan + fee_transaksi;
                     
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace']));
-                    const voucher = normalizeNumber(getVal(['voucher']));
-                    const discount = diskon_marketplace + voucher;
+                    const voucher_toko = normalizeNumber(getVal(['voucher toko']));
+                    const discount = diskon_marketplace + voucher_toko;
                     
                     const net_total = subtotal - fee - discount;
 
@@ -284,6 +285,7 @@ export default function ImportMarketplacePage() {
     </div>
   );
 }
+
 
 
 
