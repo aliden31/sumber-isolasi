@@ -29,6 +29,8 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
   const [cashAccountId, setCashAccountId] = useState(initialData.cashAccountId || '');
   const [bankAccountId, setBankAccountId] = useState(initialData.bankAccountId || '');
   const [salesRevenueAccountId, setSalesRevenueAccountId] = useState(initialData.salesRevenueAccountId || '');
+  const [salesDiscountAccountId, setSalesDiscountAccountId] = useState(initialData.salesDiscountAccountId || '');
+  const [marketplaceFeeAccountId, setMarketplaceFeeAccountId] = useState(initialData.marketplaceFeeAccountId || '');
   const [cogsAccountId, setCogsAccountId] = useState(initialData.cogsAccountId || '');
   const [inventoryAccountId, setInventoryAccountId] = useState(initialData.inventoryAccountId || '');
   const [accountsReceivableAccountId, setAccountsReceivableAccountId] = useState(initialData.accountsReceivableAccountId || '');
@@ -44,6 +46,8 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
         cashAccountId,
         bankAccountId,
         salesRevenueAccountId,
+        salesDiscountAccountId,
+        marketplaceFeeAccountId,
         cogsAccountId,
         inventoryAccountId,
         accountsReceivableAccountId,
@@ -121,6 +125,34 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
           </SelectTrigger>
           <SelectContent>
             {accounts.filter(a => a.type === 'Pendapatan').map(acc => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+       <div className="space-y-2">
+        <Label>Akun Diskon Penjualan (Kontra-Pendapatan)</Label>
+        <Select value={salesDiscountAccountId} onValueChange={setSalesDiscountAccountId} disabled={isPending}>
+          <SelectTrigger>
+            <SelectValue placeholder="Pilih akun diskon penjualan..." />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.filter(a => a.type === 'Pendapatan').map(acc => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Akun Beban Marketplace (Fee)</Label>
+        <Select value={marketplaceFeeAccountId} onValueChange={setMarketplaceFeeAccountId} disabled={isPending}>
+          <SelectTrigger>
+            <SelectValue placeholder="Pilih akun beban marketplace..." />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.filter(a => a.type === 'Beban Operasional').map(acc => (
               <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
             ))}
           </SelectContent>

@@ -1,3 +1,4 @@
+
 'use server';
 
 import {
@@ -6,6 +7,7 @@ import {
   runTransaction,
   Timestamp,
   writeBatch,
+  getDocs,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type {
@@ -35,6 +37,8 @@ export async function importMarketplaceTransactions(
   const settings = await getAccountingSettings();
   const {
     salesRevenueAccountId,
+    salesDiscountAccountId,
+    marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
     bankAccountId, // Defaulting to bank for marketplace payouts
@@ -42,6 +46,8 @@ export async function importMarketplaceTransactions(
 
   const requiredAccountIds = [
     salesRevenueAccountId,
+    salesDiscountAccountId,
+    marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
     bankAccountId,
@@ -53,7 +59,6 @@ export async function importMarketplaceTransactions(
     );
   }
 
-  const newTransactionsData: (NewTransaction & { totalCost: number })[] = [];
   const groupedByOrder = transactions.reduce((acc, row) => {
     if (!row.mappedProduct) return acc;
     const orderId = row.nomor_order;
@@ -62,12 +67,15 @@ export async function importMarketplaceTransactions(
         items: [],
         total: 0,
         totalCost: 0,
+        discount: 0,
+        fee: 0,
+        netTotal: 0,
         customerName: row.nama_pembeli,
         date: new Date(row.tanggal_order),
       };
     }
     const cost = row.mappedProduct.cost || 0;
-    const itemTotal = row.unit_price * row.qty;
+    const itemSubtotal = row.unit_price * row.qty;
 
     acc[orderId].items.push({
       productId: row.mappedProduct.id,
@@ -77,8 +85,12 @@ export async function importMarketplaceTransactions(
       cost: cost,
       unit: row.mappedProduct.baseUnit,
     });
-    acc[orderId].total += itemTotal;
+    
+    acc[orderId].total += itemSubtotal;
     acc[orderId].totalCost += cost * row.qty;
+    acc[orderId].discount += row.discount;
+    acc[orderId].fee += row.fee;
+    acc[orderId].netTotal += row.net_total;
 
     return acc;
   }, {} as Record<string, any>);
@@ -96,52 +108,41 @@ export async function importMarketplaceTransactions(
         date: Timestamp.fromDate(order.date),
         items: order.items,
         total: order.total,
+        discount: order.discount,
+        fee: order.fee,
+        netTotal: order.netTotal,
         paymentMethod: 'Transfer', // Marketplace sales are treated as transfers
-        status: 'Lunas',
         customerId: `MKT-${order.customerName}`,
         customerName: order.customerName,
       };
       batch.set(newTxRef, newTransaction);
 
-      // 2. Update Stock
-      for (const item of order.items) {
-        const productRef = doc(db, 'products', item.productId);
-        // Firestore Transaction would be safer here, but for batching this is simpler.
-        // Consider moving to a transaction per order if high concurrency is an issue.
-        batch.update(productRef, { stock: -item.quantity });
+      // 2. Update Stock for each item
+      const productRefs = order.items.map((item: any) => doc(db, 'products', item.productId));
+      const productSnaps = await Promise.all(productRefs.map(ref => getDoc(ref)));
+
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        const productSnap = productSnaps[i];
+        if (productSnap.exists()) {
+            const currentStock = productSnap.data().stock;
+            batch.update(productRefs[i], { stock: currentStock - item.quantity });
+        }
       }
+
 
       // 3. Create Journal Entries
       const journalDescription = `Penjualan Marketplace #${orderId}`;
-      const journalEntries: JournalEntry[] = [
-        {
-          accountId: bankAccountId!,
-          accountName: '',
-          debit: order.total,
-          credit: 0,
-        },
-        {
-          accountId: salesRevenueAccountId!,
-          accountName: '',
-          debit: 0,
-          credit: order.total,
-        },
-      ];
+      const journalEntries: JournalEntry[] = [];
+      
+      // Debit entries
+      if (order.netTotal > 0) journalEntries.push({ accountId: bankAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
+      if (order.discount > 0) journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
+      if (order.fee > 0) journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
 
-      if (order.totalCost > 0) {
-        journalEntries.push({
-          accountId: cogsAccountId!,
-          accountName: '',
-          debit: order.totalCost,
-          credit: 0,
-        });
-        journalEntries.push({
-          accountId: inventoryAccountId!,
-          accountName: '',
-          debit: 0,
-          credit: order.totalCost,
-        });
-      }
+      // Credit sales revenue
+      journalEntries.push({ accountId: salesRevenueAccountId!, accountName: '', debit: 0, credit: order.total });
+
 
       const newJournal: NewJournal = {
         date: order.date,
@@ -155,6 +156,25 @@ export async function importMarketplaceTransactions(
         ...newJournal,
         date: Timestamp.fromDate(newJournal.date as Date),
       });
+      
+      // Journal for COGS
+      if (order.totalCost > 0) {
+          const cogsJournal: NewJournal = {
+            date: order.date,
+            description: `HPP untuk Penjualan Marketplace #${orderId}`,
+            refNumber: newId,
+            entries: [
+                { accountId: cogsAccountId!, accountName: '', debit: order.totalCost, credit: 0 },
+                { accountId: inventoryAccountId!, accountName: '', debit: 0, credit: order.totalCost },
+            ],
+            total: order.totalCost,
+          };
+          const newCogsJournalRef = doc(db, 'journals', generateDocumentId('JNL'));
+          batch.set(newCogsJournalRef, {
+            ...cogsJournal,
+            date: Timestamp.fromDate(cogsJournal.date as Date),
+          });
+      }
     }
 
     await batch.commit();

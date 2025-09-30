@@ -1,6 +1,7 @@
 
 
 
+
 export type ProductUnit = {
   name: string; // e.g., 'Pcs', 'Box', 'Lusin'
   price: number;
@@ -45,7 +46,10 @@ export type Transaction = {
   id: string;
   date: Date;
   items: TransactionItem[];
-  total: number;
+  total: number; // Gross total
+  discount?: number;
+  fee?: number;
+  netTotal?: number;
   paymentMethod: 'Tunai' | 'Transfer' | 'Kredit';
   status: 'Lunas' | 'Belum Lunas';
   customerId?: string;

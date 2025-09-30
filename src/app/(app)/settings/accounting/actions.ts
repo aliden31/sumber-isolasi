@@ -9,6 +9,8 @@ export type AccountingSettings = {
   cashAccountId?: string;
   bankAccountId?: string;
   salesRevenueAccountId?: string;
+  salesDiscountAccountId?: string;
+  marketplaceFeeAccountId?: string;
   cogsAccountId?: string;
   inventoryAccountId?: string;
   accountsReceivableAccountId?: string;
