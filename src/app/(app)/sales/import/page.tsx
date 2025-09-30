@@ -153,7 +153,7 @@ export default function ImportMarketplacePage() {
                     const voucher = normalizeNumber(getVal(['voucher']));
                     const discount = diskon_marketplace + voucher;
                     
-                    const net_total = subtotal - discount;
+                    const net_total = subtotal - fee - discount;
 
                     let tanggal_order_formatted = 'N/A';
                     if (tanggal_order_raw) {
@@ -178,7 +178,7 @@ export default function ImportMarketplacePage() {
                         discount,
                         net_total
                     };
-                }).filter(row => row.nomor_order); // Filter out rows without an order number
+                }).filter(row => row.nomor_order && row.sku); // Filter out rows without an order number or sku
 
                 setParsedData(mappedData);
                 toast({ title: 'Berhasil', description: `${mappedData.length} baris berhasil di-parse.` });
@@ -239,7 +239,7 @@ export default function ImportMarketplacePage() {
                                 <TableHead>Pembeli</TableHead>
                                 <TableHead>SKU</TableHead>
                                 <TableHead>Qty</TableHead>
-                                <TableHead className="text-right">Harga Satuan</TableHead>
+                                <TableHead className="text-right">Subtotal</TableHead>
                                 <TableHead className="text-right">Ongkir</TableHead>
                                 <TableHead className="text-right">Diskon</TableHead>
                                 <TableHead className="text-right">Fee</TableHead>
@@ -254,7 +254,7 @@ export default function ImportMarketplacePage() {
                                     <TableCell>{row.nama_pembeli}</TableCell>
                                     <TableCell className="text-xs">{row.sku}</TableCell>
                                     <TableCell>{row.qty}</TableCell>
-                                    <TableCell className="text-right font-mono">Rp {row.unit_price.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right font-mono">Rp {row.subtotal.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono">Rp {row.shipping.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono text-destructive">Rp {row.discount.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono text-destructive">Rp {row.fee.toLocaleString('id-ID')}</TableCell>
@@ -284,5 +284,6 @@ export default function ImportMarketplacePage() {
     </div>
   );
 }
+
 
 
