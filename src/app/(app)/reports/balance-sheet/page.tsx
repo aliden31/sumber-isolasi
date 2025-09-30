@@ -165,6 +165,10 @@ export default function BalanceSheetPage() {
     
     let y = 15;
     const pageHeight = doc.internal.pageSize.getHeight();
+    const rightMargin = 195;
+    const leftMargin = 15;
+    const indent = 5;
+
     const addPageIfNeeded = () => {
         if (y > pageHeight - 20) {
             doc.addPage();
@@ -172,7 +176,7 @@ export default function BalanceSheetPage() {
         }
     }
     const formatCurrency = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
-    const drawLine = (yPos: number) => doc.line(15, yPos, 195, yPos);
+    const drawLine = (yPos: number) => doc.line(leftMargin, yPos, rightMargin, yPos);
     
     // Header
     doc.setFontSize(16);
@@ -188,30 +192,40 @@ export default function BalanceSheetPage() {
     doc.text(dateStr, 105, y, { align: 'center' });
     y += 10;
     
-    // ASET
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('ASET', 15, y);
-    y += 6;
-    
-    const renderPdfSection = (title: string, data: ReportRow[], total: number) => {
-        if (data.length === 0) return;
+    // --- RENDER FUNCTION ---
+    const renderPdfSection = (title: string, data: ReportRow[], total: number, isTotalBold: boolean = false) => {
+        if (data.length === 0 && total === 0) return;
+        
+        addPageIfNeeded();
         doc.setFont('helvetica', 'bold');
-        doc.text(title, 20, y);
+        doc.setFontSize(11);
+        doc.text(title, leftMargin, y);
         y += 6;
+
         doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
         data.forEach(row => {
-            doc.text(row.accountName, 25, y);
-            doc.text(formatCurrency(row.amount), 100, y, { align: 'right' });
-            y += 5;
             addPageIfNeeded();
+            doc.text(row.accountName, leftMargin + indent, y);
+            doc.text(formatCurrency(row.amount), rightMargin, y, { align: 'right' });
+            y += 5;
         });
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Total ${title}`, 25, y);
-        doc.text(formatCurrency(total), 110, y, { align: 'right' });
-        y += 7;
+
+        if (data.length > 1) {
+             addPageIfNeeded();
+             doc.setFont('helvetica', 'bold');
+             doc.text(`Total ${title}`, leftMargin + indent, y);
+             doc.text(formatCurrency(total), rightMargin, y, { align: 'right' });
+             y += 7;
+        }
     }
-    
+
+    // --- ASET ---
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ASET', leftMargin, y);
+    y += 6;
+
     renderPdfSection("Aset Lancar", reportData.currentAssets, reportData.currentAssets.reduce((s, r) => s + r.amount, 0));
     renderPdfSection("Aset Tetap", reportData.fixedAssets, reportData.fixedAssets.reduce((s, r) => s + r.amount, 0));
     
@@ -219,36 +233,41 @@ export default function BalanceSheetPage() {
     y += 5;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.text("TOTAL ASET", 15, y);
-    doc.text(formatCurrency(reportData.totalAssets), 195, y, { align: 'right' });
+    doc.text("TOTAL ASET", leftMargin, y);
+    doc.text(formatCurrency(reportData.totalAssets), rightMargin, y, { align: 'right' });
     y += 10;
+    
+    // --- KEWAJIBAN & EKUITAS ---
     addPageIfNeeded();
-    
-    // KEWAJIBAN & EKUITAS
-    doc.setFontSize(11);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('KEWAJIBAN DAN EKUITAS', 15, y);
+    doc.text('KEWAJIBAN DAN EKUITAS', leftMargin, y);
     y += 6;
-    
+
+    // Kewajiban
     renderPdfSection("Kewajiban Jangka Pendek", reportData.shortTermLiabilities, reportData.shortTermLiabilities.reduce((s, r) => s + r.amount, 0));
     renderPdfSection("Kewajiban Jangka Panjang", reportData.longTermLiabilities, reportData.longTermLiabilities.reduce((s, r) => s + r.amount, 0));
-    
+
+    // Ekuitas
+    addPageIfNeeded();
     doc.setFont('helvetica', 'bold');
-    doc.text('Ekuitas', 20, y);
+    doc.setFontSize(11);
+    doc.text('Ekuitas', leftMargin, y);
     y+=6;
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
     reportData.equity.forEach(row => {
-        doc.text(row.accountName, 25, y);
-        doc.text(formatCurrency(row.amount), 100, y, { align: 'right' });
-        y += 5;
         addPageIfNeeded();
+        doc.text(row.accountName, leftMargin + indent, y);
+        doc.text(formatCurrency(row.amount), rightMargin, y, { align: 'right' });
+        y += 5;
     });
-    doc.text('Laba Ditahan', 25, y);
-    doc.text(formatCurrency(reportData.retainedEarnings), 100, y, { align: 'right' });
+    doc.text('Laba Ditahan', leftMargin + indent, y);
+    doc.text(formatCurrency(reportData.retainedEarnings), rightMargin, y, { align: 'right' });
     y += 5;
     doc.setFont('helvetica', 'bold');
-    doc.text('Total Ekuitas', 25, y);
-    doc.text(formatCurrency(reportData.totalEquity), 110, y, { align: 'right' });
+    doc.text('Total Ekuitas', leftMargin + indent, y);
+    doc.text(formatCurrency(reportData.totalEquity), rightMargin, y, { align: 'right' });
     y += 7;
     addPageIfNeeded();
 
@@ -256,10 +275,10 @@ export default function BalanceSheetPage() {
     y += 5;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.text("TOTAL KEWAJIBAN DAN EKUITAS", 15, y);
-    doc.text(formatCurrency(reportData.totalLiabilities + reportData.totalEquity), 195, y, { align: 'right' });
+    doc.text("TOTAL KEWAJIBAN DAN EKUITAS", leftMargin, y);
+    doc.text(formatCurrency(reportData.totalLiabilities + reportData.totalEquity), rightMargin, y, { align: 'right' });
 
-    // Footer
+    // --- Footer ---
     const pageCount = doc.internal.pages.length;
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -375,5 +394,7 @@ export default function BalanceSheetPage() {
   );
 }
 
+
+    
 
     
