@@ -237,13 +237,13 @@ export default function BankReconciliationPage() {
               </SelectContent>
             </Select>
             <Button onClick={() => fileInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" /> Unggah Laporan Koran (.csv)
+                <Upload className="mr-2 h-4 w-4" /> gunakan file excell atau pdf saja
             </Button>
             <input 
                 type="file" 
                 ref={fileInputRef} 
                 className="hidden" 
-                accept=".csv"
+                accept=".xlsx,.xls,.pdf"
                 onChange={handleFileUpload}
             />
           </div>
