@@ -4,42 +4,49 @@
 import React, { useState, useTransition, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, File, Loader2, AlertTriangle, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Upload,
+  File,
+  Loader2,
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle,
+  XCircle,
+  ChevronsUpDown,
+  Check,
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import * as XLSX from 'xlsx';
 import { format, parse } from 'date-fns';
-import type { Product } from '@/lib/types';
+import type { Product, MappedRow } from '@/lib/types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
-
-type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop' | 'lazada' | 'bigseller' | 'generic';
-
-type ParsedRow = {
-  tanggal_order: string;
-  nomor_order: string;
-  channel: string;
-  nama_pembeli: string;
-  sku: string;
-  qty: number;
-  unit_price: number;
-  subtotal: number;
-  shipping: number;
-  fee: number;
-  discount: number;
-  net_total: number;
-};
-
-type MappedRow = ParsedRow & {
-    mappedProduct: Product | null;
-};
+import { importMarketplaceTransactions } from './actions';
+import { useRouter } from 'next/navigation';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 
 
 // Expanded mapping to handle various column names from different marketplaces
-const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow | 'harga_awal_produk' } = {
+const COLUMN_MAPPINGS: { [key: string]: keyof MappedRow | 'harga_awal_produk' } = {
   'waktu pesanan dibuat': 'tanggal_order',
   'tanggal order': 'tanggal_order',
   'nomor pesanan': 'nomor_order',
@@ -48,7 +55,7 @@ const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow | 'harga_awal_produk' } 
   'marketplace': 'channel',
   'channel': 'channel',
   'nama pembeli': 'nama_pembeli',
-  'nama produk': 'sku', // Assuming product name can be used as SKU for simplicity
+  'sku gudang': 'sku',
   'sku induk': 'sku',
   'informasi sku': 'sku',
   'jumlah': 'qty',
@@ -64,7 +71,6 @@ const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow | 'harga_awal_produk' } 
   'biaya pengiriman': 'shipping',
   'biaya pengelolaan': 'fee', // This will be added to other fees
   'biaya transaksi': 'fee',   // This will be added to other fees
-  'diskon penjual': 'discount',
   'diskon dari penjual': 'discount',
   'diskon marketplace': 'discount', // This will be added to other discounts
   'voucher': 'discount',
@@ -77,8 +83,10 @@ export default function ImportMarketplacePage() {
   const [parsedData, setParsedData] = useState<MappedRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isParsing, startParsing] = useTransition();
+  const [isImporting, startImporting] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const router = useRouter();
   
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'products'), (snapshot) => {
@@ -86,6 +94,11 @@ export default function ImportMarketplacePage() {
     });
     return () => unsub();
   }, []);
+
+  const allProductsMapped = useMemo(() => {
+    if (parsedData.length === 0) return false;
+    return parsedData.every(row => row.mappedProduct !== null);
+  }, [parsedData]);
 
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,7 +144,7 @@ export default function ImportMarketplacePage() {
                 const header = json[0].map(h => String(h).toLowerCase().trim());
                 const dataRows = json.slice(1);
                 
-                const mappedData: MappedRow[] = dataRows.map(row => {
+                const mappedData: MappedRow[] = dataRows.map((row, rowIndex) => {
                     const rowData: {[key: string]: any} = {};
                     header.forEach((h, index) => {
                         rowData[h] = row[index];
@@ -163,7 +176,6 @@ export default function ImportMarketplacePage() {
                     const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
                     const fee = fee_pengelolaan + fee_transaksi;
                     
-                    const diskon_penjual = normalizeNumber(getVal(['diskon dari penjual', 'diskon penjual']));
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
                     const voucher_toko = normalizeNumber(getVal(['voucher toko']));
                     const discount = diskon_marketplace + voucher_toko;
@@ -179,10 +191,10 @@ export default function ImportMarketplacePage() {
                        }
                     }
                     
-                    // --- Product Mapping ---
                     const mappedProduct = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
 
                     return {
+                        id: `${nomor_order}-${rowIndex}`,
                         tanggal_order: tanggal_order_formatted,
                         nomor_order, channel, nama_pembeli, sku, qty, unit_price,
                         subtotal, shipping, fee, discount, net_total,
@@ -201,6 +213,30 @@ export default function ImportMarketplacePage() {
         reader.readAsArrayBuffer(file);
     });
   };
+
+  const handleProductMapping = (rowId: string, product: Product | null) => {
+    setParsedData(prevData =>
+      prevData.map(row =>
+        row.id === rowId ? { ...row, mappedProduct: product } : row
+      )
+    );
+  };
+
+  const handleImport = () => {
+    if (!allProductsMapped) {
+        toast({ title: 'Pemetaan Belum Selesai', description: 'Harap petakan semua produk yang tidak ditemukan sebelum mengimpor.', variant: 'destructive' });
+        return;
+    }
+    startImporting(async () => {
+        const result = await importMarketplaceTransactions(parsedData);
+        if (result.error) {
+            toast({ title: 'Gagal Mengimpor', description: result.error, variant: 'destructive' });
+        } else {
+            toast({ title: 'Impor Berhasil!', description: `${result.id} pesanan berhasil diimpor dan dijurnal.` });
+            router.push('/transactions');
+        }
+    })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -237,7 +273,7 @@ export default function ImportMarketplacePage() {
         <Card>
             <CardHeader>
                 <CardTitle>Langkah 2: Pratinjau & Konfirmasi</CardTitle>
-                <CardDescription>Periksa data yang berhasil di-parse dan pemetaan produknya. Data ini belum disimpan ke sistem.</CardDescription>
+                <CardDescription>Periksa data yang berhasil di-parse dan petakan produk yang belum ditemukan. SKU di laporan harus cocok dengan SKU Gudang di data produk.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="max-h-[500px] overflow-y-auto border rounded-md">
@@ -245,7 +281,7 @@ export default function ImportMarketplacePage() {
                         <TableHeader className="sticky top-0 bg-muted">
                             <TableRow>
                                 <TableHead>SKU Laporan</TableHead>
-                                <TableHead>Produk Terpetakan</TableHead>
+                                <TableHead className="min-w-[200px]">Produk Terpetakan</TableHead>
                                 <TableHead>Qty</TableHead>
                                 <TableHead>Harga Satuan</TableHead>
                                 <TableHead className="text-right">Subtotal</TableHead>
@@ -255,21 +291,15 @@ export default function ImportMarketplacePage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {parsedData.map((row, index) => (
-                                <TableRow key={`${row.nomor_order}-${index}`}>
+                            {parsedData.map((row) => (
+                                <TableRow key={row.id}>
                                     <TableCell className="text-xs">{row.sku}</TableCell>
                                     <TableCell>
-                                        {row.mappedProduct ? (
-                                            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                                <CheckCircle className="mr-1 h-3 w-3" />
-                                                {row.mappedProduct.name}
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="destructive">
-                                                <XCircle className="mr-1 h-3 w-3" />
-                                                Tidak Ditemukan
-                                            </Badge>
-                                        )}
+                                        <ProductMappingCell
+                                            product={row.mappedProduct}
+                                            allProducts={products}
+                                            onMap={(p) => handleProductMapping(row.id, p)}
+                                        />
                                     </TableCell>
                                     <TableCell>{row.qty}</TableCell>
                                     <TableCell className="text-right font-mono">Rp {row.unit_price.toLocaleString('id-ID')}</TableCell>
@@ -284,16 +314,18 @@ export default function ImportMarketplacePage() {
                 </div>
             </CardContent>
             <CardFooter className="flex-col items-start gap-4">
-                 <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Perhatian!</AlertTitle>
-                    <AlertDescription>
-                        Ini adalah fitur eksperimental. Logika untuk menyimpan transaksi ke database dan membuat jurnal otomatis sedang dalam pengembangan. Tombol di bawah ini belum berfungsi.
-                    </AlertDescription>
-                </Alert>
-                <Button disabled>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin hidden"/>
-                    Impor {parsedData.length} Transaksi (Segera Hadir)
+                 {!allProductsMapped && (
+                    <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Pemetaan Belum Selesai</AlertTitle>
+                        <AlertDescription>
+                            Beberapa produk tidak dapat dipetakan secara otomatis. Harap pilih produk yang benar dari dropdown sebelum melanjutkan.
+                        </AlertDescription>
+                    </Alert>
+                 )}
+                <Button onClick={handleImport} disabled={isImporting || !allProductsMapped}>
+                    {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4" />}
+                    Impor {parsedData.length} Transaksi
                 </Button>
             </CardFooter>
         </Card>
@@ -301,4 +333,58 @@ export default function ImportMarketplacePage() {
 
     </div>
   );
+}
+
+
+function ProductMappingCell({ product, allProducts, onMap }: { product: Product | null, allProducts: Product[], onMap: (p: Product | null) => void }) {
+    const [open, setOpen] = useState(false);
+
+    if (product) {
+        return (
+            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                <CheckCircle className="mr-1 h-3 w-3" />
+                {product.name}
+            </Badge>
+        );
+    }
+    
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" role="combobox" aria-expanded={open} className="w-[200px] justify-between text-destructive">
+                    Pilih Produk...
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                    <CommandInput placeholder="Cari produk..." />
+                    <CommandList>
+                        <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                            {allProducts.map((p) => (
+                                <CommandItem
+                                    key={p.id}
+                                    value={p.name}
+                                    onSelect={() => {
+                                        onMap(p);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check className={cn("mr-2 h-4 w-4", "opacity-0")} />
+                                    {p.name}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+declare module "@/lib/types" {
+    interface MappedRow {
+        id: string;
+    }
 }
