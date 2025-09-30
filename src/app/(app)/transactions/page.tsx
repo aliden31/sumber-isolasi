@@ -26,6 +26,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -224,6 +225,30 @@ export default function TransactionsPage() {
                             </TableRow>
                             ))}
                         </TableBody>
+                         {(tx.discount || tx.fee) && (
+                            <TableFooter>
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
+                                    <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
+                                </TableRow>
+                                {tx.discount && (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-right">Diskon</TableCell>
+                                    <TableCell className="text-right text-destructive">- Rp {tx.discount.toLocaleString('id-ID')}</TableCell>
+                                </TableRow>
+                                )}
+                                {tx.fee && (
+                                     <TableRow>
+                                        <TableCell colSpan={3} className="text-right">Biaya Marketplace</TableCell>
+                                        <TableCell className="text-right text-destructive">- Rp {tx.fee.toLocaleString('id-ID')}</TableCell>
+                                    </TableRow>
+                                )}
+                                <TableRow className="font-bold">
+                                    <TableCell colSpan={3} className="text-right">Total Bersih</TableCell>
+                                    <TableCell className="text-right">Rp {tx.netTotal?.toLocaleString('id-ID')}</TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        )}
                         </Table>
                     </div>
                     </AccordionContent>
