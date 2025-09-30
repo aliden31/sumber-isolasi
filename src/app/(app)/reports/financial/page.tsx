@@ -11,15 +11,17 @@ import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
+import Link from 'next/link';
 
 
 type ReportRow = {
+  accountId: string;
   accountName: string;
   amount: number;
 };
@@ -118,7 +120,7 @@ export default function FinancialReportsPage() {
     Object.entries(accountBalances).forEach(([accountId, balance]) => {
       const account = accounts.find(a => a.id === accountId);
       if (account && balance !== 0) {
-        const row = { accountName: account.name, amount: balance };
+        const row = { accountId: account.id, accountName: account.name, amount: balance };
         if (revenueAccountTypes.includes(account.type)) {
           report.revenues.push(row);
         } else if (cogsAccountTypes.includes(account.type)) {
@@ -137,26 +139,6 @@ export default function FinancialReportsPage() {
 
     return report;
   }, [journals, accounts]);
-
-  const renderSection = (title: string, rows: ReportRow[], total: number, isTotal=true, className?: string, titleClassName?: string) => (
-    <>
-      <TableRow className={titleClassName}>
-        <TableHead colSpan={2} className="font-bold">{title}</TableHead>
-      </TableRow>
-      {rows.map((row, index) => (
-        <TableRow key={index}>
-          <TableCell className="pl-8">{row.accountName}</TableCell>
-          <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
-        </TableRow>
-      ))}
-      {isTotal && rows.length > 0 && (
-        <TableRow className={cn("font-bold", className)}>
-            <TableCell className="pl-8">Total {title}</TableCell>
-            <TableCell className="text-right font-mono">{total.toLocaleString('id-ID')}</TableCell>
-        </TableRow>
-      )}
-    </>
-  );
   
   const handleExportPDF = async () => {
     const doc = new jsPDF();
@@ -250,13 +232,47 @@ export default function FinancialReportsPage() {
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150); // Muted color for footer
-        doc.text(`Halaman ${i} dari ${pageCount}`, doc.internal.pageSize.getWidth() - 15, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+        doc.setTextColor(150, 150, 150);
         doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 15, doc.internal.pageSize.getHeight() - 10);
     }
     
     doc.save(`laporan-laba-rugi-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
+
+  const ReportRowLink = ({ row }: { row: ReportRow }) => {
+    const from = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+    const to = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : from;
+    const link = `/accounting/ledger?accountId=${row.accountId}&from=${from}&to=${to}`;
+
+    return (
+        <TableRow>
+            <TableCell className="pl-8">
+                <Link href={link} className="flex items-center hover:underline">
+                    {row.accountName}
+                    <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground"/>
+                </Link>
+            </TableCell>
+            <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
+        </TableRow>
+    );
+  };
+
+  const renderSection = (title: string, rows: ReportRow[], total: number, isTotal=true, className?: string, titleClassName?: string) => (
+    <>
+      <TableRow className={titleClassName}>
+        <TableHead colSpan={2} className="font-bold">{title}</TableHead>
+      </TableRow>
+      {rows.map((row) => (
+        <ReportRowLink key={row.accountId} row={row} />
+      ))}
+      {isTotal && rows.length > 0 && (
+        <TableRow className={cn("font-bold", className)}>
+            <TableCell className="pl-8">Total {title}</TableCell>
+            <TableCell className="text-right font-mono">{total.toLocaleString('id-ID')}</TableCell>
+        </TableRow>
+      )}
+    </>
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -322,5 +338,3 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
-
-

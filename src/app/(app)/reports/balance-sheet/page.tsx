@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -9,15 +10,17 @@ import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'fireba
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { format } from 'date-fns';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
+import Link from 'next/link';
 
 
 type ReportRow = {
+  accountId: string;
   accountName: string;
   amount: number;
 };
@@ -122,12 +125,12 @@ export default function BalanceSheetPage() {
 
     accounts.forEach(account => {
         const balance = balances[account.id];
-        const row = { accountName: account.name, amount: balance };
+        const row = { accountId: account.id, accountName: account.name, amount: balance };
 
         if (isAsset(account.type)) {
             if (account.type === 'Aset Lancar' || account.type === 'Kas & Bank') report.currentAssets.push(row);
             else if (account.type === 'Aset Tetap') report.fixedAssets.push(row);
-            else if (account.type === 'Akumulasi Penyusutan') report.fixedAssets.push({ accountName: account.name, amount: -balance });
+            else if (account.type === 'Akumulasi Penyusutan') report.fixedAssets.push({ accountId: account.id, accountName: account.name, amount: -balance });
             else report.otherAssets.push(row);
         } else if (isLiability(account.type)) {
             if (account.type === 'Kewajiban Jangka Pendek') report.shortTermLiabilities.push(row);
@@ -175,10 +178,11 @@ export default function BalanceSheetPage() {
             y = 15;
         }
     }
-    const formatCurrency = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+    const formatCurrency = (n: number) => n.toLocaleString('id-ID');
     const drawLine = (yPos: number) => doc.line(leftMargin, yPos, rightMargin, yPos);
     
     // Header
+    doc.setTextColor(0,0,0);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text(companyName, 105, y, { align: 'center' });
@@ -279,15 +283,29 @@ export default function BalanceSheetPage() {
     doc.text(formatCurrency(reportData.totalLiabilities + reportData.totalEquity), rightMargin, y, { align: 'right' });
 
     // --- Footer ---
-    const pageCount = doc.internal.pages.length;
-    for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 15, doc.internal.pageSize.getHeight() - 10);
-    }
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 15, doc.internal.pageSize.getHeight() - 10);
 
     doc.save(`laporan-neraca-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  };
+
+  const ReportRowLink = ({ row }: { row: ReportRow }) => {
+    const from = "1970-01-01";
+    const to = reportDate ? format(reportDate, 'yyyy-MM-dd') : '';
+    const link = `/accounting/ledger?accountId=${row.accountId}&from=${from}&to=${to}`;
+
+    return (
+        <TableRow>
+            <TableCell className="pl-8">
+                <Link href={link} className="flex items-center hover:underline">
+                    {row.accountName}
+                    <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground"/>
+                </Link>
+            </TableCell>
+            <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
+        </TableRow>
+    );
   };
 
   const renderSection = (title: string, rows: ReportRow[], total: number) => (
@@ -296,11 +314,8 @@ export default function BalanceSheetPage() {
         <TableCell>{title}</TableCell>
         <TableCell></TableCell>
       </TableRow>
-      {rows.map((row, index) => (
-        <TableRow key={index}>
-          <TableCell className="pl-8">{row.accountName}</TableCell>
-          <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
-        </TableRow>
+      {rows.map((row) => (
+        <ReportRowLink key={row.accountId} row={row} />
       ))}
       <TableRow className="font-semibold border-t">
         <TableCell className="pl-8">Total {title}</TableCell>
@@ -362,11 +377,8 @@ export default function BalanceSheetPage() {
                              <TableRow className="font-bold bg-muted/30">
                                 <TableCell colSpan={2}>Ekuitas</TableCell>
                             </TableRow>
-                            {reportData.equity.map((row, index) => (
-                                <TableRow key={index}>
-                                <TableCell className="pl-8">{row.accountName}</TableCell>
-                                <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
-                                </TableRow>
+                            {reportData.equity.map((row) => (
+                                <ReportRowLink key={row.accountId} row={row} />
                             ))}
                              <TableRow>
                                 <TableCell className="pl-8">Laba Ditahan</TableCell>
@@ -392,8 +404,3 @@ export default function BalanceSheetPage() {
     </div>
   );
 }
-
-
-    
-
-    
