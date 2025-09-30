@@ -63,18 +63,38 @@ export async function addGoodsReceipt(grData: NewGoodsReceipt, poId: string) {
         const newGRRef = await runTransaction(db, async (transaction) => {
             const grCol = collection(db, "goodsReceipts");
             const newDocRef = doc(grCol);
-            transaction.set(newDocRef, { ...grData, date: Timestamp.fromDate(grData.date as Date), status: 'Pending Invoice' });
 
-            let totalValueReceived = 0;
-            for (const item of grData.items) {
+            // --- 1. Perform all reads first ---
+            const productReads = grData.items.map(item => {
                 const productRef = doc(db, "products", item.productId);
-                const productSnap = await transaction.get(productRef);
-                if (!productSnap.exists()) throw new Error(`Produk ${item.productName} tidak ditemukan.`);
+                return transaction.get(productRef);
+            });
+            const productSnapshots = await Promise.all(productReads);
+            
+            // --- 2. Process data and prepare writes ---
+            let totalValueReceived = 0;
+            const productUpdates: { ref: any, newStock: number }[] = [];
+
+            for (let i = 0; i < productSnapshots.length; i++) {
+                const productSnap = productSnapshots[i];
+                const item = grData.items[i];
+
+                if (!productSnap.exists()) {
+                    throw new Error(`Produk ${item.productName} tidak ditemukan.`);
+                }
                 const productData = productSnap.data() as Product;
                 const newStock = productData.stock + item.receivedQuantity;
-                transaction.update(productRef, { stock: newStock });
                 totalValueReceived += (item.cost || 0) * item.receivedQuantity;
+                
+                productUpdates.push({ ref: productSnap.ref, newStock });
             }
+
+            // --- 3. Perform all writes now ---
+            transaction.set(newDocRef, { ...grData, date: Timestamp.fromDate(grData.date as Date), status: 'Pending Invoice' });
+
+            productUpdates.forEach(update => {
+                transaction.update(update.ref, { stock: update.newStock });
+            });
 
             const poRef = doc(db, "purchaseOrders", poId);
             transaction.update(poRef, { status: 'Completed' });
