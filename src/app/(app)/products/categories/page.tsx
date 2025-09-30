@@ -1,12 +1,43 @@
-'use client';
+import { db } from '@/lib/firebase';
+import type { ProductCategory } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CategoryActions } from '@/components/products/category-actions';
+import { CategoryTable } from '@/components/products/category-table';
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 
-import { PlaceholderPage } from "@/components/layout/placeholder-page";
+async function getCategories(): Promise<ProductCategory[]> {
+  const categoriesCol = collection(db, 'productCategories');
+  const categorySnapshot = await getDocs(query(categoriesCol, orderBy('name')));
+  const categoryList = categorySnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+      description: data.description,
+    } as ProductCategory;
+  });
+  return categoryList;
+}
 
-export default function ProductCategoriesPage() {
+export default async function ProductCategoriesPage() {
+  const categories = await getCategories();
+
   return (
-     <PlaceholderPage 
-        title="Kategori Produk"
-        description="Fitur ini akan memungkinkan Anda untuk mengelompokkan produk ke dalam berbagai kategori (misalnya, 'Makanan', 'Minuman', 'ATK'). Menggunakan kategori membantu menyederhanakan pelaporan penjualan, analisis profitabilitas per lini produk, dan mempermudah navigasi saat mencari barang."
-    />
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h1 className="text-2xl md:text-3xl font-headline font-bold">
+          Kategori Produk
+        </h1>
+        <CategoryActions />
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline">Daftar Kategori</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CategoryTable data={categories} />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

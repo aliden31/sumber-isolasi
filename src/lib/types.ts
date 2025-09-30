@@ -11,6 +11,15 @@ export type Product = {
 
 export type NewProduct = Omit<Product, 'id'>;
 
+export type ProductCategory = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+export type NewProductCategory = Omit<ProductCategory, 'id'>;
+
+
 export type TransactionItem = {
   productId: string;
   productName: string; // denormalized for easier display

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, useEffect } from 'react';
 import { Plus, MoreHorizontal, Loader2, Edit, Trash2, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import type { Product } from '@/lib/types';
+import type { Product, ProductCategory } from '@/lib/types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { seedInitialProducts } from '@/lib/seed-actions';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 
 export function ProductActions({ hasProducts }: { hasProducts: boolean }) {
@@ -173,11 +182,24 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
   const [cost, setCost] = useState(product?.cost || 0);
   const [stock, setStock] = useState(product?.stock || 0);
   
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "productCategories"), (snapshot) => {
+      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductCategory)));
+    });
+    return () => unsub();
+  }, []);
+
   const isEditing = !!product;
   const isDropdownItem = React.isValidElement(children) && (children.type as any).displayName === 'DropdownMenuItem';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!category) {
+        toast({ title: "Kategori harus dipilih", variant: "destructive" });
+        return;
+    }
     startTransition(async () => {
       const productData = { name, category, price, cost, stock };
       const result = isEditing 
@@ -232,7 +254,16 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
           </div>
           <div className="space-y-2">
             <Label htmlFor="category">Kategori</Label>
-            <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} required disabled={isPending}/>
+             <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger id="category" disabled={isPending}>
+                    <SelectValue placeholder="Pilih kategori" />
+                </SelectTrigger>
+                <SelectContent>
+                    {categories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

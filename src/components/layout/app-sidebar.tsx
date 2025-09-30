@@ -124,7 +124,7 @@ const navItems = [
     icon: Package,
     subItems: [
       { href: "/products", label: "Master Produk", icon: Package },
-      { href: "/products/categories", label: "Kategori Produk", icon: BookUser, isDev: true },
+      { href: "/products/categories", label: "Kategori Produk", icon: BookUser },
       { href: "/stock/warehouses", label: "Multi-Gudang", icon: Warehouse, isDev: true },
       { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft, isDev: true },
       { href: "/stock/opname", label: "Penyesuaian Stok", icon: ClipboardCheck, isDev: true },
