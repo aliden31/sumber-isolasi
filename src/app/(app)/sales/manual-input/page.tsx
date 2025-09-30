@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useTransition, useEffect } from 'react';
@@ -52,36 +53,19 @@ export default function ManualSalesInputPage() {
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.product.id === product.id && item.unit.name === baseUnit.name);
       if (existingItem) {
-        if (existingItem.quantity < product.stock) {
-          return prevCart.map(item =>
-            item.product.id === product.id && item.unit.name === baseUnit.name 
-            ? { ...item, quantity: item.quantity + 1 } 
-            : item
-          );
-        } else {
-          toast({ title: 'Stok tidak mencukupi', variant: 'destructive' });
-          return prevCart;
-        }
+        return prevCart.map(item =>
+          item.product.id === product.id && item.unit.name === baseUnit.name 
+          ? { ...item, quantity: item.quantity + 1 } 
+          : item
+        );
       }
-      if (product.stock > 0) {
-        return [...prevCart, { product, quantity: 1, unit: baseUnit }];
-      } else {
-        toast({ title: 'Stok habis', variant: 'destructive' });
-        return prevCart;
-      }
+      return [...prevCart, { product, quantity: 1, unit: baseUnit }];
     });
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
     setCart(prevCart => {
       if (quantity <= 0) return prevCart.filter(item => item.product.id !== productId);
-      const itemToUpdate = prevCart.find(item => item.product.id === productId);
-      if (itemToUpdate && quantity > itemToUpdate.product.stock) {
-        toast({ title: 'Stok tidak mencukupi', variant: 'destructive' });
-        return prevCart.map(item =>
-          item.product.id === productId ? { ...item, quantity: itemToUpdate.product.stock } : item
-        );
-      }
       return prevCart.map(item =>
         item.product.id === productId ? { ...item, quantity } : item
       );

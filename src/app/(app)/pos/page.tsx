@@ -119,31 +119,13 @@ export default function POSPage() {
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.product.id === product.id && item.unit.name === baseUnit.name);
       if (existingItem) {
-        if (existingItem.quantity < product.stock) {
-          return prevCart.map(item =>
-            item.product.id === product.id && item.unit.name === baseUnit.name 
-            ? { ...item, quantity: item.quantity + 1 } 
-            : item
-          );
-        } else {
-          toast({
-            title: 'Stok tidak mencukupi',
-            description: `Stok untuk ${product.name} hanya tersisa ${product.stock}.`,
-            variant: 'destructive',
-          });
-          return prevCart;
-        }
+        return prevCart.map(item =>
+          item.product.id === product.id && item.unit.name === baseUnit.name 
+          ? { ...item, quantity: item.quantity + 1 } 
+          : item
+        );
       }
-      if (product.stock > 0) {
-        return [...prevCart, { product, quantity: 1, unit: baseUnit }];
-      } else {
-        toast({
-          title: 'Stok habis',
-          description: `Produk ${product.name} sedang habis.`,
-          variant: 'destructive',
-        });
-        return prevCart;
-      }
+      return [...prevCart, { product, quantity: 1, unit: baseUnit }];
     });
   };
 
@@ -151,19 +133,6 @@ export default function POSPage() {
     setCart(prevCart => {
       if (quantity <= 0) {
         return prevCart.filter(item => !(item.product.id === productId && item.unit.name === unitName));
-      }
-      const itemToUpdate = prevCart.find(item => item.product.id === productId && item.unit.name === unitName);
-      const productInStock = products.find(p => p.id === productId);
-      
-      if(itemToUpdate && productInStock && quantity > productInStock.stock) {
-        toast({
-          title: 'Stok tidak mencukupi',
-          description: `Stok untuk ${productInStock.name} hanya tersisa ${productInStock.stock}.`,
-          variant: 'destructive',
-        });
-        return prevCart.map(item =>
-          item.product.id === productId && item.unit.name === unitName ? { ...item, quantity: productInStock.stock } : item
-        );
       }
       return prevCart.map(item =>
         item.product.id === productId && item.unit.name === unitName ? { ...item, quantity } : item
@@ -367,7 +336,7 @@ export default function POSPage() {
                   {recentTransactions.map(tx => (
                     <TableRow key={tx.id}>
                       <TableCell>
-                        <p className="font-medium font-mono text-xs">{tx.id}</p>
+                        <p className="font-mono text-xs">{tx.id}</p>
                         <p className="text-sm text-muted-foreground">{new Date(tx.date).toLocaleTimeString('id-ID')}</p>
                       </TableCell>
                       <TableCell className="text-right">
@@ -490,7 +459,6 @@ function ProductPicker({ products, onSelect }: { products: Product[], onSelect: 
                     onSelect(product);
                     setOpen(false);
                   }}
-                  disabled={product.stock <= 0}
                 >
                   <Check
                     className={cn(

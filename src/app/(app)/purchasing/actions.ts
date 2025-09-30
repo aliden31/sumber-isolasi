@@ -242,7 +242,6 @@ export async function processPurchaseReturn(returnData: NewPurchaseReturn) {
                 
                 const productData = productSnap.data() as Product;
                 const newStock = productData.stock - item.returnQuantity;
-                if (newStock < 0) throw new Error(`Stok ${item.productName} akan menjadi negatif.`);
                 
                 transaction.update(productRef, { stock: newStock });
             }

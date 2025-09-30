@@ -83,9 +83,7 @@ export async function createTransaction(transactionData: NewTransaction, isPOS: 
             }
             const productData = productSnap.data() as Product;
             const newStock = productData.stock - item.quantity;
-            if (newStock < 0) {
-                throw new Error(`Stok untuk produk ${productData.name} tidak mencukupi.`);
-            }
+            
             totalCost += (productData.cost || 0) * item.quantity;
             
             // This is the write operation

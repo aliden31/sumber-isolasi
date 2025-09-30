@@ -1,3 +1,4 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -14,30 +15,13 @@ export async function processStockTransfer(transferData: NewStockTransfer) {
       const newId = generateDocumentId('ST');
       const newDocRef = doc(collection(db, 'stockTransfers'), newId);
 
-      const productReads = transferData.items.map(item => {
+      for (const item of transferData.items) {
         const productRef = doc(db, 'products', item.productId);
-        return transaction.get(productRef);
-      });
-      const productSnaps = await Promise.all(productReads);
-
-      for (let i = 0; i < productSnaps.length; i++) {
-        const productSnap = productSnaps[i];
-        const item = transferData.items[i];
+        const productSnap = await transaction.get(productRef);
         
         if (!productSnap.exists()) {
           throw new Error(`Produk dengan ID ${item.productId} tidak ditemukan.`);
         }
-        
-        const productData = productSnap.data() as Product;
-        const newStock = productData.stock - item.quantity;
-        if (newStock < 0) {
-          throw new Error(`Stok untuk produk ${productData.name} tidak mencukupi.`);
-        }
-
-        // For now, we assume stock is centralized. A multi-warehouse stock model would be more complex.
-        // This action only records the transfer but doesn't affect stock levels in a multi-warehouse scenario.
-        // In a single-stock model, this transfer implies stock moving out of the system's "main" tracked inventory.
-        // A more advanced implementation would adjust stock counts per warehouse.
       }
 
       transaction.set(newDocRef, { ...transferData, date: Timestamp.fromDate(transferData.date) });
