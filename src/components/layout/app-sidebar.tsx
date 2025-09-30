@@ -58,6 +58,7 @@ import {
   Wrench,
   Scale,
   AreaChart,
+  Store,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -186,6 +187,7 @@ const navItems = [
     subItems: [
       { href: "/settings", label: "Profil Perusahaan", icon: Building },
       { href: "/settings/accounting", label: "Akuntansi", icon: SlidersHorizontal },
+      { href: "/settings/marketplace", label: "Marketplace", icon: Store },
       { href: "/settings/danger", label: "Data & Reset", icon: DatabaseZap },
     ],
   },

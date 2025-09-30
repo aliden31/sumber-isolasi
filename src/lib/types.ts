@@ -344,3 +344,11 @@ export type Currency = {
     exchangeRate: number; // relative to base currency
 };
 export type NewCurrency = Omit<Currency, 'id'>;
+
+export type MarketplaceStore = {
+  id: string;
+  marketplace: 'Tokopedia' | 'Shopee' | 'TikTok Shop' | 'Lazada' | 'BigSeller' | 'Lainnya';
+  storeName: string;
+  nickname: string;
+};
+export type NewMarketplaceStore = Omit<MarketplaceStore, 'id'>;
