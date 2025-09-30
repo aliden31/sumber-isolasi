@@ -1,13 +1,4 @@
 
-
-
-
-
-
-
-
-
-
 export type ProductUnit = {
   name: string; // e.g., 'Pcs', 'Box', 'Lusin'
   price: number;
@@ -367,6 +358,7 @@ export type MarketplaceStore = {
 export type NewMarketplaceStore = Omit<MarketplaceStore, 'id'>;
 
 export type ParsedRow = {
+  id: string;
   tanggal_order: string;
   nomor_order: string;
   channel: string;
@@ -383,7 +375,8 @@ export type ParsedRow = {
   net_total: number;
 };
 
-export type MappedRow = ParsedRow & {
-    id: string;
+export type MappedRow = Omit<ParsedRow, 'id'> & { id: string };
+
+export type ImportRow = MappedRow & {
     mappedProduct: Product | null;
 };

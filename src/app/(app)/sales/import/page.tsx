@@ -86,6 +86,8 @@ export default function ImportMarketplacePage() {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<MappedRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [skuToProductMap, setSkuToProductMap] = useState<Record<string, Product | null>>({});
+
   const [isParsing, startParsing] = useTransition();
   const [isImporting, startImporting] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,8 +103,14 @@ export default function ImportMarketplacePage() {
 
   const allProductsMapped = useMemo(() => {
     if (parsedData.length === 0) return false;
-    return parsedData.every(row => row.mappedProduct !== null);
-  }, [parsedData]);
+    const unmappedSkus = new Set(parsedData.map(row => row.sku));
+    for (const sku of unmappedSkus) {
+        if (!skuToProductMap[sku]) {
+            return false;
+        }
+    }
+    return true;
+  }, [parsedData, skuToProductMap]);
 
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,6 +123,7 @@ export default function ImportMarketplacePage() {
       }
       setFile(selectedFile);
       setParsedData([]); // Reset preview on new file
+      setSkuToProductMap({});
     }
   };
   
@@ -148,6 +157,8 @@ export default function ImportMarketplacePage() {
                 const header = json[0].map(h => String(h).toLowerCase().trim());
                 const dataRows = json.slice(1);
                 
+                const initialSkuMap: Record<string, Product | null> = {};
+
                 const mappedData: MappedRow[] = dataRows.map((row, rowIndex) => {
                     const rowData: {[key: string]: any} = {};
                     header.forEach((h, index) => {
@@ -199,18 +210,20 @@ export default function ImportMarketplacePage() {
                        }
                     }
                     
-                    const mappedProduct = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
+                    if (sku && initialSkuMap[sku] === undefined) {
+                        initialSkuMap[sku] = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
+                    }
 
                     return {
                         id: `${nomor_order}-${rowIndex}`,
                         tanggal_order: tanggal_order_formatted,
                         nomor_order, channel, nama_pembeli, alamat_lengkap, sku, qty, unit_price,
                         cost, subtotal, shipping, fee, discount, net_total,
-                        mappedProduct
                     };
                 }).filter(row => row.nomor_order && row.sku);
 
                 setParsedData(mappedData);
+                setSkuToProductMap(initialSkuMap);
                 toast({ title: 'Berhasil', description: `${mappedData.length} baris berhasil di-parse.` });
 
             } catch (err) {
@@ -222,20 +235,11 @@ export default function ImportMarketplacePage() {
     });
   };
 
-  const handleProductMapping = (rowId: string, product: Product | null) => {
-    setParsedData(prevData => {
-        const sourceRow = prevData.find(row => row.id === rowId);
-        if (!sourceRow) return prevData;
-
-        const sourceSku = sourceRow.sku;
-
-        return prevData.map(row => {
-            if (row.sku === sourceSku) {
-                return { ...row, mappedProduct: product };
-            }
-            return row;
-        });
-    });
+  const handleProductMapping = (sku: string, product: Product | null) => {
+    setSkuToProductMap(prevMap => ({
+        ...prevMap,
+        [sku]: product
+    }));
   };
 
   const handleImport = () => {
@@ -243,8 +247,14 @@ export default function ImportMarketplacePage() {
         toast({ title: 'Pemetaan Belum Selesai', description: 'Harap petakan semua produk yang tidak ditemukan sebelum mengimpor.', variant: 'destructive' });
         return;
     }
+
+    const dataToImport = parsedData.map(row => ({
+        ...row,
+        mappedProduct: skuToProductMap[row.sku]
+    }));
+
     startImporting(async () => {
-        const result = await importMarketplaceTransactions(parsedData);
+        const result = await importMarketplaceTransactions(dataToImport);
         if (result.error) {
             toast({ title: 'Gagal Mengimpor', description: result.error, variant: 'destructive' });
         } else {
@@ -312,9 +322,10 @@ export default function ImportMarketplacePage() {
                                     <TableCell className="text-xs">{row.sku}</TableCell>
                                     <TableCell>
                                         <ProductMappingCell
-                                            product={row.mappedProduct}
+                                            sku={row.sku}
+                                            mappedProduct={skuToProductMap[row.sku]}
                                             allProducts={products}
-                                            onMap={(p) => handleProductMapping(row.id, p)}
+                                            onMap={(p) => handleProductMapping(row.sku, p)}
                                         />
                                     </TableCell>
                                     <TableCell className="text-xs max-w-[200px] truncate">{row.alamat_lengkap}</TableCell>
@@ -337,7 +348,7 @@ export default function ImportMarketplacePage() {
                  )}
                 <Button onClick={handleImport} disabled={isImporting || !allProductsMapped}>
                     {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4" />}
-                    Impor {parsedData.length} Transaksi
+                    Impor {parsedData.length} Baris
                 </Button>
             </CardFooter>
         </Card>
@@ -348,14 +359,14 @@ export default function ImportMarketplacePage() {
 }
 
 
-function ProductMappingCell({ product, allProducts, onMap }: { product: Product | null, allProducts: Product[], onMap: (p: Product | null) => void }) {
+function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: string; mappedProduct: Product | null | undefined, allProducts: Product[], onMap: (p: Product | null) => void }) {
     const [open, setOpen] = useState(false);
 
-    if (product) {
+    if (mappedProduct) {
         return (
             <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                 <CheckCircle className="mr-1 h-3 w-3" />
-                {product.name}
+                {mappedProduct.name}
             </Badge>
         );
     }
