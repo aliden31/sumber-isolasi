@@ -21,6 +21,7 @@ import type {
   NewJournal,
   MappedRow,
   NewCustomer,
+  ProductUnit,
 } from '@/lib/types';
 import { addJournalEntry } from '@/app/(app)/accounting/journal/actions';
 import { getAccountingSettings } from '@/app/(app)/settings/accounting/actions';
@@ -50,7 +51,7 @@ async function queryInChunks<T>(
     const q = query(ref, where(field, 'in', chunk));
     const snapshot = await getDocs(q);
     snapshot.forEach(doc => {
-      results.push(doc.data() as T);
+      results.push({ id: doc.id, ...doc.data() } as T);
     });
   }
   return results;
@@ -128,116 +129,152 @@ export async function importMarketplaceTransactions(
   }, {} as Record<string, any>);
 
   try {
-    const batch = writeBatch(db);
     
-    // --- 1. Handle Customer Creation ---
-    const uniqueCustomers = Object.values(groupedByOrder).reduce((acc, order) => {
-        if (order.customerName) {
-            acc[order.customerName] = order.customerAddress || '';
+    // --- Pre-fetch all products to be updated to avoid race conditions ---
+    const allProductIds = [
+      ...new Set(
+        transactions.map(t => t.mappedProduct?.id).filter(Boolean) as string[]
+      ),
+    ];
+    const productDocs = await queryInChunks<{id: string} & Product>(
+        collection(db, 'products'),
+        '__name__',
+        allProductIds
+    );
+    const productMap: Map<string, Product> = new Map(productDocs.map(p => [p.id, p]));
+
+    // Use a transaction to ensure atomicity
+    await runTransaction(db, async (transaction) => {
+      // --- 1. Handle Customer Creation ---
+      const uniqueCustomers = Object.values(groupedByOrder).reduce((acc, order) => {
+          if (order.customerName) {
+              acc[order.customerName] = order.customerAddress || '';
+          }
+          return acc;
+      }, {} as {[name: string]: string});
+      
+      const customerNames = Object.keys(uniqueCustomers);
+      if (customerNames.length > 0) {
+        const existingCustomers = await queryInChunks<NewCustomer>(collection(db, 'customers'), 'name', customerNames);
+        const existingCustomerNames = new Set(existingCustomers.map(c => c.name));
+        
+        for (const name in uniqueCustomers) {
+            if (!existingCustomerNames.has(name)) {
+                const newCustomerRef = doc(collection(db, 'customers'));
+                const newCustomerData: NewCustomer = {
+                    name,
+                    email: '',
+                    phone: '',
+                    address: uniqueCustomers[name],
+                };
+                transaction.set(newCustomerRef, newCustomerData);
+            }
         }
-        return acc;
-    }, {} as {[name: string]: string});
-    
-    const customersRef = collection(db, 'customers');
-    const customerNames = Object.keys(uniqueCustomers);
-    
-    const existingCustomers = await queryInChunks<NewCustomer>(customersRef, 'name', customerNames);
-    const existingCustomerNames = new Set(existingCustomers.map(c => c.name));
-    
-    for (const name in uniqueCustomers) {
-        if (!existingCustomerNames.has(name)) {
-            const newCustomerRef = doc(customersRef);
-            const newCustomerData: NewCustomer = {
-                name,
-                email: '',
-                phone: '',
-                address: uniqueCustomers[name],
+      }
+
+      // --- 2. Handle Product Price/Cost/Stock Updates ---
+      const productUpdates = new Map<string, { stock: number; cost?: number; units?: ProductUnit[] }>();
+
+      for (const row of transactions) {
+          if (!row.mappedProduct) continue;
+          const productId = row.mappedProduct.id;
+          const product = productMap.get(productId);
+          if (!product) continue;
+
+          let currentUpdate = productUpdates.get(productId) || { stock: product.stock };
+          
+          // Decrement stock
+          currentUpdate.stock -= row.qty;
+
+          // Check and update cost (HPP)
+          if (row.cost > 0 && row.cost !== product.cost) {
+              currentUpdate.cost = row.cost;
+          }
+
+          // Check and update selling price (on base unit)
+          const baseUnit = product.units.find(u => u.name === product.baseUnit);
+          if (row.unit_price > 0 && baseUnit && row.unit_price !== baseUnit.price) {
+              const newUnits = product.units.map(u => 
+                  u.name === product.baseUnit ? { ...u, price: row.unit_price } : u
+              );
+              currentUpdate.units = newUnits;
+          }
+          
+          productUpdates.set(productId, currentUpdate);
+      }
+      
+      for (const [productId, updates] of productUpdates.entries()) {
+          const productRef = doc(db, 'products', productId);
+          transaction.update(productRef, updates);
+      }
+
+      // --- 3. Handle Transactions and Journals ---
+      for (const orderId in groupedByOrder) {
+        const order = groupedByOrder[orderId];
+        const newId = generateDocumentId('MKT');
+        const newTxRef = doc(db, 'transactions', newId);
+
+        const newTransaction: NewTransaction = {
+          date: Timestamp.fromDate(order.date),
+          items: order.items,
+          total: order.total,
+          discount: order.discount,
+          fee: order.fee,
+          netTotal: order.netTotal,
+          paymentMethod: 'Transfer',
+          customerName: order.customerName,
+          status: 'Lunas',
+          channel: order.channel,
+        };
+        transaction.set(newTxRef, newTransaction);
+        
+        const journalDescription = `Penjualan Marketplace #${orderId}`;
+        const journalEntries: JournalEntry[] = [];
+        
+        if (order.netTotal > 0) journalEntries.push({ accountId: bankAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
+        if (order.discount > 0) journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
+        if (order.fee > 0) journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
+
+        journalEntries.push({ accountId: salesRevenueAccountId!, accountName: '', debit: 0, credit: order.total });
+
+        const newJournal: NewJournal = {
+          date: order.date,
+          description: journalDescription,
+          refNumber: newId,
+          entries: journalEntries,
+          total: order.total,
+        };
+        const newJournalRef = doc(collection(db, 'journals'));
+        transaction.set(newJournalRef, {
+          ...newJournal,
+          date: Timestamp.fromDate(newJournal.date as Date),
+        });
+        
+        if (order.totalCost > 0) {
+            const cogsJournal: NewJournal = {
+              date: order.date,
+              description: `HPP untuk Marketplace #${orderId}`,
+              refNumber: newId,
+              entries: [
+                  { accountId: cogsAccountId!, accountName: '', debit: order.totalCost, credit: 0 },
+                  { accountId: inventoryAccountId!, accountName: '', debit: 0, credit: order.totalCost },
+              ],
+              total: order.totalCost,
             };
-            batch.set(newCustomerRef, newCustomerData);
-        }
-    }
-    revalidatePath('/(app)/customers');
-
-
-    // --- 2. Handle Transactions and Journals ---
-    for (const orderId in groupedByOrder) {
-      const order = groupedByOrder[orderId];
-      const newId = generateDocumentId('MKT');
-      const newTxRef = doc(db, 'transactions', newId);
-
-      const newTransaction: NewTransaction = {
-        date: Timestamp.fromDate(order.date),
-        items: order.items,
-        total: order.total,
-        discount: order.discount,
-        fee: order.fee,
-        netTotal: order.netTotal,
-        paymentMethod: 'Transfer',
-        customerName: order.customerName,
-        status: 'Lunas',
-        channel: order.channel,
-      };
-      batch.set(newTxRef, newTransaction);
-
-      const productRefs = order.items.map((item: any) => doc(db, 'products', item.productId));
-      const productSnaps = await Promise.all(productRefs.map(ref => getDoc(ref)));
-
-      for (let i = 0; i < order.items.length; i++) {
-        const item = order.items[i];
-        const productSnap = productSnaps[i];
-        if (productSnap.exists()) {
-            const currentStock = productSnap.data().stock;
-            batch.update(productRefs[i], { stock: currentStock - item.quantity });
+            const newCogsJournalRef = doc(collection(db, 'journals'));
+            transaction.set(newCogsJournalRef, {
+              ...cogsJournal,
+              date: Timestamp.fromDate(cogsJournal.date as Date),
+            });
         }
       }
-
-      const journalDescription = `Penjualan Marketplace #${orderId}`;
-      const journalEntries: JournalEntry[] = [];
-      
-      if (order.netTotal > 0) journalEntries.push({ accountId: bankAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
-      if (order.discount > 0) journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
-      if (order.fee > 0) journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
-
-      journalEntries.push({ accountId: salesRevenueAccountId!, accountName: '', debit: 0, credit: order.total });
-
-      const newJournal: NewJournal = {
-        date: order.date,
-        description: journalDescription,
-        refNumber: newId,
-        entries: journalEntries,
-        total: order.total,
-      };
-      const newJournalRef = doc(collection(db, 'journals'));
-      batch.set(newJournalRef, {
-        ...newJournal,
-        date: Timestamp.fromDate(newJournal.date as Date),
-      });
-      
-      if (order.totalCost > 0) {
-          const cogsJournal: NewJournal = {
-            date: order.date,
-            description: `HPP untuk Marketplace #${orderId}`,
-            refNumber: newId,
-            entries: [
-                { accountId: cogsAccountId!, accountName: '', debit: order.totalCost, credit: 0 },
-                { accountId: inventoryAccountId!, accountName: '', debit: 0, credit: order.totalCost },
-            ],
-            total: order.totalCost,
-          };
-          const newCogsJournalRef = doc(collection(db, 'journals'));
-          batch.set(newCogsJournalRef, {
-            ...cogsJournal,
-            date: Timestamp.fromDate(cogsJournal.date as Date),
-          });
-      }
-    }
-
-    await batch.commit();
+    });
 
     revalidatePath('/(app)/transactions');
     revalidatePath('/(app)/products');
     revalidatePath('/(app)/dashboard');
     revalidatePath('/(app)/accounting/ledger');
+    revalidatePath('/(app)/customers');
 
     return createResponse(null, `${Object.keys(groupedByOrder).length}`);
   } catch (e) {
