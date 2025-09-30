@@ -76,4 +76,5 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 Fitur-fitur berikut masih berupa halaman *placeholder* atau dalam tahap pengembangan aktif.
 
 - **Rekonsiliasi Bank**: Antarmuka untuk mencocokkan transaksi bank sudah ada, termasuk unggah laporan koran. Fungsionalitas inti (pencocokan otomatis, jurnal penyesuaian) belum ada.
+- **Jurnal Pembalik (Reversing Entries)**: Fitur untuk membuat jurnal pembalik secara otomatis di awal periode baru untuk membalik jurnal penyesuaian tertentu (misalnya, akrual beban). Fungsionalitas belum ada.
 - **Pengguna & Hak Akses**: Antarmuka untuk menampilkan pengguna sudah ada dengan data statis. Manajemen peran dan integrasi dengan Firebase Auth belum diimplementasikan.
