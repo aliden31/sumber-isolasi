@@ -106,7 +106,6 @@ const navItems = [
       { href: "/sales/manual-input", label: "Buat Invoice", icon: FileDigit },
       { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
       { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
-      { href: "/sales/import", label: "Impor Data", icon: FileUp, isDev: true },
     ],
   },
   {
@@ -127,6 +126,7 @@ const navItems = [
     subItems: [
       { href: "/products", label: "Daftar Produk", icon: Package },
       { href: "/products/categories", label: "Kategori Produk", icon: BookUser },
+      { href: "/products/import", label: "Impor Produk", icon: FileUp },
       { href: "/stock/warehouses", label: "Gudang", icon: Warehouse },
       { href: "/stock/notifications", label: "Stok Menipis", icon: Bell },
       { href: "/stock-estimation", label: "Estimasi Stok (AI)", icon: BrainCircuit },

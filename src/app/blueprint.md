@@ -27,9 +27,10 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Retur Pembelian**: Memproses pengembalian barang ke pemasok.
 
 ### Modul: Produk & Stok
-- **Master Produk**: Manajemen data produk (CRUD).
+- **Master Produk**: Manajemen data produk (CRUD) dengan dukungan multi-satuan.
 - **Kategori Produk**: Manajemen kategori produk (CRUD).
 - **Gudang**: Manajemen daftar gudang (CRUD).
+- **Impor Produk**: Fitur untuk mengunggah data produk secara massal.
 - **Notifikasi Stok**: Dasbor untuk melihat produk yang stoknya menipis.
 - **Estimasi Stok (AI)**: Alat bantu AI untuk memprediksi kebutuhan stok.
 - **Transfer Stok**: Fitur untuk mencatat perpindahan barang antar gudang.
@@ -68,6 +69,5 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 
 Fitur-fitur berikut masih berupa halaman *placeholder* dan belum memiliki fungsionalitas penuh.
 
-- **Impor Penjualan**: Kemampuan untuk mengunggah data penjualan secara massal dari file CSV/Excel.
 - **Rekonsiliasi Bank**: Fungsionalitas inti (unggah laporan koran, pencocokan otomatis) belum ada.
 - **Pengguna & Hak Akses**: Manajemen pengguna dan peran (role) untuk membatasi akses.

@@ -2,7 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { NewProduct } from "@/lib/types";
 
@@ -45,5 +45,24 @@ export async function deleteProduct(id: string) {
   } catch (e) {
     console.error("Error deleting document: ", e);
     return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
+  }
+}
+
+
+export async function batchImportProducts(products: NewProduct[]) {
+  const batch = writeBatch(db);
+  const productsCol = collection(db, "products");
+
+  products.forEach((product) => {
+    const docRef = doc(productsCol);
+    batch.set(docRef, product);
+  });
+
+  try {
+    await batch.commit();
+    revalidatePath("/(app)/products");
+    return createResponse();
+  } catch (e) {
+     return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
   }
 }

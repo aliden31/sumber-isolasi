@@ -9,6 +9,7 @@ export type ProductUnit = {
 
 export type Product = {
   id: string;
+  sku?: string; // Stock Keeping Unit
   name: string;
   category: string;
   stock: number; // Total stock in base unit
