@@ -1,16 +1,20 @@
 
 'use client';
 
-import React, { useState, useTransition, useMemo, useRef } from 'react';
+import React, { useState, useTransition, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, File, Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Upload, File, Loader2, AlertTriangle, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import * as XLSX from 'xlsx';
 import { format, parse } from 'date-fns';
+import type { Product } from '@/lib/types';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Badge } from '@/components/ui/badge';
 
 type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop' | 'bigseller' | 'generic';
 
@@ -28,6 +32,11 @@ type ParsedRow = {
   discount: number;
   net_total: number;
 };
+
+type MappedRow = ParsedRow & {
+    mappedProduct: Product | null;
+};
+
 
 // Expanded mapping to handle various column names from different marketplaces
 const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow | 'harga_awal_produk' } = {
@@ -55,23 +64,29 @@ const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow | 'harga_awal_produk' } 
   'biaya pengiriman': 'shipping',
   'biaya pengelolaan': 'fee', // This will be added to other fees
   'biaya transaksi': 'fee',   // This will be added to other fees
-  'diskon penjual': 'discount', // This will be added to other discounts
+  'diskon penjual': 'discount',
   'diskon dari penjual': 'discount',
   'diskon marketplace': 'discount', // This will be added to other discounts
   'voucher': 'discount',
-  'voucher toko': 'discount', // Added store voucher
-  'total pesanan': 'net_total', // This will be used in calculation
-  'total perkiraan jumlah pelepasan': 'net_total',
+  'voucher toko': 'discount',
 };
 
 
 export default function ImportMarketplacePage() {
-  const [marketplace, setMarketplace] = useState<Marketplace | ''>('generic');
   const [file, setFile] = useState<File | null>(null);
-  const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
+  const [parsedData, setParsedData] = useState<MappedRow[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isParsing, startParsing] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'products'), (snapshot) => {
+        setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+    });
+    return () => unsub();
+  }, []);
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -116,7 +131,7 @@ export default function ImportMarketplacePage() {
                 const header = json[0].map(h => String(h).toLowerCase().trim());
                 const dataRows = json.slice(1);
                 
-                const mappedData: ParsedRow[] = dataRows.map(row => {
+                const mappedData: MappedRow[] = dataRows.map(row => {
                     const rowData: {[key: string]: any} = {};
                     header.forEach((h, index) => {
                         rowData[h] = row[index];
@@ -134,23 +149,22 @@ export default function ImportMarketplacePage() {
                     const nomor_order = String(getVal(['nomor pesanan', 'order id', 'no. pesanan']) || '');
                     const channel = String(getVal(['marketplace', 'channel']) || 'N/A');
                     const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
-                    const sku = String(getVal(['nama produk', 'sku induk', 'informasi sku']) || '');
+                    const sku = String(getVal(['sku induk', 'informasi sku']) || getVal(['nama produk']) || '');
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
-                    // Prioritize original price over discounted price for unit price
                     const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
                     const harga_satuan = normalizeNumber(getVal(['harga satuan', 'harga jual (rp)']));
                     const unit_price = harga_awal > 0 ? harga_awal : harga_satuan;
 
-                    const subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)']));
+                    const subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)'])) || (unit_price * qty);
                     const shipping = normalizeNumber(getVal(['ongkos kirim', 'biaya pengiriman']));
 
-                    // Calculate composite fields
                     const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
                     const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
                     const fee = fee_pengelolaan + fee_transaksi;
                     
-                    const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace']));
+                    const diskon_penjual = normalizeNumber(getVal(['diskon penjual', 'diskon dari penjual']));
+                    const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
                     const voucher_toko = normalizeNumber(getVal(['voucher toko']));
                     const discount = diskon_marketplace + voucher_toko;
                     
@@ -161,25 +175,20 @@ export default function ImportMarketplacePage() {
                        try {
                          tanggal_order_formatted = format(new Date(tanggal_order_raw), 'yyyy-MM-dd HH:mm:ss');
                        } catch {
-                         tanggal_order_formatted = String(tanggal_order_raw); // fallback if parsing fails
+                         tanggal_order_formatted = String(tanggal_order_raw);
                        }
                     }
+                    
+                    // --- Product Mapping ---
+                    const mappedProduct = products.find(p => p.sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
 
                     return {
                         tanggal_order: tanggal_order_formatted,
-                        nomor_order,
-                        channel,
-                        nama_pembeli,
-                        sku,
-                        qty,
-                        unit_price,
-                        subtotal,
-                        shipping,
-                        fee,
-                        discount,
-                        net_total
+                        nomor_order, channel, nama_pembeli, sku, qty, unit_price,
+                        subtotal, shipping, fee, discount, net_total,
+                        mappedProduct
                     };
-                }).filter(row => row.nomor_order && row.sku); // Filter out rows without an order number or sku
+                }).filter(row => row.nomor_order && row.sku);
 
                 setParsedData(mappedData);
                 toast({ title: 'Berhasil', description: `${mappedData.length} baris berhasil di-parse.` });
@@ -228,20 +237,18 @@ export default function ImportMarketplacePage() {
         <Card>
             <CardHeader>
                 <CardTitle>Langkah 2: Pratinjau & Konfirmasi</CardTitle>
-                <CardDescription>Periksa data yang berhasil di-parse. Data ini belum disimpan ke sistem.</CardDescription>
+                <CardDescription>Periksa data yang berhasil di-parse dan pemetaan produknya. Data ini belum disimpan ke sistem.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="max-h-[500px] overflow-y-auto border rounded-md">
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted">
                             <TableRow>
-                                <TableHead>Tanggal</TableHead>
-                                <TableHead>Order</TableHead>
-                                <TableHead>Pembeli</TableHead>
-                                <TableHead>SKU</TableHead>
+                                <TableHead>SKU Laporan</TableHead>
+                                <TableHead>Produk Terpetakan</TableHead>
                                 <TableHead>Qty</TableHead>
+                                <TableHead>Harga Satuan</TableHead>
                                 <TableHead className="text-right">Subtotal</TableHead>
-                                <TableHead className="text-right">Ongkir</TableHead>
                                 <TableHead className="text-right">Diskon</TableHead>
                                 <TableHead className="text-right">Fee</TableHead>
                                 <TableHead className="text-right">Total Bersih</TableHead>
@@ -250,13 +257,23 @@ export default function ImportMarketplacePage() {
                         <TableBody>
                             {parsedData.map((row, index) => (
                                 <TableRow key={`${row.nomor_order}-${index}`}>
-                                    <TableCell className="text-xs whitespace-nowrap">{row.tanggal_order}</TableCell>
-                                    <TableCell className="font-mono text-xs">{row.nomor_order}</TableCell>
-                                    <TableCell>{row.nama_pembeli}</TableCell>
                                     <TableCell className="text-xs">{row.sku}</TableCell>
+                                    <TableCell>
+                                        {row.mappedProduct ? (
+                                            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                <CheckCircle className="mr-1 h-3 w-3" />
+                                                {row.mappedProduct.name}
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="destructive">
+                                                <XCircle className="mr-1 h-3 w-3" />
+                                                Tidak Ditemukan
+                                            </Badge>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{row.qty}</TableCell>
+                                    <TableCell className="text-right font-mono">Rp {row.unit_price.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono">Rp {row.subtotal.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-right font-mono">Rp {row.shipping.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono text-destructive">Rp {row.discount.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono text-destructive">Rp {row.fee.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-bold font-mono">Rp {row.net_total.toLocaleString('id-ID')}</TableCell>
@@ -285,7 +302,3 @@ export default function ImportMarketplacePage() {
     </div>
   );
 }
-
-
-
-
