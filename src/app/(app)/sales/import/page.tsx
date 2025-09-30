@@ -223,11 +223,19 @@ export default function ImportMarketplacePage() {
   };
 
   const handleProductMapping = (rowId: string, product: Product | null) => {
-    setParsedData(prevData =>
-      prevData.map(row =>
-        row.id === rowId ? { ...row, mappedProduct: product } : row
-      )
-    );
+    setParsedData(prevData => {
+        const sourceRow = prevData.find(row => row.id === rowId);
+        if (!sourceRow) return prevData;
+
+        const sourceSku = sourceRow.sku;
+
+        return prevData.map(row => {
+            if (row.sku === sourceSku) {
+                return { ...row, mappedProduct: product };
+            }
+            return row;
+        });
+    });
   };
 
   const handleImport = () => {
@@ -386,3 +394,4 @@ function ProductMappingCell({ product, allProducts, onMap }: { product: Product 
         </Popover>
     );
 }
+
