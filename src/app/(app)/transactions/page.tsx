@@ -135,7 +135,7 @@ export default function TransactionsPage() {
 
 
   const totalSales = useMemo(() => {
-    return transactions.reduce((sum, tx) => sum + tx.total, 0);
+    return transactions.reduce((sum, tx) => sum + (tx.netTotal ?? tx.total), 0);
   }, [transactions]);
   
   const getPaymentBadge = (tx: Transaction) => {
@@ -172,10 +172,10 @@ export default function TransactionsPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div>
                     <CardTitle className="font-headline">Semua Transaksi</CardTitle>
-                    <CardDescription>Total penjualan untuk periode yang dipilih (pada halaman ini).</CardDescription>
+                    <CardDescription>Total penjualan bersih untuk periode yang dipilih (pada halaman ini).</CardDescription>
                 </div>
                 <div className="text-left sm:text-right">
-                    <p className="text-sm text-muted-foreground">Total Penjualan</p>
+                    <p className="text-sm text-muted-foreground">Total Penjualan Bersih</p>
                     <p className="text-xl sm:text-2xl font-bold">Rp {totalSales.toLocaleString('id-ID')}</p>
                 </div>
             </div>
@@ -200,7 +200,7 @@ export default function TransactionsPage() {
                         </div>
                         <div className="flex items-center gap-2 sm:gap-4 justify-between">
                             {getPaymentBadge(tx)}
-                            <p className="font-bold text-md sm:text-lg text-primary">Rp {tx.total.toLocaleString('id-ID')}</p>
+                            <p className="font-bold text-md sm:text-lg text-primary">Rp {(tx.netTotal ?? tx.total).toLocaleString('id-ID')}</p>
                         </div>
                     </div>
                     </AccordionTrigger>
@@ -280,3 +280,5 @@ declare module '@/components/ui/date-range-picker' {
         className?: string;
     }
 }
+
+    
