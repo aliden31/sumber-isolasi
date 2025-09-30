@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Link from "next/link";
@@ -53,7 +54,8 @@ import {
   Percent,
   Coins,
   SlidersHorizontal,
-  DatabaseZap
+  DatabaseZap,
+  Wrench
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -76,6 +78,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { TokoKilatLogo } from "../icons/logo";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 const navItems = [
   {
@@ -99,7 +102,7 @@ const navItems = [
     subItems: [
       { href: "/transactions", label: "Riwayat Transaksi", icon: History },
       { href: "/sales/manual-input", label: "Input Manual", icon: FileDigit },
-      { href: "/sales/import", label: "Impor Penjualan", icon: FileUp },
+      { href: "/sales/import", label: "Impor Penjualan", icon: FileUp, isDev: true },
       { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
       { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
     ],
@@ -108,12 +111,12 @@ const navItems = [
     label: "Pembelian",
     icon: Truck,
     subItems: [
-      { href: "/purchasing/request", label: "Permintaan Pembelian", icon: FilePlus },
+      { href: "/purchasing/request", label: "Permintaan Pembelian", icon: FilePlus, isDev: true },
       { href: "/purchasing/order", label: "Pesanan Pembelian", icon: PackagePlus },
       { href: "/purchasing/goods-receipt", label: "Penerimaan Barang", icon: PackageCheck },
-      { href: "/purchasing/invoice", label: "Faktur Pemasok", icon: FileKey2 },
-      { href: "/purchasing/returns", label: "Retur Pembelian", icon: ArrowRightLeft },
-      { href: "/purchasing/payables", label: "Utang Usaha", icon: Handshake },
+      { href: "/purchasing/invoice", label: "Faktur Pemasok", icon: FileKey2, isDev: true },
+      { href: "/purchasing/returns", label: "Retur Pembelian", icon: ArrowRightLeft, isDev: true },
+      { href: "/purchasing/payables", label: "Utang Usaha", icon: Handshake, isDev: true },
     ],
   },
   {
@@ -121,12 +124,12 @@ const navItems = [
     icon: Package,
     subItems: [
       { href: "/products", label: "Master Produk", icon: Package },
-      { href: "/products/categories", label: "Kategori Produk", icon: BookUser },
-      { href: "/stock/warehouses", label: "Multi-Gudang", icon: Warehouse },
-      { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft },
-      { href: "/stock/opname", label: "Penyesuaian Stok", icon: ClipboardCheck },
+      { href: "/products/categories", label: "Kategori Produk", icon: BookUser, isDev: true },
+      { href: "/stock/warehouses", label: "Multi-Gudang", icon: Warehouse, isDev: true },
+      { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft, isDev: true },
+      { href: "/stock/opname", label: "Penyesuaian Stok", icon: ClipboardCheck, isDev: true },
       { href: "/stock-estimation", label: "Estimasi Stok (AI)", icon: BrainCircuit },
-      { href: "/stock/notifications", label: "Notifikasi Stok", icon: Bell },
+      { href: "/stock/notifications", label: "Notifikasi Stok", icon: Bell, isDev: true },
     ],
   },
   {
@@ -136,7 +139,7 @@ const navItems = [
       { href: "/cash/in", label: "Kas Masuk", icon: Banknote },
       { href: "/cash/out", label: "Kas Keluar", icon: LogOut },
       { href: "/cash/transfer", label: "Transfer Antar Kas", icon: ArrowRightLeft },
-      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw },
+      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw, isDev: true },
     ],
   },
   {
@@ -146,16 +149,16 @@ const navItems = [
       { href: "/accounting/coa", label: "Bagan Akun (COA)", icon: FileSpreadsheet },
       { href: "/accounting/journal", label: "Jurnal Umum", icon: FileDigit },
       { href: "/accounting/ledger", label: "Buku Besar", icon: BookCopy },
-      { href: "/accounting/closing", label: "Tutup Buku", icon: BookLock },
+      { href: "/accounting/closing", label: "Tutup Buku", icon: BookLock, isDev: true },
     ],
   },
   {
     label: "Laporan",
     icon: BarChart2,
     subItems: [
-      { href: "/reports", label: "Laporan Penjualan", icon: FileText },
-      { href: "/reports/purchasing", label: "Laporan Pembelian", icon: FileText },
-      { href: "/reports/stock", label: "Laporan Stok", icon: FileText },
+      { href: "/reports", label: "Laporan Penjualan", icon: FileText, isDev: true },
+      { href: "/reports/purchasing", label: "Laporan Pembelian", icon: FileText, isDev: true },
+      { href: "/reports/stock", label: "Laporan Stok", icon: FileText, isDev: true },
       { href: "/reports/financial", label: "Laporan Keuangan", icon: FileText },
     ],
   },
@@ -165,9 +168,9 @@ const navItems = [
     subItems: [
       { href: "/customers", label: "Pelanggan", icon: Users },
       { href: "/suppliers", label: "Pemasok", icon: Factory },
-      { href: "/users", label: "Pengguna & Hak Akses", icon: UserCheck },
-      { href: "/taxes", label: "Pajak", icon: Percent },
-      { href: "/currencies", label: "Mata Uang", icon: Coins },
+      { href: "/users", label: "Pengguna & Hak Akses", icon: UserCheck, isDev: true },
+      { href: "/taxes", label: "Pajak", icon: Percent, isDev: true },
+      { href: "/currencies", label: "Mata Uang", icon: Coins, isDev: true },
     ],
   },
   {
@@ -229,6 +232,16 @@ export function AppSidebar() {
                             >
                               {subItem.icon && <subItem.icon />}
                               <span>{subItem.label}</span>
+                               {subItem.isDev && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Wrench className="ml-auto h-3 w-3 text-muted-foreground" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" align="center">
+                                    <p>Dalam Pengembangan</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                             </SidebarMenuSubButton>
                           </Link>
                         </SidebarMenuSubItem>
