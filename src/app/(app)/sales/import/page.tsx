@@ -145,9 +145,8 @@ export default function ImportMarketplacePage() {
                     const voucher = normalizeNumber(getVal(['voucher']));
                     const discount = diskon_penjual + diskon_marketplace + voucher;
                     
-                    const total_pesanan = normalizeNumber(getVal(['total pesanan', 'total perkiraan jumlah pelepasan']));
-                    // Net Total Calculation
-                    const net_total = total_pesanan > 0 ? (total_pesanan - fee - discount) : (subtotal + shipping - discount);
+                    // Correct Net Total Calculation
+                    const net_total = subtotal + shipping - discount;
 
                     let tanggal_order_formatted = 'N/A';
                     if (tanggal_order_raw) {
