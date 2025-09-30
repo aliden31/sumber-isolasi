@@ -180,21 +180,23 @@ export default function BankReconciliationPage() {
             const json = XLSX.utils.sheet_to_json(worksheet);
 
             const parsedData = json.map((row: any, index: number) => {
-                // Common headers: Tanggal, Keterangan, Mutasi, Saldo. Adjust as needed.
                 const dateValue = row.Tanggal || row.Date;
-                // Excel dates can be tricky. This handles serial numbers and string dates.
+                if (!dateValue) {
+                    console.warn(`Skipping row ${index + 2} due to missing date.`);
+                    return null;
+                }
+
                 let date;
                 if (typeof dateValue === 'number') {
                     date = XLSX.SSF.parse_date_code(dateValue);
                     date = new Date(date.y, date.m - 1, date.d);
                 } else {
-                    // Try parsing various string formats
-                    date = parse(dateValue, 'dd/MM/yyyy', new Date());
+                    date = parse(String(dateValue), 'dd/MM/yyyy', new Date());
                     if (isNaN(date.getTime())) {
-                       date = parse(dateValue, 'MM/dd/yyyy', new Date());
+                       date = parse(String(dateValue), 'MM/dd/yyyy', new Date());
                     }
                     if (isNaN(date.getTime())) {
-                       date = new Date(dateValue);
+                       date = new Date(String(dateValue));
                     }
                 }
                 
@@ -213,7 +215,7 @@ export default function BankReconciliationPage() {
                     description: description,
                     amount: amount,
                 };
-            }).filter(Boolean) as BankStatementItem[]; // Filter out null values
+            }).filter(Boolean) as BankStatementItem[];
             
             setBankStatementItems(parsedData);
             toast({ title: 'Berhasil', description: `${parsedData.length} transaksi bank berhasil diimpor.` });
