@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -9,9 +9,12 @@ import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'fireba
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
+import { Button } from '@/components/ui/button';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 type ReportRow = {
@@ -44,6 +47,7 @@ export default function BalanceSheetPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [reportDate, setReportDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsubAccounts = onSnapshot(collection(db, 'coa'), (snapshot) => {
@@ -153,6 +157,24 @@ export default function BalanceSheetPage() {
 
     return report;
   }, [journals, accounts]);
+  
+  const handleExportPDF = () => {
+    const input = reportRef.current;
+    if (!input) return;
+
+    html2canvas(input, { scale: 2 }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      const height = pdfWidth / ratio;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
+      pdf.save(`laporan-neraca-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    });
+  };
 
   const renderSection = (title: string, rows: ReportRow[], total: number) => (
     <>
@@ -177,11 +199,15 @@ export default function BalanceSheetPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Posisi Keuangan (Neraca)</h1>
-        <div className="w-full sm:w-auto">
+        <div className="flex gap-2">
             <DatePicker date={reportDate} setDate={setReportDate} />
+             <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
+                <Download className="mr-2 h-4 w-4"/>
+                Ekspor PDF
+            </Button>
         </div>
       </div>
-      <Card>
+      <Card ref={reportRef}>
         <CardHeader>
           <CardTitle>Neraca</CardTitle>
           <CardDescription>
