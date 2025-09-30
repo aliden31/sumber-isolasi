@@ -8,6 +8,7 @@ import {
   Timestamp,
   writeBatch,
   getDocs,
+  getDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type {
@@ -114,6 +115,7 @@ export async function importMarketplaceTransactions(
         paymentMethod: 'Transfer', // Marketplace sales are treated as transfers
         customerId: `MKT-${order.customerName}`,
         customerName: order.customerName,
+        status: 'Lunas'
       };
       batch.set(newTxRef, newTransaction);
 
@@ -151,7 +153,7 @@ export async function importMarketplaceTransactions(
         entries: journalEntries,
         total: order.total,
       };
-      const newJournalRef = doc(db, 'journals', generateDocumentId('JNL'));
+      const newJournalRef = doc(collection(db, 'journals'));
       batch.set(newJournalRef, {
         ...newJournal,
         date: Timestamp.fromDate(newJournal.date as Date),
@@ -169,7 +171,7 @@ export async function importMarketplaceTransactions(
             ],
             total: order.totalCost,
           };
-          const newCogsJournalRef = doc(db, 'journals', generateDocumentId('JNL'));
+          const newCogsJournalRef = doc(collection(db, 'journals'));
           batch.set(newCogsJournalRef, {
             ...cogsJournal,
             date: Timestamp.fromDate(cogsJournal.date as Date),

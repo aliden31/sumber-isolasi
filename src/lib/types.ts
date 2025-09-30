@@ -2,6 +2,7 @@
 
 
 
+
 export type ProductUnit = {
   name: string; // e.g., 'Pcs', 'Box', 'Lusin'
   price: number;
@@ -56,7 +57,7 @@ export type Transaction = {
   customerName?: string;
 };
 
-export type NewTransaction = Omit<Transaction, 'id' | 'date' | 'status'> & {
+export type NewTransaction = Omit<Transaction, 'id' | 'date'> & {
   date: Date | any; // Allow for server timestamp
 };
 

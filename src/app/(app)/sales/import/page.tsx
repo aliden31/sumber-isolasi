@@ -178,7 +178,8 @@ export default function ImportMarketplacePage() {
                     
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
                     const voucher_toko = normalizeNumber(getVal(['voucher toko']));
-                    const discount = diskon_marketplace + voucher_toko;
+                    const diskon_penjual = normalizeNumber(getVal(['diskon dari penjual']));
+                    const discount = diskon_marketplace + voucher_toko + diskon_penjual;
                     
                     const net_total = subtotal - fee - discount;
 
@@ -381,10 +382,4 @@ function ProductMappingCell({ product, allProducts, onMap }: { product: Product 
             </PopoverContent>
         </Popover>
     );
-}
-
-declare module "@/lib/types" {
-    interface MappedRow {
-        id: string;
-    }
 }
