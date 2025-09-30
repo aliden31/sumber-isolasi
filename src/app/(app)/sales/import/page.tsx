@@ -44,7 +44,7 @@ const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow } = {
   'informasi sku': 'sku',
   'jumlah': 'qty',
   'jumlah produk dibeli': 'qty',
-f  'kuantitas': 'qty',
+  'kuantitas': 'qty',
   'harga satuan': 'unit_price',
   'harga jual (rp)': 'unit_price',
   'subtotal produk': 'subtotal',
@@ -278,3 +278,5 @@ export default function ImportMarketplacePage() {
     </div>
   );
 }
+
+    

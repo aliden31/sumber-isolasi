@@ -1,11 +1,9 @@
 
-import { AppSidebar } from "@/components/layout/app-sidebar";
-import { AppHeader } from "@/components/layout/app-header";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/app-shell";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 export default function AppLayout({
   children,
