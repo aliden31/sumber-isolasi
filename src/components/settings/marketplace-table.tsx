@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { MarketplaceRowActions } from './marketplace-actions';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
@@ -17,18 +17,18 @@ interface MarketplaceStoreTableProps {
   data: MarketplaceStore[];
 }
 
-export function MarketplaceStoreTable({ data }: MarketplaceStoreTableProps) {
-  const [selectedStore, setSelectedStore] = useState<MarketplaceStore | null>(null);
+function HistoryDialog({ store }: { store: MarketplaceStore }) {
+  const [open, setOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!selectedStore) return;
+    if (!open) return;
 
     setLoading(true);
     const q = query(
       collection(db, 'transactions'),
-      where('channel', '==', selectedStore.marketplace),
+      where('channel', '==', store.marketplace),
       orderBy('date', 'desc')
     );
 
@@ -46,89 +46,84 @@ export function MarketplaceStoreTable({ data }: MarketplaceStoreTableProps) {
     });
 
     return () => unsubscribe();
-  }, [selectedStore]);
-
-  const handleStoreClick = (store: MarketplaceStore) => {
-    setSelectedStore(store);
-  };
-  
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-        setSelectedStore(null);
-        setTransactions([]);
-    }
-  }
+  }, [open, store.marketplace]);
 
   return (
-    <Dialog onOpenChange={handleOpenChange}>
-      <div className="w-full overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Marketplace</TableHead>
-              <TableHead>Nama Toko</TableHead>
-              <TableHead>Nama Panggilan (Internal)</TableHead>
-              <TableHead className="text-right">Aksi</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((store) => (
-              <TableRow key={store.id}>
-                <TableCell>
-                  <DialogTrigger asChild>
-                    <Button variant="link" className="p-0 h-auto" onClick={() => handleStoreClick(store)}>
-                        <Badge variant="secondary">{store.marketplace}</Badge>
-                    </Button>
-                  </DialogTrigger>
-                </TableCell>
-                <TableCell className="font-medium">{store.storeName}</TableCell>
-                <TableCell>{store.nickname}</TableCell>
-                <TableCell className="text-right">
-                  <MarketplaceRowActions store={store} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="link" className="p-0 h-auto">
+          <Badge variant="secondary">{store.marketplace}</Badge>
+        </Button>
+      </DialogTrigger>
       <DialogContent className="max-w-3xl">
-            <DialogHeader>
-                <DialogTitle>Riwayat Transaksi: {selectedStore?.storeName}</DialogTitle>
-                <DialogDescription>
-                    Berikut adalah daftar semua transaksi yang diimpor dari channel {selectedStore?.marketplace}.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="max-h-[60vh] overflow-y-auto">
-                {loading ? (
-                    <div className="flex justify-center items-center h-48">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : transactions.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-10">Toko ini belum memiliki riwayat transaksi.</p>
-                ) : (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Tanggal</TableHead>
-                                <TableHead>No. Transaksi</TableHead>
-                                <TableHead>Pelanggan</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {transactions.map(tx => (
-                                <TableRow key={tx.id}>
-                                    <TableCell>{format(tx.date, 'dd MMM yyyy, HH:mm')}</TableCell>
-                                    <TableCell className="font-mono text-xs">{tx.id}</TableCell>
-                                    <TableCell>{tx.customerName}</TableCell>
-                                    <TableCell className="text-right font-medium">Rp {tx.netTotal?.toLocaleString('id-ID') || tx.total.toLocaleString('id-ID')}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                )}
+        <DialogHeader>
+          <DialogTitle>Riwayat Transaksi: {store.storeName}</DialogTitle>
+          <DialogDescription>
+            Berikut adalah daftar semua transaksi yang diimpor dari channel {store.marketplace}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center items-center h-48">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-        </DialogContent>
+          ) : transactions.length === 0 ? (
+            <p className="text-center text-muted-foreground py-10">Toko ini belum memiliki riwayat transaksi.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>No. Transaksi</TableHead>
+                  <TableHead>Pelanggan</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.map(tx => (
+                  <TableRow key={tx.id}>
+                    <TableCell>{format(tx.date, 'dd MMM yyyy, HH:mm')}</TableCell>
+                    <TableCell className="font-mono text-xs">{tx.id}</TableCell>
+                    <TableCell>{tx.customerName}</TableCell>
+                    <TableCell className="text-right font-medium">Rp {tx.netTotal?.toLocaleString('id-ID') || tx.total.toLocaleString('id-ID')}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </DialogContent>
     </Dialog>
+  );
+}
+
+export function MarketplaceStoreTable({ data }: MarketplaceStoreTableProps) {
+  return (
+    <div className="w-full overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Marketplace</TableHead>
+            <TableHead>Nama Toko</TableHead>
+            <TableHead>Nama Panggilan (Internal)</TableHead>
+            <TableHead className="text-right">Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((store) => (
+            <TableRow key={store.id}>
+              <TableCell>
+                <HistoryDialog store={store} />
+              </TableCell>
+              <TableCell className="font-medium">{store.storeName}</TableCell>
+              <TableCell>{store.nickname}</TableCell>
+              <TableCell className="text-right">
+                <MarketplaceRowActions store={store} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
