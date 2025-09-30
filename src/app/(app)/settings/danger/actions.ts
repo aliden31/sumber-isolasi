@@ -11,7 +11,7 @@ const COLLECTIONS = {
     TRANSACTIONAL: [
         "transactions", "journals", "salesReturns", "parkedTransactions",
         "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
-        "purchasePayments", "purchaseReturns", "stockTransfers"
+        "purchasePayments", "purchaseReturns", "stockTransfers", "periodClosings"
     ],
     MASTER: [
         "products", "customers", "suppliers", "productCategories", 
@@ -113,6 +113,7 @@ function revalidateAllPaths() {
         "/(app)/accounting/journal",
         "/(app)/accounting/ledger",
         "/(app)/accounting/closing",
+        "/(app)/accounting/post-closing-trial-balance",
         "/(app)/reports",
         "/(app)/reports/financial",
         "/(app)/reports/balance-sheet",

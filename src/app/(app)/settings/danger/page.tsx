@@ -26,7 +26,7 @@ const COLLECTIONS = {
     TRANSACTIONAL: [
         "transactions", "journals", "salesReturns", "parkedTransactions",
         "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
-        "purchasePayments", "purchaseReturns", "stockTransfers"
+        "purchasePayments", "purchaseReturns", "stockTransfers", "periodClosings"
     ],
     MASTER: [
         "products", "customers", "suppliers", "productCategories", 
@@ -154,7 +154,7 @@ function ResetAction({ title, description, buttonText, actionType, onConfirm, co
           <AlertDialogHeader>
             <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
             <AlertDialogDescription>
-              <p>Tindakan ini tidak dapat diurungkan. Ini akan menghapus data berikut secara permanen:</p>
+              Tindakan ini tidak dapat diurungkan. Ini akan menghapus data berikut secara permanen:
               <div className="flex flex-wrap gap-1 py-2">
                 {collectionsToDelete.map(col => (
                   <Badge key={col} variant="outline" className="font-mono">{col}</Badge>
