@@ -10,16 +10,51 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 
 type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop' | 'bigseller';
 
-// A very simplified representation of a parsed row
 type ParsedRow = {
   orderId: string;
   totalAmount: number;
   productName: string;
   quantity: number;
   status: string;
+  finishTime?: string;
+};
+
+const COLUMN_MAPPINGS: { [key in Marketplace]: { [key: string]: keyof ParsedRow } } = {
+  tokopedia: {
+    'nomor pesanan': 'orderId',
+    'order id': 'orderId',
+    'nama produk': 'productName',
+    'jumlah produk dibeli': 'quantity',
+    'status terakhir': 'status',
+    'total perkiraan jumlah pelepasan': 'totalAmount',
+    'waktu selesai': 'finishTime',
+  },
+  shopee: {
+    'no. pesanan': 'orderId',
+    'nama produk': 'productName',
+    'jumlah': 'quantity',
+    'status pesanan': 'status',
+    'total jumlah pelepasan': 'totalAmount',
+    'waktu pesanan selesai': 'finishTime',
+  },
+  tiktok_shop: {
+    'id pesanan': 'orderId',
+    'nama produk': 'productName',
+    'kuantitas': 'quantity',
+    'status pesanan': 'status',
+    'subtotal pesanan': 'totalAmount',
+    'waktu pembayaran': 'finishTime',
+  },
+  bigseller: {
+    'nomor pesanan': 'orderId',
+    'nama panggilan toko bigseller': 'productName', // Placeholder, needs better column from BigSeller
+    'total perkiraan jumlah pelepasan': 'totalAmount',
+    'waktu selesai': 'finishTime',
+  },
 };
 
 export default function ImportMarketplacePage() {
@@ -39,6 +74,7 @@ export default function ImportMarketplacePage() {
         return;
       }
       setFile(selectedFile);
+      setParsedData([]); // Reset preview on new file
     }
   };
 
@@ -53,41 +89,56 @@ export default function ImportMarketplacePage() {
         reader.onload = (e) => {
             try {
                 const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'array' });
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+                const json = XLSX.utils.sheet_to_json(worksheet, { raw: false }) as any[];
 
-                // Basic mapping logic, this needs to be greatly expanded
+                const mapping = COLUMN_MAPPINGS[marketplace];
+                const lowerCaseMapping: { [key: string]: keyof ParsedRow } = {};
+                for (const key in mapping) {
+                    lowerCaseMapping[key.toLowerCase()] = mapping[key as keyof typeof mapping];
+                }
+
                 const mappedData: ParsedRow[] = json.map(row => {
-                  if (marketplace === 'tokopedia') {
+                    const normalizedRow: Partial<ParsedRow> = {};
+                    for (const col in row) {
+                        const mappedKey = lowerCaseMapping[col.toLowerCase().trim()];
+                        if (mappedKey) {
+                            (normalizedRow[mappedKey] as any) = row[col];
+                        }
+                    }
+
+                    // Data Cleaning and Normalization
+                    const orderId = String(normalizedRow.orderId || '');
+                    const totalAmountStr = String(normalizedRow.totalAmount || '0').replace(/[^0-9.-]+/g, '');
+                    const totalAmount = parseFloat(totalAmountStr) || 0;
+                    
+                    let finishTime: string | undefined;
+                    if (normalizedRow.finishTime) {
+                        try {
+                           finishTime = format(new Date(normalizedRow.finishTime), 'yyyy-MM-dd HH:mm:ss');
+                        } catch {
+                           finishTime = normalizedRow.finishTime; // fallback to original string if date is invalid
+                        }
+                    }
+
                     return {
-                      orderId: row['Nomor Pesanan'] || row['Order ID'],
-                      productName: row['Nama Produk'] || 'N/A',
-                      quantity: parseInt(row['Jumlah Produk Dibeli'], 10) || 1,
-                      totalAmount: parseFloat(row['Total Perkiraan Jumlah Pelepasan']?.replace(/[^0-9.-]+/g, '')) || 0,
-                      status: row['Status Terakhir'] || 'N/A',
+                      orderId: orderId,
+                      productName: String(normalizedRow.productName || 'N/A'),
+                      quantity: parseInt(String(normalizedRow.quantity), 10) || 1,
+                      totalAmount: totalAmount,
+                      status: String(normalizedRow.status || 'N/A'),
+                      finishTime: finishTime,
                     };
-                  }
-                  if (marketplace === 'bigseller') {
-                     return {
-                      orderId: row['Nomor Pesanan'],
-                      productName: 'Multiple Items', // BigSeller often aggregates
-                      quantity: 1, // Not easily available per row
-                      totalAmount: parseFloat(row['Total Perkiraan Jumlah Pelepasan']?.replace(/[^0-9.-]+/g, '')) || 0,
-                      status: row['Waktu Selesai'] ? 'Selesai' : 'Diproses',
-                    };
-                  }
-                  // Add similar mapping for 'shopee', 'tiktok_shop' here
-                  return { orderId: 'N/A', productName: 'N/A', quantity: 0, totalAmount: 0, status: 'N/A' };
-                }).filter(row => row.orderId && row.totalAmount > 0);
+                }).filter(row => row.orderId && row.orderId !== 'null' && row.totalAmount > 0);
 
                 setParsedData(mappedData);
                 toast({ title: 'Berhasil', description: `${mappedData.length} baris berhasil di-parse.` });
 
             } catch (err) {
                  const e = err as Error;
-                 toast({ title: 'Gagal Parse File', description: `Format file tidak sesuai. ${e.message}`, variant: 'destructive' });
+                 toast({ title: 'Gagal Parse File', description: `Format file tidak sesuai atau rusak. Error: ${e.message}`, variant: 'destructive' });
             }
         }
         reader.readAsArrayBuffer(file);
@@ -113,8 +164,8 @@ export default function ImportMarketplacePage() {
               <SelectContent>
                 <SelectItem value="tokopedia">Tokopedia</SelectItem>
                 <SelectItem value="bigseller">BigSeller</SelectItem>
-                <SelectItem value="shopee" disabled>Shopee (Segera Hadir)</SelectItem>
-                <SelectItem value="tiktok_shop" disabled>TikTok Shop (Segera Hadir)</SelectItem>
+                <SelectItem value="shopee">Shopee</SelectItem>
+                <SelectItem value="tiktok_shop">TikTok Shop</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -152,9 +203,8 @@ export default function ImportMarketplacePage() {
                         <TableHeader className="sticky top-0 bg-muted">
                             <TableRow>
                                 <TableHead>Order ID</TableHead>
-                                <TableHead>Produk</TableHead>
-                                <TableHead>Jumlah</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Waktu Selesai</TableHead>
                                 <TableHead className="text-right">Total</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -162,9 +212,8 @@ export default function ImportMarketplacePage() {
                             {parsedData.map((row, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="font-mono text-xs">{row.orderId}</TableCell>
-                                    <TableCell>{row.productName}</TableCell>
-                                    <TableCell>{row.quantity}</TableCell>
                                     <TableCell>{row.status}</TableCell>
+                                    <TableCell>{row.finishTime || 'N/A'}</TableCell>
                                     <TableCell className="text-right font-medium">Rp {row.totalAmount.toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
                             ))}

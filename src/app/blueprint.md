@@ -74,8 +74,6 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 
 Fitur-fitur berikut masih berupa halaman *placeholder* atau dalam tahap pengembangan aktif.
 
-- **Impor Penjualan dari Marketplace**: Antarmuka untuk mengunggah laporan dari Tokopedia, Shopee, dll. Logika pemrosesan file belum ada.
+- **Impor Penjualan dari Marketplace**: Antarmuka untuk mengunggah dan mem-parsing laporan dari Tokopedia, Shopee, dll. sudah ada. Logika untuk menyimpan ke database dan rekonsiliasi belum ada.
 - **Rekonsiliasi Bank**: Antarmuka untuk mencocokkan transaksi bank sudah ada, namun fungsionalitas inti (unggah laporan koran, pencocokan otomatis) belum ada.
 - **Pengguna & Hak Akses**: Antarmuka untuk menampilkan pengguna sudah ada dengan data statis. Manajemen peran dan integrasi dengan Firebase Auth belum diimplementasikan.
-
-    
