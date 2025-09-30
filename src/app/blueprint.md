@@ -23,8 +23,8 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Pesanan Pembelian (PO)**: Membuat dan melacak status pesanan resmi ke pemasok.
 - **Penerimaan Barang (GRN)**: Mencatat barang yang diterima, menambah stok, dan membuat jurnal.
 - **Faktur Pemasok**: Mencatat tagihan dari pemasok dan mengakui utang usaha.
-- **Utang Usaha (Accounts Payable)**: Mengelola dan mencatat pembayaran utang kepada pemasok.
 - **Retur Pembelian**: Memproses pengembalian barang ke pemasok.
+- **Utang Usaha (Accounts Payable)**: Mengelola dan mencatat pembayaran utang kepada pemasok.
 
 ### Modul: Produk & Stok
 - **Master Produk**: Manajemen data produk (CRUD) dengan dukungan multi-satuan.
@@ -39,7 +39,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 ### Modul: Kas & Bank
 - **Kas Masuk**: Mencatat pemasukan di luar penjualan (misal: setoran modal).
 - **Kas Keluar**: Mencatat pengeluaran operasional (misal: bayar listrik).
-- **Transfer Antar Kas**: Mencatat perpindahan dana antar rekening kas/bank.
+- **Transfer Antar Kas**: Mencatat perpindahan dana antar rekening kas atau bank.
 
 ### Modul: Akuntansi
 - **Bagan Akun (COA)**: Manajemen daftar akun akuntansi (CRUD) dan seeding.
@@ -52,6 +52,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Laporan Pembelian**: Analisis aktivitas pembelian dan pemasok.
 - **Laporan Stok**: Rincian stok dan valuasi persediaan.
 - **Laporan Laba Rugi**: Laporan keuangan untuk mengukur profitabilitas.
+- **Laporan Neraca**: Laporan posisi keuangan (Aset, Kewajiban, Ekuitas).
 
 ### Modul: Master Data & Pengaturan
 - **Pelanggan**: Manajemen data pelanggan (CRUD).
@@ -68,6 +69,6 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 
 Fitur-fitur berikut masih berupa halaman *placeholder* atau dalam tahap pengembangan aktif.
 
-- **Laporan Neraca**: Laporan keuangan untuk melihat posisi aset, kewajiban, dan ekuitas.
+- **Laporan Arus Kas**: Laporan keuangan untuk melacak pergerakan kas.
 - **Rekonsiliasi Bank**: Fungsionalitas inti (unggah laporan koran, pencocokan otomatis) belum ada.
 - **Pengguna & Hak Akses**: Manajemen pengguna dan peran (role) untuk membatasi akses.
