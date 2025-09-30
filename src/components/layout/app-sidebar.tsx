@@ -76,10 +76,10 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarTrigger,
   useSidebar,
   SidebarFooter,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { ThemeToggle } from "./theme-toggle";
@@ -139,11 +139,15 @@ const navItems = [
     ],
   },
   {
+    href: "/cash/out",
+    label: "Pengeluaran",
+    icon: LogOut
+  },
+  {
     label: "Kas & Bank",
     icon: Landmark,
     subItems: [
       { href: "/cash/in", label: "Kas Masuk", icon: Banknote },
-      { href: "/cash/out", label: "Kas Keluar", icon: LogOut },
       { href: "/cash/transfer", label: "Transfer Antar Kas", icon: ArrowRightLeft },
       { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw, isDev: true },
     ],
