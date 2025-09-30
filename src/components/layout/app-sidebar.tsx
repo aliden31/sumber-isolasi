@@ -157,8 +157,8 @@ const navItems = [
     icon: BarChart2,
     subItems: [
       { href: "/reports", label: "Laporan Penjualan", icon: FileText },
-      { href: "/reports/purchasing", label: "Laporan Pembelian", icon: FileText, isDev: true },
-      { href: "/reports/stock", label: "Laporan Stok", icon: FileText, isDev: true },
+      { href: "/reports/purchasing", label: "Laporan Pembelian", icon: FileText },
+      { href: "/reports/stock", label: "Laporan Stok", icon: FileText },
       { href: "/reports/financial", label: "Laporan Keuangan", icon: FileText },
     ],
   },
@@ -272,3 +272,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+    
