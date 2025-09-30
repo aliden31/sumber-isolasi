@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
@@ -15,6 +16,8 @@ import { processStockOpname } from './actions';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 type OpnameItem = {
   product: Product;
@@ -58,6 +61,18 @@ export default function StockOpnamePage() {
     ));
   };
   
+  const handleCheckboxChange = (productId: string, checked: boolean) => {
+    setOpnameItems(prev => prev.map(item => {
+        if (item.product.id === productId) {
+            return {
+                ...item,
+                physicalCount: checked ? item.product.stock : null
+            };
+        }
+        return item;
+    }));
+  };
+
   const processedItems = useMemo(() => {
     return opnameItems.map(item => {
         const difference = (item.physicalCount ?? item.product.stock) - item.product.stock;
@@ -102,12 +117,12 @@ export default function StockOpnamePage() {
       <Card>
         <CardHeader>
           <CardTitle>Sesi Stock Opname</CardTitle>
-          <CardDescription>Masukkan jumlah stok fisik hasil perhitungan di gudang. Kosongkan jika tidak ada perubahan.</CardDescription>
+          <CardDescription>Masukkan jumlah stok fisik hasil perhitungan di gudang. Kosongkan jika tidak ada perubahan, atau centang "Sesuai" jika jumlahnya sama dengan sistem.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
             <div className="grid md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                    <label>Gudang</label>
+                    <Label>Gudang</Label>
                     <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
                         <SelectTrigger><SelectValue placeholder="Pilih gudang" /></SelectTrigger>
                         <SelectContent>
@@ -116,11 +131,11 @@ export default function StockOpnamePage() {
                     </Select>
                 </div>
                  <div className="space-y-2">
-                    <label>Tanggal Opname</label>
+                    <Label>Tanggal Opname</Label>
                     <DatePicker date={opnameDate} setDate={setOpnameDate} />
                 </div>
                  <div className="space-y-2">
-                    <label>Catatan/Referensi</label>
+                    <Label>Catatan/Referensi</Label>
                     <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Contoh: Opname Bulanan" />
                 </div>
             </div>
@@ -132,11 +147,12 @@ export default function StockOpnamePage() {
                   <TableHead className="text-center">Stok Sistem</TableHead>
                   <TableHead className="w-[150px] text-center">Stok Fisik</TableHead>
                   <TableHead className="text-center">Selisih</TableHead>
+                  <TableHead className="text-center">Sesuai (Set 0)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
                 ) : opnameItems.map(item => (
                   <TableRow key={item.product.id}>
                     <TableCell>{item.product.name}</TableCell>
@@ -148,6 +164,7 @@ export default function StockOpnamePage() {
                         value={item.physicalCount ?? ''}
                         onChange={e => handleCountChange(item.product.id, e.target.value)}
                         className="text-center"
+                        disabled={item.physicalCount === item.product.stock}
                       />
                     </TableCell>
                     <TableCell className={cn(
@@ -156,6 +173,13 @@ export default function StockOpnamePage() {
                         ((item.physicalCount ?? item.product.stock) - item.product.stock) < 0 && "text-destructive",
                     )}>
                       { (item.physicalCount ?? item.product.stock) - item.product.stock }
+                    </TableCell>
+                    <TableCell className="text-center">
+                        <Checkbox 
+                            id={`check-${item.product.id}`}
+                            checked={item.physicalCount === item.product.stock}
+                            onCheckedChange={(checked) => handleCheckboxChange(item.product.id, Boolean(checked))}
+                        />
                     </TableCell>
                   </TableRow>
                 ))}
