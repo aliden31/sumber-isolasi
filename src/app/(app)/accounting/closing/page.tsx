@@ -71,6 +71,12 @@ export default function PeriodClosingPage() {
                     title: 'Tutup Buku Berhasil!',
                     description: `Jurnal penutup untuk periode ${getMonthName(month)} ${year} telah berhasil dibuat.`,
                 });
+                if (result.extraMessage) {
+                    toast({
+                        title: 'Jurnal Pembalik Dibuat',
+                        description: result.extraMessage,
+                    });
+                }
             }
         });
     };
@@ -80,9 +86,9 @@ export default function PeriodClosingPage() {
             <h1 className="text-2xl md:text-3xl font-headline font-bold">Tutup Buku Periode</h1>
             <Card className="max-w-xl mx-auto w-full">
                 <CardHeader>
-                    <CardTitle>Proses Tutup Buku</CardTitle>
+                    <CardTitle>Proses Tutup Buku & Jurnal Balik</CardTitle>
                     <CardDescription>
-                        Fitur ini akan membuat jurnal penutup untuk semua akun pendapatan dan beban pada periode yang dipilih, lalu mentransfer laba bersih ke akun Laba Ditahan.
+                        Fitur ini akan membuat jurnal penutup untuk semua akun pendapatan dan beban, mentransfer laba bersih ke Laba Ditahan, dan secara otomatis membuat jurnal pembalik untuk periode berikutnya.
                         <br/><strong className="text-destructive">Peringatan:</strong> Proses ini tidak dapat diurungkan. Pastikan semua transaksi pada periode tersebut sudah final.
                     </CardDescription>
                 </CardHeader>
@@ -132,7 +138,7 @@ export default function PeriodClosingPage() {
                             <AlertDialogTitle>Konfirmasi Tutup Buku</AlertDialogTitle>
                             <AlertDialogDescription>
                                 Anda akan melakukan tutup buku untuk periode <strong>{getMonthName(month)} {year}</strong>.
-                                Tindakan ini bersifat permanen dan akan membuat jurnal penutup. Pastikan semua data sudah benar. Lanjutkan?
+                                Tindakan ini bersifat permanen dan akan membuat jurnal penutup serta jurnal pembalik. Pastikan semua data sudah benar. Lanjutkan?
                             </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

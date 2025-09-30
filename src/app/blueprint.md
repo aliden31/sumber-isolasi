@@ -1,3 +1,4 @@
+
 # Blueprint & Status Pengembangan
 
 Berikut adalah daftar lengkap fitur aplikasi, beserta status implementasinya.
@@ -51,6 +52,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Jurnal Umum**: Input manual untuk transaksi jurnal.
 - **Buku Besar**: Melihat riwayat transaksi per akun.
 - **Tutup Buku**: Proses akuntansi akhir periode untuk menutup akun temporer.
+- **Jurnal Pembalik (Reversing Entries)**: Membuat jurnal pembalik secara otomatis di awal periode baru untuk membalik jurnal penyesuaian tertentu.
 
 ### Modul: Laporan
 - **Laporan Penjualan**: Analisis performa penjualan, produk terlaris, dan tren.
@@ -76,5 +78,4 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 Fitur-fitur berikut masih berupa halaman *placeholder* atau dalam tahap pengembangan aktif.
 
 - **Rekonsiliasi Bank**: Antarmuka untuk mencocokkan transaksi bank sudah ada, termasuk unggah laporan koran. Fungsionalitas inti (pencocokan otomatis, jurnal penyesuaian) belum ada.
-- **Jurnal Pembalik (Reversing Entries)**: Fitur untuk membuat jurnal pembalik secara otomatis di awal periode baru untuk membalik jurnal penyesuaian tertentu (misalnya, akrual beban). Fungsionalitas belum ada.
 - **Pengguna & Hak Akses**: Antarmuka untuk menampilkan pengguna sudah ada dengan data statis. Manajemen peran dan integrasi dengan Firebase Auth belum diimplementasikan.
