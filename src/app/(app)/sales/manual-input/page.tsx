@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useTransition, useEffect } from 'react';
 import { PlusCircle, MinusCircle, X, Save, Loader2 } from 'lucide-react';
-import type { Product, CartItem, NewTransaction, Customer, Account } from '@/lib/types';
+import type { Product, CartItem, NewTransaction, Customer, ProductUnit } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
@@ -43,12 +43,20 @@ export default function ManualSalesInputPage() {
   }, []);
   
   const addToCart = (product: Product) => {
+    const baseUnit = product.units.find(u => u.conversionRate === 1) || product.units[0];
+    if (!baseUnit) {
+        toast({ title: 'Produk tidak valid', description: 'Satuan dasar produk tidak ditemukan.', variant: 'destructive' });
+        return;
+    }
+
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.product.id === product.id);
+      const existingItem = prevCart.find(item => item.product.id === product.id && item.unit.name === baseUnit.name);
       if (existingItem) {
         if (existingItem.quantity < product.stock) {
           return prevCart.map(item =>
-            item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+            item.product.id === product.id && item.unit.name === baseUnit.name 
+            ? { ...item, quantity: item.quantity + 1 } 
+            : item
           );
         } else {
           toast({ title: 'Stok tidak mencukupi', variant: 'destructive' });
@@ -56,7 +64,7 @@ export default function ManualSalesInputPage() {
         }
       }
       if (product.stock > 0) {
-        return [...prevCart, { product, quantity: 1 }];
+        return [...prevCart, { product, quantity: 1, unit: baseUnit }];
       } else {
         toast({ title: 'Stok habis', variant: 'destructive' });
         return prevCart;
@@ -81,7 +89,7 @@ export default function ManualSalesInputPage() {
   };
 
   const cartTotal = useMemo(() => {
-    return cart.reduce((total, item) => total + item.product.price * item.quantity, 0);
+    return cart.reduce((total, item) => total + item.unit.price * item.quantity, 0);
   }, [cart]);
 
   const resetForm = () => {
@@ -103,8 +111,9 @@ export default function ManualSalesInputPage() {
           productId: item.product.id,
           productName: item.product.name,
           quantity: item.quantity,
-          price: item.product.price,
-          cost: item.product.cost,
+          price: item.unit.price,
+          cost: item.unit.cost,
+          unit: item.unit.name,
         })),
         total: cartTotal,
         paymentMethod: 'Kredit',
@@ -173,7 +182,7 @@ export default function ManualSalesInputPage() {
                                         </Button>
                                     </div>
                                     </TableCell>
-                                    <TableCell className="text-right">Rp {(item.product.price * item.quantity).toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right">Rp {(item.unit.price * item.quantity).toLocaleString('id-ID')}</TableCell>
                                     <TableCell>
                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, 0)}>
                                         <X className="h-4 w-4 text-destructive" />
