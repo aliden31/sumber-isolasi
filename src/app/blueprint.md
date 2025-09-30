@@ -53,6 +53,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Buku Besar**: Melihat riwayat transaksi per akun.
 - **Tutup Buku**: Proses akuntansi akhir periode untuk menutup akun temporer.
 - **Jurnal Pembalik (Reversing Entries)**: Membuat jurnal pembalik secara otomatis di awal periode baru untuk membalik jurnal penyesuaian tertentu.
+- **Neraca Saldo Setelah Penutupan**: Laporan untuk verifikasi saldo akun setelah proses tutup buku.
 
 ### Modul: Laporan
 - **Laporan Penjualan**: Analisis performa penjualan, produk terlaris, dan tren.

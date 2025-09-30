@@ -60,6 +60,7 @@ import {
   AreaChart,
   Store,
   ArrowDownCircle,
+  BookCheck,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -161,6 +162,7 @@ const navItems = [
       { href: "/accounting/journal", label: "Jurnal Umum", icon: FileDigit },
       { href: "/accounting/ledger", label: "Buku Besar", icon: BookCopy },
       { href: "/accounting/closing", label: "Tutup Buku", icon: BookLock },
+      { href: "/accounting/post-closing-trial-balance", label: "Neraca Saldo Stlh Penutupan", icon: BookCheck },
     ],
   },
   {
