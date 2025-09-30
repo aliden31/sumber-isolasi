@@ -178,7 +178,7 @@ export default function ImportProductsPage() {
                                 <TableHead>Nama Produk</TableHead>
                                 <TableHead>SKU GUDANG</TableHead>
                                 <TableHead>Kategori</TableHead>
-                                <TableHead className="text-right">Harga Modal</TableHead>
+                                <TableHead className="text-right">HPP</TableHead>
                                 <TableHead className="text-right">Harga Jual</TableHead>
                                 <TableHead className="text-right">Stok</TableHead>
                             </TableRow>
