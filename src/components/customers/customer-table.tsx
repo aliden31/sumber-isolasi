@@ -80,7 +80,7 @@ export function CustomerTable({ data }: CustomerTableProps) {
             <TableHeader>
             <TableRow>
                 <TableHead className="min-w-[200px]">Nama Pelanggan</TableHead>
-                <TableHead>Alamat</TableHead>
+                <TableHead className="min-w-[250px]">Alamat</TableHead>
                 <TableHead>No. Telepon</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
