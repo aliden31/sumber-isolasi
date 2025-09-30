@@ -59,6 +59,7 @@ import {
   Scale,
   AreaChart,
   Store,
+  ArrowDownCircle,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -141,7 +142,7 @@ const navItems = [
   {
     href: "/cash/out",
     label: "Pengeluaran",
-    icon: LogOut
+    icon: ArrowDownCircle,
   },
   {
     label: "Kas & Bank",
