@@ -39,6 +39,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Kas Masuk**: Mencatat pemasukan di luar penjualan (misal: setoran modal).
 - **Kas Keluar**: Mencatat pengeluaran operasional (misal: bayar listrik).
 - **Transfer Antar Kas**: Mencatat perpindahan dana antar rekening kas/bank.
+- **Rekonsiliasi Bank**: UI dasar untuk proses rekonsiliasi.
 
 ### Modul: Akuntansi
 - **Bagan Akun (COA)**: Manajemen daftar akun akuntansi (CRUD) dan seeding.
@@ -68,5 +69,5 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 Fitur-fitur berikut masih berupa halaman *placeholder* dan belum memiliki fungsionalitas penuh.
 
 - **Impor Penjualan**: Kemampuan untuk mengunggah data penjualan secara massal dari file CSV/Excel.
-- **Rekonsiliasi Bank**: Alat untuk mencocokkan transaksi internal dengan laporan koran dari bank. (UI Dasar Selesai)
+- **Rekonsiliasi Bank**: Fungsionalitas inti (unggah laporan koran, pencocokan otomatis) belum ada.
 - **Pengguna & Hak Akses**: Manajemen pengguna dan peran (role) untuk membatasi akses.

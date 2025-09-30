@@ -128,8 +128,8 @@ const navItems = [
       { href: "/stock/warehouses", label: "Gudang", icon: Warehouse },
       { href: "/stock/notifications", label: "Stok Menipis", icon: Bell },
       { href: "/stock-estimation", label: "Estimasi Stok (AI)", icon: BrainCircuit },
-      { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft, isDev: true },
-      { href: "/stock/opname", label: "Stock Opname", icon: ClipboardCheck, isDev: true },
+      { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft },
+      { href: "/stock/opname", label: "Stock Opname", icon: ClipboardCheck },
     ],
   },
   {
@@ -139,7 +139,7 @@ const navItems = [
       { href: "/cash/in", label: "Kas Masuk", icon: Banknote },
       { href: "/cash/out", label: "Kas Keluar", icon: LogOut },
       { href: "/cash/transfer", label: "Transfer Antar Kas", icon: ArrowRightLeft },
-      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw, isDev: true },
+      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw },
     ],
   },
   {
