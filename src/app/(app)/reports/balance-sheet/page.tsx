@@ -284,7 +284,6 @@ export default function BalanceSheetPage() {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Halaman ${i} dari ${pageCount}`, doc.internal.pageSize.getWidth() - 15, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
         doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 15, doc.internal.pageSize.getHeight() - 10);
     }
 
