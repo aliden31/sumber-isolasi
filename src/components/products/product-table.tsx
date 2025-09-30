@@ -23,6 +23,7 @@ export function ProductTable({ data }: ProductTableProps) {
           <TableRow>
             <TableHead className="min-w-[200px]">Nama Produk</TableHead>
             <TableHead>Kategori</TableHead>
+            <TableHead>Harga Pokok</TableHead>
             <TableHead>Harga Jual (Satuan Dasar)</TableHead>
             <TableHead className="text-center">Stok (Satuan Dasar)</TableHead>
             <TableHead className="text-right">Aksi</TableHead>
@@ -36,6 +37,9 @@ export function ProductTable({ data }: ProductTableProps) {
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>
                   <Badge variant="outline">{product.category}</Badge>
+                </TableCell>
+                 <TableCell>
+                  {`Rp ${(product.cost || 0).toLocaleString('id-ID')}`}
                 </TableCell>
                 <TableCell>
                   {baseUnit ? `Rp ${baseUnit.price.toLocaleString('id-ID')}` : '-'}
