@@ -24,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { addProduct, updateProduct, deleteProduct } from '@/app/(app)/products/actions';
+import { addProduct, updateProduct, deleteProduct, getProductsForExport } from '@/app/(app)/products/actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,8 +49,9 @@ import { db } from '@/lib/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 
-export function ProductActions({ products }: { products: Product[] }) {
+export function ProductActions({ hasProducts }: { hasProducts: boolean }) {
   const [isPending, startTransition] = useTransition();
+  const [isExporting, startExporting] = useTransition();
   const { toast } = useToast();
 
   const handleSeed = () => {
@@ -65,33 +66,42 @@ export function ProductActions({ products }: { products: Product[] }) {
   };
 
   const handleExport = () => {
-    const dataToExport = products.map(p => {
-        const baseUnit = p.units?.find(u => u.conversionRate === 1) || p.units?.[0];
-        return {
-            'Nama Produk': p.name,
-            'SKU': p.sku || '',
-            'Kategori': p.category,
-            'Stok': p.stock,
-            'Harga Pokok': p.cost || 0,
-            'Satuan Dasar': p.baseUnit,
-            'Harga Jual (Satuan Dasar)': baseUnit?.price || 0,
-            'Batas Stok Minimum': p.minStockThreshold || 0,
-        };
-    });
+    startExporting(async () => {
+        const { data, error } = await getProductsForExport();
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Daftar Produk');
-    XLSX.writeFile(workbook, 'Daftar_Produk.xlsx');
-    
-    toast({ title: "Ekspor Berhasil", description: "File Excel berhasil diunduh." });
+        if (error || !data) {
+            toast({ title: "Gagal Mengekspor", description: error || "Tidak dapat mengambil data produk.", variant: "destructive" });
+            return;
+        }
+
+        const dataToExport = data.map(p => {
+            const baseUnit = p.units?.find(u => u.conversionRate === 1) || p.units?.[0];
+            return {
+                'Nama Produk': p.name,
+                'SKU': p.sku || '',
+                'Kategori': p.category,
+                'Stok': p.stock,
+                'Harga Pokok': p.cost || 0,
+                'Satuan Dasar': p.baseUnit,
+                'Harga Jual (Satuan Dasar)': baseUnit?.price || 0,
+                'Batas Stok Minimum': p.minStockThreshold || 0,
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Daftar Produk');
+        XLSX.writeFile(workbook, 'Daftar_Produk.xlsx');
+        
+        toast({ title: "Ekspor Berhasil", description: "File Excel berhasil diunduh." });
+    });
   };
 
   return (
      <div className="flex gap-2">
         <AlertDialog>
           <AlertDialogTrigger asChild>
-             <Button variant="outline" disabled={products.length > 0 || isPending}>
+             <Button variant="outline" disabled={hasProducts || isPending}>
                 <Database className="mr-2 h-4 w-4" /> Seed Produk
             </Button>
           </AlertDialogTrigger>
@@ -113,8 +123,9 @@ export function ProductActions({ products }: { products: Product[] }) {
           </AlertDialogContent>
         </AlertDialog>
         
-        <Button variant="outline" onClick={handleExport} disabled={products.length === 0}>
-          <Download className="mr-2 h-4 w-4" /> Ekspor Excel
+        <Button variant="outline" onClick={handleExport} disabled={!hasProducts || isExporting}>
+          {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+          Ekspor Excel
         </Button>
        
         <ProductFormDialog>

@@ -2,9 +2,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewProduct } from "@/lib/types";
+import type { NewProduct, Product } from "@/lib/types";
 
 // Helper function to return a consistent response shape
 const createResponse = (error: string | null = null) => ({ error });
@@ -65,4 +65,28 @@ export async function batchImportProducts(products: NewProduct[]) {
   } catch (e) {
      return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
   }
+}
+
+export async function getProductsForExport(): Promise<{data: Product[] | null, error: string | null}> {
+    try {
+        const productsCol = collection(db, 'products');
+        const productSnapshot = await getDocs(productsCol);
+        const productList = productSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+            id: doc.id,
+            name: data.name,
+            sku: data.sku,
+            stock: data.stock,
+            category: data.category,
+            cost: data.cost,
+            units: data.units || [],
+            baseUnit: data.baseUnit,
+            minStockThreshold: data.minStockThreshold,
+            } as Product;
+        });
+        return { data: productList, error: null };
+    } catch (e) {
+        return { data: null, error: e instanceof Error ? e.message : "An unknown error occurred." };
+    }
 }
