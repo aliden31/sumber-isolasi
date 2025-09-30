@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useTransition, useMemo, useRef } from 'react';
@@ -17,7 +18,8 @@ const HEADER_MAP: Record<string, keyof NewProduct | 'hargaJual'> = {
   'nama produk': 'name',
   'sku gudang': 'sku',
   'kategori': 'category',
-  'harga modal': 'cost',
+  'hpp': 'cost',
+  'harga modal': 'cost', // Alias for hpp
   'harga jual': 'hargaJual',
   'stok': 'stock',
 };
@@ -59,18 +61,22 @@ export default function ImportProductsPage() {
             const header = json[0].map(h => String(h).trim().toLowerCase());
             const dataRows = json.slice(1);
             
-            const requiredHeaders = ['nama produk', 'harga modal', 'harga jual', 'stok'];
+            const requiredHeaders = ['nama produk', 'harga jual', 'stok'];
+            const requiredHppHeaders = ['hpp', 'harga modal'];
+            
             const missingHeaders = requiredHeaders.filter(rh => !header.includes(rh));
-
             if (missingHeaders.length > 0) {
-                throw new Error(`Header kolom wajib tidak ditemukan: ${missingHeaders.join(', ')}.`);
+                 throw new Error(`Header kolom wajib tidak ditemukan: ${missingHeaders.join(', ')}.`);
+            }
+
+            if (!requiredHppHeaders.some(rh => header.includes(rh))) {
+                 throw new Error(`Header kolom wajib tidak ditemukan: hpp atau harga modal.`);
             }
             
-            const mappedHeaders = header.map(h => HEADER_MAP[h]);
-
             const products: NewProduct[] = dataRows.map(rowArr => {
                 let product: any = { units: [] };
                 let rowHargaJual = 0;
+                let rowHpp = 0;
 
                 header.forEach((h, index) => {
                     const key = HEADER_MAP[h];
@@ -79,18 +85,21 @@ export default function ImportProductsPage() {
                     if (key) {
                         if (key === 'hargaJual') {
                             rowHargaJual = Number(value) || 0;
-                        } else if (key === 'stock' || key === 'cost') {
+                        } else if (key === 'stock') {
                             product[key] = Number(value) || 0;
+                        } else if (key === 'cost') {
+                            rowHpp = Number(value) || 0;
                         } else {
                             product[key] = value;
                         }
                     }
                 });
 
+                product.cost = rowHpp; // Explicitly set cost
                 product.units.push({
                     name: 'Pcs', // Default base unit
                     price: rowHargaJual,
-                    cost: product.cost || 0,
+                    cost: product.cost,
                     conversionRate: 1,
                 });
                 product.baseUnit = 'Pcs';
@@ -137,7 +146,7 @@ export default function ImportProductsPage() {
           <CardTitle>1. Unggah File Anda</CardTitle>
           <CardDescription>
             Pilih file spreadsheet (Excel, CSV) dari komputer Anda. Pastikan baris pertama adalah header yang sesuai.
-            Header wajib: Nama Produk, Harga Modal, Harga Jual, Stok.
+            Header wajib: Nama Produk, HPP (atau Harga Modal), Harga Jual, Stok.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -220,3 +229,4 @@ export default function ImportProductsPage() {
     
 
     
+
