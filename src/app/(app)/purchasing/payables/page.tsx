@@ -24,13 +24,14 @@ export default function AccountsPayablePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'supplierInvoices'), where('status', '==', 'Unpaid'), orderBy('date', 'asc'));
+    const q = query(collection(db, 'supplierInvoices'), orderBy('date', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const unpaidInvoices = snapshot.docs.map(doc => ({
+      const allInvoices = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         date: doc.data().date.toDate(),
       } as SupplierInvoice));
+      const unpaidInvoices = allInvoices.filter(inv => inv.status === 'Unpaid');
       setPayables(unpaidInvoices);
       setLoading(false);
     });
