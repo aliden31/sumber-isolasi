@@ -165,7 +165,16 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
         const newReturnRef = doc(returnsCol);
 
         let totalCost = 0;
+        const productUpdates: { ref: any, newStock: number }[] = [];
+        const productReads: Promise<any>[] = [];
+        
+        // --- 1. Perform all reads first ---
 
+        // Read original transaction
+        const originalTxRef = doc(db, 'transactions', returnData.originalTransactionId);
+        const originalTxSnap = await t.get(originalTxRef);
+
+        // Read all products involved in the return
         for (const item of returnData.items) {
             const productRef = doc(db, 'products', item.productId);
             const productSnap = await t.get(productRef);
@@ -174,12 +183,17 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
             }
             const productData = productSnap.data() as Product;
             totalCost += (productData.cost || 0) * item.quantity;
-            t.update(productRef, { stock: productData.stock + item.quantity });
+            productUpdates.push({ ref: productRef, newStock: productData.stock + item.quantity });
+        }
+
+        // --- 2. Perform all writes now ---
+        
+        // Update product stocks
+        for (const update of productUpdates) {
+            t.update(update.ref, { stock: update.newStock });
         }
         
         // If the original transaction was credit and not yet paid, update its total
-        const originalTxRef = doc(db, 'transactions', returnData.originalTransactionId);
-        const originalTxSnap = await t.get(originalTxRef);
         if (originalTxSnap.exists()) {
             const originalTxData = originalTxSnap.data() as Transaction;
             if (originalTxData.status === 'Belum Lunas') {
@@ -187,11 +201,13 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
             }
         }
         
+        // Create the new sales return document
         const returnWithTimestamp = {
           ...returnData,
           date: Timestamp.fromDate(new Date()),
         };
         t.set(newReturnRef, returnWithTimestamp);
+        
         return { ref: newReturnRef, totalCost };
     });
 
