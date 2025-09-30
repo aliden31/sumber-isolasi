@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 
 interface AccountingSettingsFormProps {
   initialData: AccountingSettings;
@@ -31,6 +32,7 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
   const [cogsAccountId, setCogsAccountId] = useState(initialData.cogsAccountId || '');
   const [inventoryAccountId, setInventoryAccountId] = useState(initialData.inventoryAccountId || '');
   const [accountsReceivableAccountId, setAccountsReceivableAccountId] = useState(initialData.accountsReceivableAccountId || '');
+  const [accountsPayableAccountId, setAccountsPayableAccountId] = useState(initialData.accountsPayableAccountId || '');
 
   const handleSaveChanges = () => {
     startTransition(async () => {
@@ -41,6 +43,7 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
         cogsAccountId,
         inventoryAccountId,
         accountsReceivableAccountId,
+        accountsPayableAccountId,
       });
 
       if (result.error) {
@@ -60,6 +63,7 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
 
   return (
     <div className="space-y-6 max-w-2xl">
+      <h3 className="text-lg font-medium">Penjualan & Piutang</h3>
       <div className="space-y-2">
         <Label>Akun Kas (Untuk Pembayaran Tunai)</Label>
         <Select value={cashAccountId} onValueChange={setCashAccountId} disabled={isPending}>
@@ -110,6 +114,23 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
           </SelectTrigger>
           <SelectContent>
             {accounts.filter(a => a.type === 'Pendapatan').map(acc => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+      <h3 className="text-lg font-medium">Pembelian & Persediaan</h3>
+
+      <div className="space-y-2">
+        <Label>Akun Utang Usaha</Label>
+        <Select value={accountsPayableAccountId} onValueChange={setAccountsPayableAccountId} disabled={isPending}>
+          <SelectTrigger>
+            <SelectValue placeholder="Pilih akun utang usaha..." />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.filter(a => a.type === 'Kewajiban Jangka Pendek').map(acc => (
               <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
             ))}
           </SelectContent>

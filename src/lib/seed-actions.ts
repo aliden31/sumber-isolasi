@@ -60,6 +60,7 @@ export async function seedInitialAccounts() {
         cashAccountId: docRefs['Kas Kecil'],
         bankAccountId: docRefs['Kas pada Bank ABC'],
         accountsReceivableAccountId: docRefs['Piutang Usaha'],
+        accountsPayableAccountId: docRefs['Utang Usaha'],
         salesRevenueAccountId: docRefs['Pendapatan Penjualan Produk'],
         cogsAccountId: docRefs['Beban Pokok Penjualan'],
         inventoryAccountId: docRefs['Persediaan Barang Dagang'],

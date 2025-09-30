@@ -122,6 +122,27 @@ export type PurchaseOrder = {
 
 export type NewPurchaseOrder = Omit<PurchaseOrder, 'id'>;
 
+export type GoodsReceiptItem = {
+    productId: string;
+    productName: string;
+    quantity: number; // Jumlah yang dipesan
+    receivedQuantity: number;
+    cost: number;
+};
+
+export type GoodsReceipt = {
+    id: string;
+    date: Date;
+    purchaseOrderId: string;
+    supplierId: string;
+    supplierName: string;
+    items: GoodsReceiptItem[];
+};
+
+export type NewGoodsReceipt = Omit<GoodsReceipt, 'id' | 'date'> & {
+    date: Date | any;
+};
+
 
 export type Account = {
   id: string;

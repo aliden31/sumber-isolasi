@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useMemo, useTransition, useEffect } from 'react';
-import { PlusCircle, MinusCircle, X, Save, Loader2, Plus } from 'lucide-react';
+import { PlusCircle, MinusCircle, X, Save, Loader2, Plus, Send } from 'lucide-react';
 import type { Product, Supplier, PurchaseOrderItem, NewPurchaseOrder, PurchaseOrder } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -16,10 +16,21 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DatePicker } from '@/components/ui/date-picker';
-import { addPurchaseOrder } from '../actions';
+import { addPurchaseOrder, updatePurchaseOrderStatus } from '../actions';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function PurchaseOrderPage() {
   const [isNewPO, setIsNewPO] = useState(false);
@@ -66,21 +77,25 @@ export default function PurchaseOrderPage() {
                 <TableHead>Supplier</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin"/></TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
               ) : purchaseOrders.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center h-24">Belum ada Purchase Order.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center h-24">Belum ada Purchase Order.</TableCell></TableRow>
               ) : (
                 purchaseOrders.map(po => (
                   <TableRow key={po.id}>
                     <TableCell>{format(po.date, "dd MMM yyyy", { locale: id })}</TableCell>
                     <TableCell className="font-mono text-xs">{po.id}</TableCell>
                     <TableCell>{po.supplierName}</TableCell>
-                    <TableCell><Badge variant="secondary">{po.status}</Badge></TableCell>
+                    <TableCell><POStatusBadge status={po.status} /></TableCell>
                     <TableCell className="text-right font-medium">Rp {po.total.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-right">
+                        <SendPOButton po={po} />
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -295,4 +310,56 @@ function DataPicker<T extends {id: string; [key: string]: any}>({ data, selected
       </PopoverContent>
     </Popover>
   );
+}
+
+
+function POStatusBadge({ status }: { status: PurchaseOrder['status'] }) {
+    const variants = {
+        Draft: 'default',
+        Sent: 'secondary',
+        Completed: 'outline',
+        Cancelled: 'destructive'
+    } as const;
+    return <Badge variant={variants[status] || 'default'}>{status}</Badge>
+}
+
+function SendPOButton({ po }: { po: PurchaseOrder }) {
+    const [isPending, startTransition] = useTransition();
+    const { toast } = useToast();
+
+    const handleSend = () => {
+        startTransition(async () => {
+            const result = await updatePurchaseOrderStatus(po.id, 'Sent');
+            if (result.error) {
+                toast({ title: "Gagal mengirim PO", description: result.error, variant: 'destructive' });
+            } else {
+                toast({ title: "PO berhasil dikirim", description: `Status PO #${po.id} telah diubah menjadi "Sent".` });
+            }
+        });
+    };
+
+    if (po.status !== 'Draft') return null;
+
+    return (
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline"><Send className="mr-2 h-4 w-4"/> Kirim</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Kirim Purchase Order?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Ini akan mengubah status PO menjadi "Sent" dan membuatnya siap untuk proses penerimaan barang.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleSend} disabled={isPending}>
+                        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                        Ya, Kirim PO
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
 }
