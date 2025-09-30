@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, File, Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import Papa from 'papaparse';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import * as XLSX from 'xlsx';
 
-type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop';
+type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop' | 'bigseller';
 
 // A very simplified representation of a parsed row
 type ParsedRow = {
@@ -33,8 +33,9 @@ export default function ImportMarketplacePage() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      if (selectedFile.type !== 'text/csv') {
-        toast({ title: "File tidak valid", description: "Mohon unggah file dengan format .csv", variant: "destructive" });
+      const allowedTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+      if (!allowedTypes.includes(selectedFile.type)) {
+        toast({ title: "File tidak valid", description: "Mohon unggah file dengan format .xlsx atau .xls", variant: "destructive" });
         return;
       }
       setFile(selectedFile);
@@ -48,37 +49,48 @@ export default function ImportMarketplacePage() {
     }
 
     startParsing(() => {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          try {
-            const data = results.data as any[];
-            // Basic mapping logic, this needs to be greatly expanded
-            const mappedData: ParsedRow[] = data.map(row => {
-              if (marketplace === 'tokopedia') {
-                return {
-                  orderId: row['Nomor Pesanan'] || row['Order ID'],
-                  productName: row['Nama Produk'] || 'N/A',
-                  quantity: parseInt(row['Jumlah Produk Dibeli'], 10) || 1,
-                  totalAmount: parseFloat(row['Total Perkiraan Jumlah Pelepasan']?.replace(/[^0-9.-]+/g, '')) || 0,
-                  status: row['Status Terakhir'] || 'N/A',
-                };
-              }
-              // Add similar mapping for 'shopee', 'tiktok_shop' here
-              return { orderId: 'N/A', productName: 'N/A', quantity: 0, totalAmount: 0, status: 'N/A' };
-            });
-            setParsedData(mappedData);
-            toast({ title: 'Berhasil', description: `${mappedData.length} baris berhasil di-parse.` });
-          } catch(e) {
-            const err = e as Error;
-            toast({ title: 'Gagal Parse File', description: `Format CSV tidak sesuai. ${err.message}`, variant: 'destructive' });
-          }
-        },
-        error: (error: any) => {
-          toast({ title: 'Gagal Membaca File', description: error.message, variant: 'destructive' });
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+                // Basic mapping logic, this needs to be greatly expanded
+                const mappedData: ParsedRow[] = json.map(row => {
+                  if (marketplace === 'tokopedia') {
+                    return {
+                      orderId: row['Nomor Pesanan'] || row['Order ID'],
+                      productName: row['Nama Produk'] || 'N/A',
+                      quantity: parseInt(row['Jumlah Produk Dibeli'], 10) || 1,
+                      totalAmount: parseFloat(row['Total Perkiraan Jumlah Pelepasan']?.replace(/[^0-9.-]+/g, '')) || 0,
+                      status: row['Status Terakhir'] || 'N/A',
+                    };
+                  }
+                  if (marketplace === 'bigseller') {
+                     return {
+                      orderId: row['Nomor Pesanan'],
+                      productName: 'Multiple Items', // BigSeller often aggregates
+                      quantity: 1, // Not easily available per row
+                      totalAmount: parseFloat(row['Total Perkiraan Jumlah Pelepasan']?.replace(/[^0-9.-]+/g, '')) || 0,
+                      status: row['Waktu Selesai'] ? 'Selesai' : 'Diproses',
+                    };
+                  }
+                  // Add similar mapping for 'shopee', 'tiktok_shop' here
+                  return { orderId: 'N/A', productName: 'N/A', quantity: 0, totalAmount: 0, status: 'N/A' };
+                }).filter(row => row.orderId && row.totalAmount > 0);
+
+                setParsedData(mappedData);
+                toast({ title: 'Berhasil', description: `${mappedData.length} baris berhasil di-parse.` });
+
+            } catch (err) {
+                 const e = err as Error;
+                 toast({ title: 'Gagal Parse File', description: `Format file tidak sesuai. ${e.message}`, variant: 'destructive' });
+            }
         }
-      });
+        reader.readAsArrayBuffer(file);
     });
   };
 
@@ -89,7 +101,7 @@ export default function ImportMarketplacePage() {
       <Card>
         <CardHeader>
           <CardTitle>Langkah 1: Unggah Laporan Penjualan</CardTitle>
-          <CardDescription>Pilih marketplace dan unggah file laporan penjualan (.csv) yang Anda unduh dari seller center.</CardDescription>
+          <CardDescription>Pilih marketplace dan unggah file laporan penjualan (.xlsx) yang Anda unduh dari seller center.</CardDescription>
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-6">
           <div className="space-y-2">
@@ -100,6 +112,7 @@ export default function ImportMarketplacePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="tokopedia">Tokopedia</SelectItem>
+                <SelectItem value="bigseller">BigSeller</SelectItem>
                 <SelectItem value="shopee" disabled>Shopee (Segera Hadir)</SelectItem>
                 <SelectItem value="tiktok_shop" disabled>TikTok Shop (Segera Hadir)</SelectItem>
               </SelectContent>
@@ -110,7 +123,7 @@ export default function ImportMarketplacePage() {
             <div className="flex gap-2">
                 <Button variant="outline" className="w-full justify-start" onClick={() => fileInputRef.current?.click()}>
                     <File className="mr-2 h-4 w-4" />
-                    {file ? file.name : 'Pilih file .csv...'}
+                    {file ? file.name : 'Pilih file .xlsx...'}
                 </Button>
                  <Button onClick={handleParse} disabled={isParsing || !file || !marketplace}>
                     {isParsing ? <Loader2 className="animate-spin" /> : <ArrowRight />}
@@ -120,7 +133,7 @@ export default function ImportMarketplacePage() {
                 type="file" 
                 ref={fileInputRef} 
                 className="hidden" 
-                accept=".csv"
+                accept=".xlsx,.xls"
                 onChange={handleFileChange}
             />
           </div>
