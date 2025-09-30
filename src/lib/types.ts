@@ -1,6 +1,5 @@
 
 
-
 export type Product = {
   id: string;
   name: string;
@@ -289,6 +288,25 @@ export type Warehouse = {
     isDefault: boolean;
 };
 export type NewWarehouse = Omit<Warehouse, 'id'>;
+
+
+export type StockTransferItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+}
+export type StockTransfer = {
+    id: string;
+    date: Date;
+    fromWarehouseId: string;
+    fromWarehouseName: string;
+    toWarehouseId: string;
+    toWarehouseName: string;
+    items: StockTransferItem[];
+    notes?: string;
+}
+export type NewStockTransfer = Omit<StockTransfer, 'id'>;
+
 
 export type Tax = {
     id: string;
