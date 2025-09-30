@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, useTransition } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import {
   Card,
   CardContent,
@@ -26,16 +26,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, Upload, AlertCircle, Plus, FilePlus } from 'lucide-react';
+import { Loader2, Upload, AlertCircle, Plus, FilePlus, Minus, Banknote } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { collection, onSnapshot, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
-import { format, parse } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import {
@@ -49,19 +46,12 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { createAdjustmentJournal } from './actions';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 
-type LedgerEntry = {
-  id: string;
-  date: Date;
-  ref: string;
-  desc: string;
-  amount: number; // Positive for debit, negative for credit
-};
-
-type BankStatementItem = {
-    id: string;
-    date: Date;
+type AdjustmentItem = {
+    id: number;
     description: string;
     amount: number;
 }
@@ -73,13 +63,17 @@ export default function BankReconciliationPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [loading, setLoading] = useState(false);
   
-  const [clearedLedgerIds, setClearedLedgerIds] = useState<Set<string>>(new Set());
-  const [clearedBankIds, setClearedBankIds] = useState<Set<string>>(new Set());
-
-  const [bankStatementItems, setBankStatementItems] = useState<BankStatementItem[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  const [bookBalance, setBookBalance] = useState(0);
+  const [bankBalance, setBankBalance] = useState(0);
+  
+  const [additionsToBank, setAdditionsToBank] = useState<AdjustmentItem[]>([]);
+  const [deductionsFromBank, setDeductionsFromBank] = useState<AdjustmentItem[]>([]);
+  const [additionsToBook, setAdditionsToBook] = useState<AdjustmentItem[]>([]);
+  const [deductionsFromBook, setDeductionsFromBook] = useState<AdjustmentItem[]>([]);
+  
+  const [nextId, setNextId] = useState(1);
 
   useEffect(() => {
     const q = query(collection(db, 'coa'), orderBy('name'));
@@ -94,12 +88,12 @@ export default function BankReconciliationPage() {
     if (!selectedAccountId || !dateRange?.from) return;
 
     setLoading(true);
-    const from = Timestamp.fromDate(dateRange.from);
-    const to = dateRange.to ? Timestamp.fromDate(new Date(dateRange.to.setHours(23, 59, 59, 999))) : from;
+    const toDayEnd = new Date(dateRange.to || dateRange.from);
+    toDayEnd.setHours(23, 59, 59, 999);
+    const to = Timestamp.fromDate(toDayEnd);
 
     const q = query(
       collection(db, "journals"), 
-      where("date", ">=", from), 
       where("date", "<=", to)
     );
 
@@ -108,151 +102,85 @@ export default function BankReconciliationPage() {
         id: doc.id, ...doc.data(), date: doc.data().date.toDate()
       } as Journal));
 
-      const relevantJournals = allJournals.filter(j => 
-        j.entries.some(e => e.accountId === selectedAccountId)
-      );
-
-      setJournals(relevantJournals);
+      let runningBalance = 0;
+      allJournals.sort((a, b) => a.date.getTime() - b.date.getTime())
+        .forEach(journal => {
+            journal.entries.forEach(entry => {
+                if (entry.accountId === selectedAccountId) {
+                    runningBalance += entry.debit - entry.credit;
+                }
+            })
+        });
+      
+      setBookBalance(runningBalance);
       setLoading(false);
     });
 
     return () => unsubJournals();
   }, [selectedAccountId, dateRange]);
 
-
-  const { ledgerEntries, closingBalance } = useMemo(() => {
-    if (!selectedAccountId) return { ledgerEntries: [], closingBalance: 0 };
-    let runningBalance = 0;
-    const entries: LedgerEntry[] = [];
-
-    journals.sort((a, b) => a.date.getTime() - b.date.getTime())
-      .forEach(journal => {
-        journal.entries.forEach(entry => {
-          if (entry.accountId === selectedAccountId) {
-            const amount = entry.debit - entry.credit;
-            runningBalance += amount;
-            entries.push({
-              id: `${journal.id}-${entry.accountId}-${Math.random()}`,
-              date: journal.date,
-              ref: journal.refNumber,
-              desc: journal.description,
-              amount: amount,
-            });
-          }
-        });
-      });
-    return { ledgerEntries: entries, closingBalance: runningBalance };
-  }, [journals, selectedAccountId]);
-  
-  const handleToggleCleared = (id: string, type: 'ledger' | 'bank') => {
-      const updater = (prev: Set<string>) => {
-          const newSet = new Set(prev);
-          if (newSet.has(id)) {
-              newSet.delete(id);
-          } else {
-              newSet.add(id);
-          }
-          return newSet;
-      }
-      if (type === 'ledger') setClearedLedgerIds(updater);
-      if (type === 'bank') setClearedBankIds(updater);
+  const handleAdjustmentChange = (
+    setter: React.Dispatch<React.SetStateAction<AdjustmentItem[]>>, 
+    id: number, 
+    field: 'description' | 'amount', 
+    value: string | number
+  ) => {
+    setter(prev => prev.map(item => item.id === id ? {...item, [field]: value} : item));
   }
 
-  const { unclearedLedgerTotal, unclearedBankTotal, difference, allBankItemsAccountedFor } = useMemo(() => {
-      const clearedLedgerTotal = ledgerEntries
-        .filter(e => clearedLedgerIds.has(e.id))
-        .reduce((sum, e) => sum + e.amount, 0);
-
-      const clearedBankTotal = bankStatementItems
-        .filter(e => clearedBankIds.has(e.id))
-        .reduce((sum, e) => sum + e.amount, 0);
-      
-      const allBankItemsAccountedFor = bankStatementItems.every(item => clearedBankIds.has(item.id));
-
-      return {
-          unclearedLedgerTotal: closingBalance - clearedLedgerTotal,
-          unclearedBankTotal: bankStatementItems.reduce((sum, item) => sum + item.amount, 0) - clearedBankTotal,
-          difference: (closingBalance - clearedLedgerTotal) - (bankStatementItems.reduce((sum, item) => sum + item.amount, 0) - clearedBankTotal),
-          allBankItemsAccountedFor,
-      }
-  }, [clearedLedgerIds, clearedBankIds, ledgerEntries, closingBalance, bankStatementItems]);
+  const addAdjustment = (setter: React.Dispatch<React.SetStateAction<AdjustmentItem[]>>) => {
+    setter(prev => [...prev, {id: nextId, description: '', amount: 0}]);
+    setNextId(prev => prev + 1);
+  }
   
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const removeAdjustment = (setter: React.Dispatch<React.SetStateAction<AdjustmentItem[]>>, id: number) => {
+    setter(prev => prev.filter(item => item.id !== id));
+  }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = e.target?.result;
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet);
-
-            const parsedData = json.map((row: any, index: number) => {
-                const dateValue = row.Tanggal || row.Date;
-                 if (!dateValue) {
-                    console.warn(`Skipping row ${index + 2} due to missing date.`);
-                    return null;
-                }
-
-                let date;
-                if (typeof dateValue === 'number') {
-                    date = XLSX.SSF.parse_date_code(dateValue);
-                    date = new Date(date.y, date.m - 1, date.d);
-                } else {
-                    date = parse(String(dateValue), 'dd/MM/yyyy', new Date());
-                    if (isNaN(date.getTime())) {
-                       date = parse(String(dateValue), 'MM/dd/yyyy', new Date());
-                    }
-                    if (isNaN(date.getTime())) {
-                       date = new Date(String(dateValue));
-                    }
-                }
-                
-                const description = row.Keterangan || row.Deskripsi || row.Description;
-                const amountValue = row.Mutasi || row.Amount || row.Jumlah || row.Credit || row.Debit;
-                
-                let amount = 0;
-                if (amountValue) {
-                   amount = parseFloat(String(amountValue).replace(/[^0-9\\.-]+/g, ""));
-                } else if (row.Debit) {
-                    amount = -parseFloat(String(row.Debit).replace(/[^0-9\\.-]+/g, ""));
-                } else if (row.Credit) {
-                     amount = parseFloat(String(row.Credit).replace(/[^0-9\\.-]+/g, ""));
-                }
-
-                
-                if (isNaN(date.getTime()) || !description || isNaN(amount)) {
-                    console.warn(`Skipping invalid row ${index + 2}:`, row);
-                    return null;
-                }
-
-                return {
-                    id: `bank-${index}`,
-                    date: date,
-                    description: description,
-                    amount: amount,
-                };
-            }).filter(Boolean) as BankStatementItem[];
-            
-            setBankStatementItems(parsedData.sort((a,b) => b.date.getTime() - a.date.getTime()));
-            toast({ title: 'Berhasil', description: `${parsedData.length} transaksi bank berhasil diimpor.` });
-
-        } catch (err) {
-            console.error(err);
-            toast({ title: 'Gagal Memproses File', description: 'Pastikan file Excel Anda memiliki format yang benar.', variant: 'destructive' });
-        }
-    };
-    reader.onerror = (err) => {
-        console.error(err);
-        toast({ title: 'Gagal Membaca File', description: 'Terjadi kesalahan saat membaca file.', variant: 'destructive' });
-    }
-    reader.readAsArrayBuffer(file);
-  };
+  const bankTotalAdditions = useMemo(() => additionsToBank.reduce((sum, item) => sum + Number(item.amount), 0), [additionsToBank]);
+  const bankTotalDeductions = useMemo(() => deductionsFromBank.reduce((sum, item) => sum + Number(item.amount), 0), [deductionsFromBank]);
+  const bookTotalAdditions = useMemo(() => additionsToBook.reduce((sum, item) => sum + Number(item.amount), 0), [additionsToBook]);
+  const bookTotalDeductions = useMemo(() => deductionsFromBook.reduce((sum, item) => sum + Number(item.amount), 0), [deductionsFromBook]);
+  
+  const adjustedBankBalance = bankBalance + bankTotalAdditions - bankTotalDeductions;
+  const adjustedBookBalance = bookBalance + bookTotalAdditions - bookTotalDeductions;
+  
+  const difference = adjustedBookBalance - adjustedBankBalance;
   
   const bankAccounts = accounts.filter(a => a.type === 'Kas & Bank');
+
+  const renderAdjustmentSection = (
+    title: string,
+    items: AdjustmentItem[],
+    setter: React.Dispatch<React.SetStateAction<AdjustmentItem[]>>
+  ) => (
+    <div className="space-y-2">
+        <h4 className="font-semibold text-muted-foreground">{title}</h4>
+        {items.map(item => (
+            <div key={item.id} className="flex items-center gap-2">
+                <Input 
+                    placeholder="Deskripsi..." 
+                    value={item.description} 
+                    onChange={e => handleAdjustmentChange(setter, item.id, 'description', e.target.value)}
+                    className="h-8"
+                />
+                <Input 
+                    type="number" 
+                    placeholder="Jumlah" 
+                    value={item.amount || ''}
+                    onChange={e => handleAdjustmentChange(setter, item.id, 'amount', e.target.value)}
+                    className="h-8 w-32 text-right"
+                />
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeAdjustment(setter, item.id)}>
+                    <Minus className="h-4 w-4"/>
+                </Button>
+            </div>
+        ))}
+         <Button variant="outline" size="sm" className="w-full" onClick={() => addAdjustment(setter)}>
+            <Plus className="mr-2 h-4 w-4"/> Tambah Item
+        </Button>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -262,19 +190,15 @@ export default function BankReconciliationPage() {
         </h1>
          <div className="flex items-center gap-2">
             <DateRangePicker onSelect={setDateRange} />
-            <Button variant="outline" disabled>
-              <Download className="mr-2 h-4 w-4" />
-              Ekspor
-            </Button>
         </div>
       </div>
        <Card>
         <CardHeader>
           <CardTitle className="font-headline">Proses Rekonsiliasi</CardTitle>
           <CardDescription>
-            Pilih akun bank dan periode, lalu unggah laporan koran (format .xlsx) dan centang transaksi yang cocok.
+            Sesuaikan saldo buku dan bank hingga keduanya seimbang.
           </CardDescription>
-          <div className="grid md:grid-cols-2 gap-4 pt-4">
+          <div className="pt-4 max-w-sm">
              <Select onValueChange={setSelectedAccountId} disabled={loading}>
               <SelectTrigger id="account">
                 <SelectValue placeholder="Pilih Akun Bank..." />
@@ -285,120 +209,60 @@ export default function BankReconciliationPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => fileInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" /> Unggah Laporan Koran (.xlsx)
-            </Button>
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-            />
           </div>
         </CardHeader>
         <CardContent>
            <div className="grid md:grid-cols-2 gap-8">
-                <div>
-                    <h3 className="font-semibold mb-2">Transaksi di Pembukuan (Buku Besar)</h3>
-                    <div className="border rounded-md max-h-[500px] overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-10"></TableHead>
-                                    <TableHead>Tanggal</TableHead>
-                                    <TableHead>Deskripsi</TableHead>
-                                    <TableHead className="text-right">Jumlah</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                             <TableBody>
-                                {loading ? (
-                                    <TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
-                                ) : ledgerEntries.length === 0 ? (
-                                     <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Pilih akun & tanggal.</TableCell></TableRow>
-                                ) : ledgerEntries.map(entry => (
-                                    <TableRow key={entry.id} data-state={clearedLedgerIds.has(entry.id) && 'selected'}>
-                                        <TableCell><Checkbox checked={clearedLedgerIds.has(entry.id)} onCheckedChange={() => handleToggleCleared(entry.id, 'ledger')} /></TableCell>
-                                        <TableCell>{format(entry.date, 'dd/MM')}</TableCell>
-                                        <TableCell className="text-xs">{entry.desc}</TableCell>
-                                        <TableCell className={`text-right font-mono text-xs ${entry.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {entry.amount.toLocaleString('id-ID')}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                {/* Kolom Bank */}
+                <div className="space-y-4 p-4 border rounded-lg">
+                    <h3 className="font-headline text-lg">Saldo Menurut Bank</h3>
+                     <div className="space-y-2">
+                        <Label>Saldo Akhir Laporan Koran</Label>
+                        <Input type="number" placeholder="Masukkan saldo dari laporan koran" value={bankBalance || ''} onChange={e => setBankBalance(Number(e.target.value))} />
+                    </div>
+                    {renderAdjustmentSection("Ditambah: Setoran dalam Perjalanan", additionsToBank, setAdditionsToBank)}
+                    {renderAdjustmentSection("Dikurangi: Cek Beredar", deductionsFromBank, setDeductionsFromBank)}
+                    <div className="flex justify-between items-center font-bold text-lg pt-4 border-t">
+                        <span>Saldo Bank Disesuaikan</span>
+                        <span>Rp {adjustedBankBalance.toLocaleString('id-ID')}</span>
                     </div>
                 </div>
-                 <div>
-                    <h3 className="font-semibold mb-2">Transaksi di Laporan Koran</h3>
-                     <div className="border rounded-md max-h-[500px] overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-10"></TableHead>
-                                    <TableHead>Tanggal</TableHead>
-                                    <TableHead>Deskripsi</TableHead>
-                                    <TableHead className="text-right">Jumlah</TableHead>
-                                    <TableHead className="w-10 text-right"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                             <TableBody>
-                                 {bankStatementItems.length === 0 ? (
-                                     <TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">Unggah laporan koran.</TableCell></TableRow>
-                                ) : bankStatementItems.map(entry => (
-                                    <TableRow key={entry.id} data-state={clearedBankIds.has(entry.id) && 'selected'}>
-                                        <TableCell><Checkbox checked={clearedBankIds.has(entry.id)} onCheckedChange={() => handleToggleCleared(entry.id, 'bank')} /></TableCell>
-                                        <TableCell>{format(entry.date, 'dd/MM')}</TableCell>
-                                        <TableCell className="text-xs">{entry.description}</TableCell>
-                                        <TableCell className={`text-right font-mono text-xs ${entry.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {entry.amount.toLocaleString('id-ID')}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {!clearedBankIds.has(entry.id) && (
-                                                <AdjustmentJournalDialog
-                                                    triggerButton={<Button size="icon" variant="ghost" className="h-6 w-6"><Plus className="h-4 w-4"/></Button>}
-                                                    bankItem={entry}
-                                                    reconciledAccountId={selectedAccountId}
-                                                    allAccounts={accounts}
-                                                    onJournalCreated={() => setClearedBankIds(prev => new Set(prev.add(entry.id)))}
-                                                />
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                 {/* Kolom Buku */}
+                <div className="space-y-4 p-4 border rounded-lg">
+                    <h3 className="font-headline text-lg">Saldo Menurut Pembukuan</h3>
+                     <div className="space-y-2">
+                        <Label>Saldo Akhir Buku Besar</Label>
+                        <Input type="number" value={bookBalance} disabled className="font-semibold"/>
+                    </div>
+                    {renderAdjustmentSection("Ditambah: Pendapatan (misal: bunga)", additionsToBook, setAdditionsToBook)}
+                    {renderAdjustmentSection("Dikurangi: Beban (misal: admin bank)", deductionsFromBook, setDeductionsFromBook)}
+                     <div className="flex justify-between items-center font-bold text-lg pt-4 border-t">
+                        <span>Saldo Buku Disesuaikan</span>
+                        <span>Rp {adjustedBookBalance.toLocaleString('id-ID')}</span>
                     </div>
                 </div>
            </div>
         </CardContent>
         <CardFooter className="flex-col items-start gap-4">
             <h3 className="font-semibold">Ringkasan Rekonsiliasi</h3>
-            <div className="w-full grid md:grid-cols-3 gap-4">
-                <Card className="p-4">
-                    <p className="text-sm text-muted-foreground">Saldo Akhir Pembukuan</p>
-                    <p className="font-bold text-lg">Rp {closingBalance.toLocaleString('id-ID')}</p>
-                </Card>
-                 <Card className="p-4">
-                    <p className="text-sm text-muted-foreground">Selisih Belum Clear</p>
-                     <p className="font-bold text-lg">Rp {difference.toLocaleString('id-ID')}</p>
-                </Card>
-                 <Card className="p-4">
-                    <p className="text-sm text-muted-foreground">Saldo Disesuaikan</p>
-                    <p className="font-bold text-lg">Rp {(closingBalance - difference).toLocaleString('id-ID')}</p>
-                </Card>
-            </div>
-            {difference !== 0 && (
+            {difference !== 0 ? (
                  <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Tidak Seimbang</AlertTitle>
+                    <AlertTitle>Belum Seimbang</AlertTitle>
                     <AlertDescription>
-                        Masih ada selisih sebesar Rp {difference.toLocaleString('id-ID')} antara pembukuan dan laporan koran. Mohon periksa kembali transaksi yang dicentang atau buat jurnal penyesuaian.
+                        Masih ada selisih sebesar Rp {difference.toLocaleString('id-ID')}. Periksa kembali item penyesuaian Anda.
+                    </AlertDescription>
+                </Alert>
+            ) : (
+                <Alert variant="default" className="border-green-500 text-green-700 [&>svg]:text-green-700">
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Seimbang!</AlertTitle>
+                    <AlertDescription>
+                        Saldo bank dan buku sudah cocok. Anda bisa menyelesaikan rekonsiliasi.
                     </AlertDescription>
                 </Alert>
             )}
-            <Button disabled={difference !== 0 || !allBankItemsAccountedFor}>Selesaikan Rekonsiliasi</Button>
+            <Button disabled={difference !== 0 || loading}>Selesaikan Rekonsiliasi</Button>
         </CardFooter>
        </Card>
     </div>
@@ -408,7 +272,7 @@ export default function BankReconciliationPage() {
 
 interface AdjustmentJournalDialogProps {
   triggerButton: React.ReactNode;
-  bankItem: BankStatementItem;
+  bankItem: { description: string, date: Date, amount: number };
   reconciledAccountId: string | null;
   allAccounts: Account[];
   onJournalCreated: () => void;
@@ -487,4 +351,17 @@ declare module '@/components/ui/date-range-picker' {
     interface DateRangePickerProps {
         onSelect?: (date?: DateRange) => void;
     }
+}
+
+declare module '@/components/ui/alert' {
+    interface AlertProps {
+        children?: React.ReactNode;
+    }
+}
+declare module 'react' {
+  interface HTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {
+    // extends React's HTMLAttributes
+    'data-value'?: string;
+    'data-state'?: 'checked' | 'unchecked' | 'indeterminate' | 'open' | 'closed';
+  }
 }
