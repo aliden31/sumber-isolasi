@@ -1,9 +1,11 @@
+
 'use client';
 
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AppHeader } from './app-header';
 import { AppSidebar } from './app-sidebar';
+import { SidebarInset } from '@/components/ui/sidebar';
 
 export function AppShell({
   children,
@@ -14,23 +16,21 @@ export function AppShell({
 }) {
   return (
     <>
-      <div className="flex min-h-screen flex-col">
+      <AppSidebar companyName={companyName} />
+      <SidebarInset>
         <AppHeader companyName={companyName} />
-        <div className="flex flex-1">
-          <AppSidebar companyName={companyName} />
-          <main className="flex-1 bg-background p-4 md:p-6 lg:p-8">
+        <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
             <Suspense
-              fallback={
+            fallback={
                 <div className="flex h-full items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin" />
+                <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
-              }
+            }
             >
-              {children}
+            {children}
             </Suspense>
-          </main>
-        </div>
-      </div>
+        </main>
+      </SidebarInset>
     </>
   );
 }
