@@ -13,6 +13,7 @@ export type Product = {
   name: string;
   category: string;
   stock: number; // Total stock in base unit
+  cost?: number; // Base cost of the product
   units: ProductUnit[];
   baseUnit: string; // Name of the base unit, e.g., 'Pcs'
   minStockThreshold?: number;

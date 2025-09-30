@@ -178,8 +178,10 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
   const { toast } = useToast();
 
   const [name, setName] = useState(product?.name || '');
+  const [sku, setSku] = useState(product?.sku || '');
   const [category, setCategory] = useState(product?.category || '');
   const [stock, setStock] = useState(product?.stock || 0);
+  const [cost, setCost] = useState(product?.cost || 0);
   const [minStockThreshold, setMinStockThreshold] = useState(product?.minStockThreshold || 10);
   const [units, setUnits] = useState<ProductUnit[]>(product?.units || [{ name: '', price: 0, cost: 0, conversionRate: 1 }]);
   
@@ -227,8 +229,10 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
     startTransition(async () => {
       const productData = { 
         name, 
+        sku,
         category, 
-        stock, 
+        stock,
+        cost,
         minStockThreshold, 
         units, 
         baseUnit: units[0].name 
@@ -258,8 +262,10 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
     if (!isOpen) {
       // Reset form on close
       setName(product?.name || '');
+      setSku(product?.sku || '');
       setCategory(product?.category || '');
       setStock(product?.stock || 0);
+      setCost(product?.cost || 0);
       setMinStockThreshold(product?.minStockThreshold || 10);
       setUnits(product?.units || [{ name: '', price: 0, cost: 0, conversionRate: 1 }]);
     }
@@ -281,6 +287,10 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
               <Label htmlFor="name">Nama Produk</Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isPending}/>
             </div>
+             <div className="space-y-2">
+              <Label htmlFor="sku">SKU</Label>
+              <Input id="sku" value={sku} onChange={(e) => setSku(e.target.value)} disabled={isPending} placeholder="Opsional"/>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="category">Kategori</Label>
               <Select value={category} onValueChange={setCategory}>
@@ -294,6 +304,10 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
                   </SelectContent>
               </Select>
             </div>
+             <div className="space-y-2">
+              <Label htmlFor="cost">Harga Pokok Satuan Dasar</Label>
+              <Input id="cost" type="number" value={cost || ''} onChange={(e) => setCost(Number(e.target.value))} required disabled={isPending}/>
+            </div>
           </div>
           
           <div className="space-y-2">
@@ -305,7 +319,6 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
                         <TableRow>
                             <TableHead>Nama Satuan</TableHead>
                             <TableHead>Harga Jual</TableHead>
-                            <TableHead>Harga Pokok</TableHead>
                             <TableHead>Konversi</TableHead>
                             <TableHead></TableHead>
                         </TableRow>
@@ -315,7 +328,6 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
                             <TableRow key={index}>
                                 <TableCell><Input placeholder={index === 0 ? "Pcs" : "Box"} value={unit.name} onChange={e => handleUnitChange(index, 'name', e.target.value)} required/></TableCell>
                                 <TableCell><Input type="number" placeholder="10000" value={unit.price || ''} onChange={e => handleUnitChange(index, 'price', Number(e.target.value))} required/></TableCell>
-                                <TableCell><Input type="number" placeholder="8000" value={unit.cost || ''} onChange={e => handleUnitChange(index, 'cost', Number(e.target.value))} required/></TableCell>
                                 <TableCell><Input type="number" placeholder={index === 0 ? "1" : "12"} value={unit.conversionRate || ''} onChange={e => handleUnitChange(index, 'conversionRate', Number(e.target.value))} required disabled={index === 0} /></TableCell>
                                 <TableCell>
                                     {index > 0 && <Button type="button" variant="ghost" size="icon" onClick={() => removeUnit(index)}><XCircle className="w-4 h-4 text-destructive" /></Button>}
@@ -333,7 +345,7 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="stock">Stok Awal (dalam satuan dasar)</Label>
-              <Input id="stock" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} required disabled={isPending}/>
+              <Input id="stock" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} required disabled={isEditing || isPending}/>
             </div>
              <div className="space-y-2">
               <Label htmlFor="minStockThreshold">Batas Stok Min.</Label>

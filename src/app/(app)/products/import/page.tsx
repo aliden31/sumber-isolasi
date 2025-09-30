@@ -14,11 +14,11 @@ import { batchImportProducts } from '../actions';
 import type { NewProduct } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
-const HEADER_MAP: Record<string, keyof NewProduct | 'hargaJual' | 'hargaModal'> = {
+const HEADER_MAP: Record<string, keyof NewProduct | 'hargaJual'> = {
   'nama produk': 'name',
   'sku': 'sku',
   'kategori': 'category',
-  'harga modal': 'hargaModal',
+  'harga modal': 'cost',
   'harga jual': 'hargaJual',
   'stok': 'stock',
 };
@@ -58,9 +58,9 @@ export default function ImportProductsPage() {
 
             mappedHeaders.forEach((key, index) => {
                 const value = row[index]?.trim();
-                if (key === 'hargaJual' || key === 'hargaModal') return;
+                if (key === 'hargaJual') return;
 
-                if(key === 'stock') {
+                if(key === 'stock' || key === 'cost') {
                     product[key as keyof NewProduct] = Number(value) || 0;
                 } else {
                     product[key as keyof NewProduct] = value;
@@ -68,12 +68,11 @@ export default function ImportProductsPage() {
             });
 
             const hargaJualIndex = mappedHeaders.indexOf('hargaJual');
-            const hargaModalIndex = mappedHeaders.indexOf('hargaModal');
-
+            
             product.units.push({
                 name: 'Pcs', // Default base unit
                 price: Number(row[hargaJualIndex]) || 0,
-                cost: Number(row[hargaModalIndex]) || 0,
+                cost: product.cost || 0,
                 conversionRate: 1,
             });
             product.baseUnit = 'Pcs';
@@ -163,7 +162,7 @@ export default function ImportProductsPage() {
                                     <TableCell>{product.name}</TableCell>
                                     <TableCell>{product.sku}</TableCell>
                                     <TableCell>{product.category}</TableCell>
-                                    <TableCell className="text-right">{(product.units[0]?.cost || 0).toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right">{(product.cost || 0).toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right">{(product.units[0]?.price || 0).toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right">{product.stock}</TableCell>
                                 </TableRow>
