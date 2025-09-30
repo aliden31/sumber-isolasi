@@ -118,84 +118,75 @@ export default function ManualSalesInputPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl md:text-3xl font-headline font-bold">Input Penjualan Manual (Invoice)</h1>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Detail Invoice</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Pelanggan</Label>
-                  <CustomerPicker customers={customers} selected={selectedCustomer} onSelect={setSelectedCustomer} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tanggal Invoice</Label>
-                  <DatePicker date={date} setDate={setDate} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                 <Label>Item Invoice</Label>
-                 {cart.length > 0 && (
-                    <div className="border rounded-md">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Produk</TableHead>
-                                    <TableHead className="w-[120px]">Jumlah</TableHead>
-                                    <TableHead className="text-right">Subtotal</TableHead>
-                                    <TableHead className="w-[50px]"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {cart.map(item => (
-                                <TableRow key={item.product.id}>
-                                    <TableCell className="font-medium">{item.product.name}</TableCell>
-                                    <TableCell>
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}>
-                                        <MinusCircle className="h-4 w-4" />
-                                        </Button>
-                                        <span>{item.quantity}</span>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}>
-                                        <PlusCircle className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">Rp {(item.unit.price * item.quantity).toLocaleString('id-ID')}</TableCell>
-                                    <TableCell>
-                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, 0)}>
-                                        <X className="h-4 w-4 text-destructive" />
+      <h1 className="text-2xl md:text-3xl font-headline font-bold">Input Penjualan Manual (Invoice)</h1>
+      <Card>
+        <CardHeader>
+          <CardTitle>Detail Invoice</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Pelanggan</Label>
+              <CustomerPicker customers={customers} selected={selectedCustomer} onSelect={setSelectedCustomer} />
+            </div>
+            <div className="space-y-2">
+              <Label>Tanggal Invoice</Label>
+              <DatePicker date={date} setDate={setDate} />
+            </div>
+          </div>
+          <div className="space-y-2">
+             <Label>Item Invoice</Label>
+             {cart.length > 0 && (
+                <div className="border rounded-md overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Produk</TableHead>
+                                <TableHead className="w-[120px]">Jumlah</TableHead>
+                                <TableHead className="text-right">Subtotal</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {cart.map(item => (
+                            <TableRow key={item.product.id}>
+                                <TableCell className="font-medium">{item.product.name}</TableCell>
+                                <TableCell>
+                                <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}>
+                                    <MinusCircle className="h-4 w-4" />
                                     </Button>
-                                    </TableCell>
-                                </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                 )}
-                 <ProductPicker products={products} onSelect={addToCart} />
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between items-center bg-muted/50 p-6">
-                <div className="text-lg font-bold">
-                    Total Invoice: Rp {cartTotal.toLocaleString('id-ID')}
+                                    <span>{item.quantity}</span>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}>
+                                    <PlusCircle className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                </TableCell>
+                                <TableCell className="text-right">Rp {(item.unit.price * item.quantity).toLocaleString('id-ID')}</TableCell>
+                                <TableCell>
+                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, 0)}>
+                                    <X className="h-4 w-4 text-destructive" />
+                                </Button>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </div>
-              <Button onClick={handleSaveInvoice} disabled={isPending || !selectedCustomer || cart.length === 0}>
-                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Simpan Sebagai Piutang
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-        <div className="lg:col-span-1">
-          {/* Could be a summary or recent invoices list */}
-        </div>
-      </div>
+             )}
+             <ProductPicker products={products} onSelect={addToCart} />
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/50 p-6">
+            <div className="text-lg font-bold">
+                Total Invoice: Rp {cartTotal.toLocaleString('id-ID')}
+            </div>
+          <Button onClick={handleSaveInvoice} disabled={isPending || !selectedCustomer || cart.length === 0} className="w-full sm:w-auto">
+            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Simpan Sebagai Piutang
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

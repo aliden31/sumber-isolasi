@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -86,7 +87,7 @@ export default function PeriodClosingPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                          <div className="space-y-2">
                             <Label htmlFor="month">Bulan</Label>
                             <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
