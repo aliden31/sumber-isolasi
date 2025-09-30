@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, useTransition, useEffect } from 'react';
+import React, { useState, useTransition } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -63,7 +64,7 @@ export default function PeriodClosingPage() {
                     <CardDescription>
                         Fitur ini akan membuat jurnal penutup untuk semua akun pendapatan dan beban pada periode yang dipilih, lalu mentransfer laba bersih ke akun Laba Ditahan.
                         <br/><strong className="text-destructive">Peringatan:</strong> Proses ini tidak dapat diurungkan. Pastikan semua transaksi pada periode tersebut sudah final.
-                    </dCardDescription>
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
