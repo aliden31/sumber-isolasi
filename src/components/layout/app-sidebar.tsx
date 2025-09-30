@@ -156,7 +156,7 @@ const navItems = [
     label: "Laporan",
     icon: BarChart2,
     subItems: [
-      { href: "/reports", label: "Laporan Penjualan", icon: FileText, isDev: true },
+      { href: "/reports", label: "Laporan Penjualan", icon: FileText },
       { href: "/reports/purchasing", label: "Laporan Pembelian", icon: FileText, isDev: true },
       { href: "/reports/stock", label: "Laporan Stok", icon: FileText, isDev: true },
       { href: "/reports/financial", label: "Laporan Keuangan", icon: FileText },

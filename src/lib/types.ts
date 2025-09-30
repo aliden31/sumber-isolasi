@@ -84,6 +84,27 @@ export type MonthlyRevenue = {
   revenue: number;
 };
 
+export type SalesMetric = {
+  grossSales: number;
+  totalTransactions: number;
+  avgTransactionValue: number;
+  productsSold: number;
+};
+
+export type ProductSalesSummary = {
+  productId: string;
+  productName: string;
+  quantitySold: number;
+  grossRevenue: number;
+  grossProfit: number;
+};
+
+export type SalesTrendData = {
+  date: string;
+  total: number;
+};
+
+
 export type Customer = {
   id: string;
   name: string;
