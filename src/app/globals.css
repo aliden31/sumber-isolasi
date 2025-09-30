@@ -4,11 +4,6 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --font-body: 'Alegreya', serif;
-    --font-headline: 'Belleza', sans-serif;
-  }
-
   body {
     @apply font-body;
   }
@@ -22,6 +17,8 @@
 @layer base {
   /* Default: Kilat (Orange & Warm) */
   :root, .theme-kilat {
+    --font-body: var(--font-alegreya);
+    --font-headline: var(--font-belleza);
     --background: 40 100% 94.1%;
     --foreground: 25 15% 15%;
     --card: 40 100% 97%;
@@ -79,8 +76,8 @@
 
   /* Theme: Senja (Purple & Pink) */
   .theme-senja {
-    --font-body: 'Lora', serif;
-    --font-headline: 'Playfair Display', serif;
+    --font-body: var(--font-lora);
+    --font-headline: var(--font-playfair-display);
     --background: 270 50% 96%;
     --foreground: 270 30% 20%;
     --card: 270 50% 99%;
@@ -110,8 +107,8 @@
 
   /* Theme: Hutan (Green & Brown) */
   .theme-hutan {
-    --font-body: 'Inter', sans-serif;
-    --font-headline: 'Merriweather', serif;
+    --font-body: var(--font-inter);
+    --font-headline: var(--font-merriweather);
     --background: 90 20% 95%;
     --foreground: 90 25% 15%;
     --card: 90 20% 98%;
@@ -141,8 +138,8 @@
 
   /* Theme: Laut (Blue & Cyan) */
   .theme-laut {
-    --font-body: 'Poppins', sans-serif;
-    --font-headline: 'Montserrat', sans-serif;
+    --font-body: var(--font-poppins);
+    --font-headline: var(--font-montserrat);
     --background: 210 40% 97%;
     --foreground: 215 30% 25%;
     --card: 0 0% 100%;
@@ -172,8 +169,8 @@
 
   /* Theme: Modern (Grayscale & Slate) */
   .theme-modern {
-    --font-body: 'System-UI', sans-serif;
-    --font-headline: 'System-UI', sans-serif;
+    --font-body: sans-serif;
+    --font-headline: sans-serif;
     --background: 0 0% 98%;
     --foreground: 0 0% 5%;
     --card: 0 0% 100%;

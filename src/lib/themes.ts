@@ -30,8 +30,8 @@ export const THEMES = [
   {
     name: 'theme-modern',
     label: 'Modern',
-    headlineFont: 'System-UI',
-    bodyFont: 'System-UI',
+    headlineFont: 'System',
+    bodyFont: 'System',
     colors: ['hsl(220 15% 25%)', 'hsl(220 10% 60%)', 'hsl(0 0% 98%)'],
   },
 ] as const;
