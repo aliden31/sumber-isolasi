@@ -8,8 +8,15 @@ import { db } from "@/lib/firebase";
 const createResponse = (error: string | null = null) => ({ error });
 
 const COLLECTIONS = {
-    TRANSACTIONAL: ["transactions", "journals", "salesReturns", "parkedTransactions"],
-    MASTER: ["products", "customers", "suppliers"],
+    TRANSACTIONAL: [
+        "transactions", "journals", "salesReturns", "parkedTransactions",
+        "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
+        "purchasePayments", "purchaseReturns", "stockTransfers"
+    ],
+    MASTER: [
+        "products", "customers", "suppliers", "productCategories", 
+        "warehouses", "taxes", "currencies", "marketplaceStores"
+    ],
     ACCOUNTING: ["coa"],
 }
 
@@ -84,13 +91,44 @@ function revalidateAllPaths() {
         "/(app)/pos/parked",
         "/(app)/transactions",
         "/(app)/sales/receivables",
+        "/(app)/sales/manual-input",
+        "/(app)/sales/returns",
+        "/(app)/sales/import",
         "/(app)/products",
+        "/(app)/products/categories",
+        "/(app)/products/import",
+        "/(app)/stock/warehouses",
+        "/(app)/stock/notifications",
+        "/(app)/stock/transfer",
+        "/(app)/stock/opname",
         "/(app)/customers",
         "/(app)/suppliers",
+        "/(app)/purchasing/request",
+        "/(app)/purchasing/order",
+        "/(app)/purchasing/goods-receipt",
+        "/(app)/purchasing/invoice",
+        "/(app)/purchasing/payables",
+        "/(app)/purchasing/returns",
         "/(app)/accounting/coa",
         "/(app)/accounting/journal",
         "/(app)/accounting/ledger",
+        "/(app)/accounting/closing",
+        "/(app)/reports",
         "/(app)/reports/financial",
+        "/(app)/reports/balance-sheet",
+        "/(app)/reports/cash-flow",
+        "/(app)/reports/purchasing",
+        "/(app)/reports/stock",
+        "/(app)/settings",
+        "/(app)/settings/accounting",
+        "/(app)/settings/marketplace",
+        "/(app)/settings/danger",
+        "/(app)/taxes",
+        "/(app)/currencies",
+        "/(app)/users",
+        "/(app)/cash/in",
+        "/(app)/cash/out",
+        "/(app)/cash/transfer",
     ];
     paths.forEach(path => revalidatePath(path));
 }

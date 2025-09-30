@@ -19,11 +19,36 @@ import { useToast } from '@/hooks/use-toast';
 import { deleteAllData, deleteMasterData, deleteTransactionalData, deleteCoaData } from './actions';
 import { Loader2, Trash2 } from 'lucide-react';
 
+type ActionType = 'transactional' | 'master' | 'coa' | 'all';
+
 export default function DangerZonePage() {
   const { toast } = useToast();
   
-  const handleAction = async (action: () => Promise<{ error: string | null }>, successMessage: string) => {
-    const result = await action();
+  const handleAction = async (actionType: ActionType) => {
+    let result: { error: string | null };
+    let successMessage = '';
+    
+    switch (actionType) {
+        case 'transactional':
+            result = await deleteTransactionalData();
+            successMessage = "Semua data transaksional berhasil dihapus.";
+            break;
+        case 'master':
+            result = await deleteMasterData();
+            successMessage = "Semua data master berhasil dihapus.";
+            break;
+        case 'coa':
+            result = await deleteCoaData();
+            successMessage = "Bagan Akun (COA) berhasil dihapus.";
+            break;
+        case 'all':
+            result = await deleteAllData();
+            successMessage = "Semua data aplikasi berhasil di-reset.";
+            break;
+        default:
+            return;
+    }
+
     if (result.error) {
       toast({ title: 'Gagal', description: result.error, variant: 'destructive' });
     } else {
@@ -46,29 +71,29 @@ export default function DangerZonePage() {
             title="Hapus Data Transaksional"
             description="Menghapus semua transaksi, jurnal, retur, dan piutang. Data master seperti produk dan pelanggan akan tetap ada."
             buttonText="Hapus Data Transaksional"
-            successMessage="Semua data transaksional berhasil dihapus."
-            action={() => handleAction(deleteTransactionalData, "Semua data transaksional berhasil dihapus.")}
+            actionType="transactional"
+            onConfirm={handleAction}
           />
           <ResetAction
             title="Hapus Data Master"
             description="Menghapus semua produk, pelanggan, dan supplier. Data transaksi akan tetap ada tetapi mungkin kehilangan referensi."
             buttonText="Hapus Data Master"
-            successMessage="Semua data master berhasil dihapus."
-            action={() => handleAction(deleteMasterData, "Semua data master berhasil dihapus.")}
+            actionType="master"
+            onConfirm={handleAction}
           />
            <ResetAction
             title="Hapus Bagan Akun (COA)"
             description="Menghapus seluruh struktur bagan akun Anda. Tindakan ini akan merusak penjurnalan otomatis. Anda perlu melakukan seed ulang."
             buttonText="Hapus Bagan Akun"
-            successMessage="Bagan Akun berhasil dihapus."
-            action={() => handleAction(deleteCoaData, "Bagan Akun (COA) berhasil dihapus.")}
+            actionType="coa"
+            onConfirm={handleAction}
           />
           <ResetAction
             title="Reset Pabrik (Factory Reset)"
             description="Menghapus SEMUA data aplikasi (transaksi dan master). Mengembalikan aplikasi ke kondisi kosong."
             buttonText="Reset Semua Data"
-            successMessage="Semua data aplikasi berhasil di-reset."
-            action={() => handleAction(deleteAllData, "Semua data aplikasi berhasil dihapus.")}
+            actionType="all"
+            onConfirm={handleAction}
           />
         </CardContent>
       </Card>
@@ -80,16 +105,16 @@ interface ResetActionProps {
   title: string;
   description: string;
   buttonText: string;
-  successMessage: string;
-  action: () => Promise<void>;
+  actionType: ActionType;
+  onConfirm: (actionType: ActionType) => Promise<void>;
 }
 
-function ResetAction({ title, description, buttonText, action }: ResetActionProps) {
+function ResetAction({ title, description, buttonText, actionType, onConfirm }: ResetActionProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleConfirm = () => {
     startTransition(async () => {
-      await action();
+      await onConfirm(actionType);
     });
   };
 
