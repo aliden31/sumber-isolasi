@@ -17,8 +17,13 @@ import { Badge } from '@/components/ui/badge';
 import { id } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import 'jspdf-autotable';
+import { getCompanySettings } from '@/app/(app)/settings/actions';
 
+(jsPDF as any).autoTableSetDefaults({
+    headStyles: { fillColor: [15, 23, 42] },
+    styles: { font: 'helvetica' },
+});
 
 interface PurchaseMetric {
     totalValue: number;
@@ -38,8 +43,6 @@ export default function PurchasingReportPage() {
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   });
-  const reportRef = useRef<HTMLDivElement>(null);
-
 
   useEffect(() => {
     setLoading(true);
@@ -100,36 +103,75 @@ export default function PurchasingReportPage() {
   
   const top5Suppliers = useMemo(() => supplierSummary.slice(0, 5), [supplierSummary]);
 
-  const handleExportPDF = () => {
-    const input = reportRef.current;
-    if (!input) return;
-
-    html2canvas(input, { scale: 2 }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const width = pdfWidth;
-      const height = width / ratio;
-
-      let position = 0;
-      let heightLeft = height;
-      
-      pdf.addImage(imgData, 'PNG', 0, position, width, height);
-      heightLeft -= pdfHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - height;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, width, height);
-        heightLeft -= pdfHeight;
-      }
-      
-      pdf.save(`laporan-pembelian-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  const handleExportPDF = async () => {
+    const doc = new jsPDF();
+    const settings = await getCompanySettings();
+    const companyName = settings.companyName || 'Toko Kilat';
+    const period = `Periode: ${dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - ${dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}`;
+    
+    let y = 15;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName, 105, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Laporan Pembelian', 105, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(10);
+    doc.text(period, 105, y, { align: 'center' });
+    y += 10;
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Ringkasan Metrik Pembelian", 14, y);
+    y+= 6;
+    (doc as any).autoTable({
+        startY: y,
+        body: [
+            ['Total Nilai Pembelian', `Rp ${metrics.totalValue.toLocaleString('id-ID')}`],
+            ['Total Pesanan (PO)', `${metrics.totalOrders.toLocaleString('id-ID')}`],
+            ['Jumlah Pemasok', `${metrics.supplierCount.toLocaleString('id-ID')}`],
+        ],
+        theme: 'grid',
     });
+
+    y = (doc as any).autoTable.previous.finalY + 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Riwayat Pesanan Pembelian", 14, y);
+    y += 6;
+
+    const tableData = purchaseOrders.map(po => [
+      format(po.date, "dd MMM yyyy", { locale: id }),
+      po.id,
+      po.supplierName,
+      po.status,
+      `Rp ${po.total.toLocaleString('id-ID')}`,
+    ]);
+
+    (doc as any).autoTable({
+        startY: y,
+        head: [['Tanggal', 'No. PO', 'Pemasok', 'Status', 'Total']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [22, 22, 22] },
+        styles: { cellPadding: 2, fontSize: 8 },
+        columnStyles: {
+            4: { halign: 'right' },
+        }
+    });
+
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 14, doc.internal.pageSize.getHeight() - 10);
+    }
+    
+    doc.save(`laporan-pembelian-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   return (
@@ -148,7 +190,7 @@ export default function PurchasingReportPage() {
       {loading ? (
         <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>
       ) : (
-        <div ref={reportRef} className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6">
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <MetricCard title="Total Nilai Pembelian" value={metrics.totalValue} format="currency" icon={DollarSign} />
             <MetricCard title="Total Pesanan (PO)" value={metrics.totalOrders} icon={ShoppingCart} />

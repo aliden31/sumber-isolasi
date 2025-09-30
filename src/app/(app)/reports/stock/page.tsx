@@ -13,8 +13,15 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import 'jspdf-autotable';
 import { format } from 'date-fns';
+import { getCompanySettings } from '@/app/(app)/settings/actions';
+import { id } from 'date-fns/locale';
+
+(jsPDF as any).autoTableSetDefaults({
+    headStyles: { fillColor: [15, 23, 42] },
+    styles: { font: 'helvetica' },
+});
 
 
 export default function StockReportsPage() {
@@ -23,8 +30,6 @@ export default function StockReportsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const reportRef = useRef<HTMLDivElement>(null);
-
 
   useEffect(() => {
     const qProducts = query(collection(db, 'products'), orderBy('name'));
@@ -68,22 +73,76 @@ export default function StockReportsPage() {
     return filteredProducts.reduce((sum, p) => sum + p.stock, 0);
   }, [filteredProducts]);
 
-  const handleExportPDF = () => {
-    const input = reportRef.current;
-    if (!input) return;
-
-    html2canvas(input, { scale: 2 }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const height = pdfWidth / ratio;
-
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
-      pdf.save(`laporan-stok-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  const handleExportPDF = async () => {
+    const doc = new jsPDF();
+    const settings = await getCompanySettings();
+    const companyName = settings.companyName || 'Toko Kilat';
+    const period = `Per tanggal: ${format(new Date(), 'd MMMM yyyy', { locale: id })}`;
+    
+    let y = 15;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName, 105, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Laporan Stok', 105, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(10);
+    doc.text(period, 105, y, { align: 'center' });
+    y += 10;
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Ringkasan Persediaan", 14, y);
+    y+= 6;
+    (doc as any).autoTable({
+        startY: y,
+        body: [
+            ['Total Nilai Persediaan', `Rp ${totalInventoryValue.toLocaleString('id-ID')}`],
+            ['Total Unit Persediaan', `${totalStockCount.toLocaleString('id-ID')}`],
+        ],
+        theme: 'grid',
     });
+
+    y = (doc as any).autoTable.previous.finalY + 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Rincian Nilai Persediaan", 14, y);
+    y += 6;
+
+    const tableData = filteredProducts.map(p => [
+      p.name,
+      p.category,
+      p.stock.toLocaleString('id-ID'),
+      `Rp ${(p.cost || 0).toLocaleString('id-ID')}`,
+      `Rp ${((p.cost || 0) * p.stock).toLocaleString('id-ID')}`,
+    ]);
+
+    (doc as any).autoTable({
+        startY: y,
+        head: [['Produk', 'Kategori', 'Stok', 'Harga Pokok', 'Total Nilai']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [22, 22, 22] },
+        styles: { cellPadding: 2, fontSize: 8 },
+        columnStyles: {
+            2: { halign: 'right' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+        }
+    });
+
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 14, doc.internal.pageSize.getHeight() - 10);
+    }
+    
+    doc.save(`laporan-stok-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   if (loading) {
@@ -100,7 +159,7 @@ export default function StockReportsPage() {
         </Button>
       </div>
       
-      <div ref={reportRef} className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -182,4 +241,3 @@ export default function StockReportsPage() {
     </div>
   );
 }
-

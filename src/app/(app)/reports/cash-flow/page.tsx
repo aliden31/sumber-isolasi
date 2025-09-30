@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { getCompanySettings } from '@/app/(app)/settings/actions';
 
 type ReportRow = {
   description: string;
@@ -55,8 +55,6 @@ export default function CashFlowPage() {
     to: new Date(),
   });
   const [loading, setLoading] = useState(true);
-  const reportRef = useRef<HTMLDivElement>(null);
-
 
   useEffect(() => {
     const unsubAccounts = onSnapshot(query(collection(db, 'coa'), orderBy('code')), (snapshot) => {
@@ -132,12 +130,15 @@ export default function CashFlowPage() {
     const beginningBalances = calculateBalances(beginningJournals);
     report.beginningCash = cashAccountIds.reduce((sum, id) => sum + (beginningBalances[id] || 0), 0);
 
-    const endingBalances = calculateBalances(allTimeJournals.filter(j => j.date <= (dateRange.to || dateRange.from!)));
+    const toDate = dateRange.to || dateRange.from;
+    const endOfDayToDate = new Date(toDate);
+    endOfDayToDate.setHours(23, 59, 59, 999);
+
+    const endingBalances = calculateBalances(allTimeJournals.filter(j => j.date <= endOfDayToDate));
     report.endingCash = cashAccountIds.reduce((sum, id) => sum + (endingBalances[id] || 0), 0);
     
     const currentBalances = calculateBalances(journals);
 
-    // Calculate Net Income for the period
     let netIncome = 0;
     accounts.forEach(acc => {
         if (isRevenue(acc.type)) netIncome += currentBalances[acc.id] || 0;
@@ -145,34 +146,31 @@ export default function CashFlowPage() {
     });
     report.netIncome = netIncome;
 
-    // Adjustments for Operating Activities (Indirect Method)
     const operatingAdjustments: ReportRow[] = [];
     accounts.forEach(acc => {
-        const beginningBalance = beginningBalances[acc.id] || 0;
-        const endingBalance = endingBalances[acc.id] || 0;
-        const change = endingBalance - beginningBalance;
+        const beginningBalanceForPeriod = calculateBalances(allTimeJournals.filter(j => j.date < dateRange.from!));
+        const endingBalanceForPeriod = calculateBalances(allTimeJournals.filter(j => j.date <= endOfDayToDate));
+        
+        const change = (endingBalanceForPeriod[acc.id] || 0) - (beginningBalanceForPeriod[acc.id] || 0);
 
         if (change === 0) return;
 
-        // Depreciation & Amortization (non-cash expense)
         if (isContraAsset(acc.type)) {
             operatingAdjustments.push({ description: `Penambahan ${acc.name}`, amount: change });
         }
-        // Changes in Working Capital
         else if (acc.type === 'Aset Lancar' && acc.type !== 'Kas & Bank') {
-            operatingAdjustments.push({ description: `Kenaikan ${acc.name}`, amount: -change }); // Increase in asset is cash outflow
+            operatingAdjustments.push({ description: `Kenaikan ${acc.name}`, amount: -change });
         } else if (acc.type === 'Kewajiban Jangka Pendek') {
-            operatingAdjustments.push({ description: `Kenaikan ${acc.name}`, amount: change }); // Increase in liability is cash inflow
+            operatingAdjustments.push({ description: `Kenaikan ${acc.name}`, amount: change });
         }
     });
 
-    report.adjustments = operatingAdjustments;
-    report.netCashFromOperating = report.netIncome + operatingAdjustments.reduce((sum, adj) => sum + adj.amount, 0);
+    report.adjustments = operatingAdjustments.filter(adj => adj.amount !== 0);
+    report.netCashFromOperating = report.netIncome + report.adjustments.reduce((sum, adj) => sum + adj.amount, 0);
 
-    // Direct cash movements for Investing and Financing
     journals.forEach(journal => {
         const cashEntry = journal.entries.find(e => cashAccountIds.includes(e.accountId));
-        if (!cashEntry) return; // Skip non-cash transaction
+        if (!cashEntry) return;
 
         const cashAmount = cashEntry.debit - cashEntry.credit;
         const contraEntries = journal.entries.filter(e => !cashAccountIds.includes(e.accountId));
@@ -185,7 +183,7 @@ export default function CashFlowPage() {
 
             if (contraAccount.type === 'Aset Tetap') {
                 report.investingActivities.push({ description: contraAmount > 0 ? `Pembelian ${contraAccount.name}` : `Penjualan ${contraAccount.name}`, amount: -cashAmount });
-            } else if (contraAccount.type === 'Kewajiban Jangka Panjang' || contraAccount.type === 'Ekuitas') {
+            } else if (contraAccount.type === 'Kewajiban Jangka Panjang' || (contraAccount.type === 'Ekuitas' && !contraAccount.name.toLowerCase().includes('laba'))) {
                 report.financingActivities.push({ description: contraAmount < 0 ? `Penerimaan dari ${contraAccount.name}` : `Pembayaran ke ${contraAccount.name}`, amount: cashAmount });
             }
         });
@@ -197,23 +195,87 @@ export default function CashFlowPage() {
 
     return report;
   }, [journals, accounts, cashAccountIds, allTimeJournals, dateRange]);
+  
+  const handleExportPDF = async () => {
+    const doc = new jsPDF();
+    const settings = await getCompanySettings();
+    const companyName = settings.companyName || 'Toko Kilat';
+    
+    let y = 15;
+    const leftMargin = 15;
+    const rightMargin = 195;
+    const indent = 5;
 
-  const handleExportPDF = () => {
-    const input = reportRef.current;
-    if (!input) return;
+    const formatCurrency = (n: number) => n.toLocaleString('id-ID');
+    const drawLine = (yPos: number) => doc.line(leftMargin, yPos, rightMargin, yPos);
+    
+    doc.setTextColor(0, 0, 0);
 
-    html2canvas(input, { scale: 2 }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const height = pdfWidth / ratio;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName, 105, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Laporan Arus Kas', 105, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(10);
+    const dateStr = `Untuk Periode yang Berakhir pada ${dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : ''}`;
+    doc.text(dateStr, 105, y, { align: 'center' });
+    y += 10;
+    
+    const renderPdfSection = (title: string, data: ReportRow[], total: number) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(title, leftMargin, y);
+        y += 6;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
-      pdf.save(`laporan-arus-kas-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        data.forEach(row => {
+            doc.text(row.description, leftMargin + indent, y);
+            doc.text(formatCurrency(row.amount), rightMargin, y, { align: 'right' });
+            y += 5;
+        });
+
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Arus Kas Bersih dari ${title.replace('Arus Kas dari ', '')}`, leftMargin, y);
+        doc.text(formatCurrency(total), rightMargin, y, { align: 'right' });
+        y += 7;
+    }
+    
+    renderPdfSection('Arus Kas dari Aktivitas Operasi', [
+        { description: 'Laba Bersih', amount: reportData.netIncome },
+        ...reportData.adjustments
+    ], reportData.netCashFromOperating);
+    
+    renderPdfSection('Arus Kas dari Aktivitas Investasi', reportData.investingActivities, reportData.netCashFromInvesting);
+    
+    renderPdfSection('Arus Kas dari Aktivitas Pendanaan', reportData.financingActivities, reportData.netCashFromFinancing);
+
+    drawLine(y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text("Kenaikan (Penurunan) Bersih Kas", leftMargin, y);
+    doc.text(formatCurrency(reportData.netCashChange), rightMargin, y, { align: 'right' });
+    y += 6;
+    
+    doc.text("Saldo Kas, Awal Periode", leftMargin, y);
+    doc.text(formatCurrency(reportData.beginningCash), rightMargin, y, { align: 'right' });
+    y += 6;
+
+    drawLine(y);
+    y += 5;
+    doc.setFontSize(12);
+    doc.text("Saldo Kas, Akhir Periode", leftMargin, y);
+    doc.text(formatCurrency(reportData.endingCash), rightMargin, y, { align: 'right' });
+
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Dicetak pada ${format(new Date(), 'dd MMM yyyy HH:mm')}`, 15, doc.internal.pageSize.getHeight() - 10);
+    
+    doc.save(`laporan-arus-kas-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   const renderSection = (title: string, rows: ReportRow[], total: number) => (
@@ -246,7 +308,7 @@ export default function CashFlowPage() {
             </Button>
         </div>
       </div>
-      <Card ref={reportRef}>
+      <Card>
         <CardHeader>
           <CardTitle>Laporan Arus Kas (Metode Tidak Langsung)</CardTitle>
            <CardDescription>
