@@ -42,7 +42,7 @@ export async function importMarketplaceTransactions(
     marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
-    accountsReceivableAccountId,
+    bankAccountId, // Menggunakan akun bank/kas, bukan piutang
   } = settings;
 
   const requiredAccountIds = [
@@ -51,7 +51,7 @@ export async function importMarketplaceTransactions(
     marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
-    accountsReceivableAccountId,
+    bankAccountId, // Memastikan akun bank sudah di-set
   ];
 
   if (requiredAccountIds.some((id) => !id)) {
@@ -105,7 +105,7 @@ export async function importMarketplaceTransactions(
       const newId = generateDocumentId('MKT');
       const newTxRef = doc(db, 'transactions', newId);
 
-      // 1. Create Transaction Document as a Credit Sale (Invoice)
+      // 1. Create Transaction Document as a Paid Sale
       const newTransaction: NewTransaction = {
         date: Timestamp.fromDate(order.date),
         items: order.items,
@@ -113,10 +113,10 @@ export async function importMarketplaceTransactions(
         discount: order.discount,
         fee: order.fee,
         netTotal: order.netTotal,
-        paymentMethod: 'Kredit', // Treat as credit sale
+        paymentMethod: 'Transfer', // Dianggap sebagai transfer bank
         customerId: `MKT-${order.customerName}`,
         customerName: order.customerName,
-        status: 'Belum Lunas' // To be settled upon marketplace payout
+        status: 'Lunas' // Langsung dianggap lunas
       };
       batch.set(newTxRef, newTransaction);
 
@@ -133,12 +133,12 @@ export async function importMarketplaceTransactions(
         }
       }
 
-      // 3. Create Journal Entries for the Invoice
-      const journalDescription = `Invoice Marketplace #${orderId}`;
+      // 3. Create Journal Entries for the Sale
+      const journalDescription = `Penjualan Marketplace #${orderId}`;
       const journalEntries: JournalEntry[] = [];
       
       // Debit entries
-      if (order.netTotal > 0) journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
+      if (order.netTotal > 0) journalEntries.push({ accountId: bankAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
       if (order.discount > 0) journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
       if (order.fee > 0) journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
 
