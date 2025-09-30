@@ -226,25 +226,22 @@ export function AppSidebar() {
                     <SidebarMenuSub>
                       {item.subItems.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.href}>
-                          <Link href={subItem.href || "#"} passHref legacyBehavior>
+                          <Link href={subItem.href || "#"} passHref>
                              <SidebarMenuSubButton
-                              asChild
                               isActive={isActive(subItem.href || "#")}
                             >
-                              <a>
-                                {subItem.icon && <subItem.icon />}
-                                <span>{subItem.label}</span>
-                                {subItem.isDev && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Wrench className="ml-auto h-3 w-3 text-muted-foreground" />
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" align="center">
-                                      <p>Dalam Pengembangan</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </a>
+                              {subItem.icon && <subItem.icon />}
+                              <span>{subItem.label}</span>
+                              {subItem.isDev && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Wrench className="ml-auto h-3 w-3 text-muted-foreground" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" align="center">
+                                    <p>Dalam Pengembangan</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                             </SidebarMenuSubButton>
                           </Link>
                         </SidebarMenuSubItem>
