@@ -1,16 +1,17 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Product, Warehouse } from '@/lib/types';
+import type { Product, Warehouse, StockOpname, StockOpnameItem as OpnameDetailItem } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { processStockOpname } from './actions';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -18,6 +19,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 type OpnameItem = {
   product: Product;
@@ -33,6 +44,9 @@ export default function StockOpnamePage() {
   const [isPending, startTransition] = useTransition();
   const [opnameDate, setOpnameDate] = useState<Date|undefined>(new Date());
   const [notes, setNotes] = useState('');
+  
+  const [opnameHistory, setOpnameHistory] = useState<StockOpname[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   const { toast } = useToast();
 
@@ -48,9 +62,19 @@ export default function StockOpnamePage() {
         setWarehouses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse)));
     });
 
+    const unsubHistory = onSnapshot(query(collection(db, 'stockOpnames'), orderBy('date', 'desc')), (snapshot) => {
+      setOpnameHistory(snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        date: doc.data().date.toDate()
+      } as StockOpname)))
+      setLoadingHistory(false);
+    });
+
     return () => {
         unsubProducts();
         unsubWarehouses();
+        unsubHistory();
     };
   }, []);
 
@@ -81,6 +105,7 @@ export default function StockOpnamePage() {
   };
 
   const allCheckedState = useMemo(() => {
+    if (opnameItems.length === 0) return 'none';
     const checkedCount = opnameItems.filter(item => item.physicalCount === item.product.stock).length;
     if (checkedCount === 0) return 'none';
     if (checkedCount === opnameItems.length) return 'all';
@@ -88,11 +113,14 @@ export default function StockOpnamePage() {
   }, [opnameItems]);
 
   const processedItems = useMemo(() => {
-    return opnameItems.map(item => {
-        const difference = (item.physicalCount ?? item.product.stock) - item.product.stock;
+    return opnameItems
+      .filter(item => item.physicalCount !== null)
+      .map(item => {
+        const difference = (item.physicalCount as number) - item.product.stock;
         const differenceValue = difference * (item.product.cost || 0);
         return {
-            ...item,
+            product: item.product,
+            physicalCount: item.physicalCount as number,
             difference,
             differenceValue
         }
@@ -109,18 +137,20 @@ export default function StockOpnamePage() {
   }, [processedItems]);
 
   const handleSave = () => {
-    if (processedItems.length === 0) {
-        toast({ title: "Tidak ada perubahan", description: "Tidak ada selisih stok yang perlu disesuaikan. Opname dicatat tanpa jurnal.", variant: "default" });
-        resetForm();
-        return;
+    if (!hasCountedItems) {
+      toast({ title: "Belum ada item dihitung", description: "Mohon isi jumlah stok fisik setidaknya untuk satu produk.", variant: "destructive" });
+      return;
     }
-    if (!opnameDate) {
-        toast({ title: "Tanggal harus diisi", variant: "destructive" });
+     if (!opnameDate || !selectedWarehouseId) {
+        toast({ title: "Data tidak lengkap", description: "Tanggal opname dan gudang harus diisi.", variant: "destructive" });
         return;
     }
 
+    const warehouse = warehouses.find(w => w.id === selectedWarehouseId);
+    if (!warehouse) return;
+
     startTransition(async () => {
-        const result = await processStockOpname(processedItems, opnameDate, notes);
+        const result = await processStockOpname(processedItems, opnameDate, notes, warehouse.id, warehouse.name);
         if (result.error) {
             toast({ title: "Gagal menyimpan penyesuaian", description: result.error, variant: "destructive" });
         } else {
@@ -207,7 +237,7 @@ export default function StockOpnamePage() {
                         ((item.physicalCount ?? item.product.stock) - item.product.stock) > 0 && "text-green-600",
                         ((item.physicalCount ?? item.product.stock) - item.product.stock) < 0 && "text-destructive",
                     )}>
-                      { (item.physicalCount ?? item.product.stock) - item.product.stock }
+                      { item.physicalCount !== null ? item.physicalCount - item.product.stock : '-' }
                     </TableCell>
                     <TableCell className="text-center">
                         <Checkbox 
@@ -236,6 +266,92 @@ export default function StockOpnamePage() {
             </Button>
         </CardFooter>
       </Card>
+      <OpnameHistoryList history={opnameHistory} loading={loadingHistory} />
     </div>
   );
+}
+
+
+function OpnameHistoryList({ history, loading }: { history: StockOpname[], loading: boolean }) {
+  const [selectedOpname, setSelectedOpname] = useState<StockOpname | null>(null);
+
+  return (
+    <Dialog open={!!selectedOpname} onOpenChange={(open) => !open && setSelectedOpname(null)}>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><History/>Riwayat Stock Opname</CardTitle>
+          <CardDescription>Daftar sesi penyesuaian stok yang telah selesai.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Gudang</TableHead>
+                <TableHead>Catatan</TableHead>
+                <TableHead className="text-right">Nilai Penyesuaian</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={4} className="text-center h-24"><Loader2 className="animate-spin"/></TableCell></TableRow>
+              ) : history.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center h-24 text-muted-foreground">Belum ada riwayat stock opname.</TableCell></TableRow>
+              ) : (
+                history.map(item => (
+                  <DialogTrigger key={item.id} asChild>
+                    <TableRow className="cursor-pointer" onClick={() => setSelectedOpname(item)}>
+                      <TableCell>{format(item.date, "dd MMM yyyy", { locale: id })}</TableCell>
+                      <TableCell>{item.warehouseName}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{item.notes}</TableCell>
+                      <TableCell className={cn("text-right font-mono", item.totalAdjustmentValue !== 0 && (item.totalAdjustmentValue > 0 ? "text-green-600" : "text-destructive"))}>
+                        Rp {item.totalAdjustmentValue.toLocaleString('id-ID')}
+                      </TableCell>
+                    </TableRow>
+                  </DialogTrigger>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      
+      {selectedOpname && (
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Detail Stock Opname #{selectedOpname.id.substring(0,8)}</DialogTitle>
+            <DialogDescription>
+              {format(selectedOpname.date, "dd MMMM yyyy", { locale: id })} - Gudang: {selectedOpname.warehouseName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+             <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produk</TableHead>
+                  <TableHead className="text-center">Stok Sistem</TableHead>
+                  <TableHead className="text-center">Stok Fisik</TableHead>
+                  <TableHead className="text-center">Selisih</TableHead>
+                  <TableHead className="text-right">Nilai Selisih</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedOpname.items.map(item => (
+                  <TableRow key={item.productId}>
+                    <TableCell>{item.productName}</TableCell>
+                    <TableCell className="text-center">{item.systemStock}</TableCell>
+                    <TableCell className="text-center">{item.physicalCount}</TableCell>
+                    <TableCell className={cn("text-center font-bold", item.difference > 0 && "text-green-600", item.difference < 0 && "text-destructive")}>
+                        {item.difference}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">{item.differenceValue.toLocaleString('id-ID')}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      )}
+    </Dialog>
+  )
 }

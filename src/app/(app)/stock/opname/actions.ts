@@ -1,11 +1,13 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, doc, writeBatch, Timestamp } from "firebase/firestore";
+import { collection, doc, writeBatch, Timestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Product, NewJournal, JournalEntry } from "@/lib/types";
+import type { Product, NewJournal, JournalEntry, StockOpname, StockOpnameItem as OpnameDetailItem, NewStockOpname } from "@/lib/types";
 import { getAccountingSettings } from "@/app/(app)/settings/accounting/actions";
 import { addJournalEntry } from "@/app/(app)/accounting/journal/actions";
+import { generateDocumentId } from "@/lib/utils";
 
 const createResponse = (error: string | null = null) => ({ error });
 
@@ -16,16 +18,38 @@ type OpnameItem = {
   differenceValue: number;
 };
 
-export async function processStockOpname(opnameItems: OpnameItem[], opnameDate: Date, notes: string) {
+export async function processStockOpname(opnameItems: OpnameItem[], opnameDate: Date, notes: string, warehouseId: string, warehouseName: string) {
   try {
     const batch = writeBatch(db);
-    let totalAdjustmentValue = 0;
+
+    const adjustedItems: OpnameDetailItem[] = opnameItems.map(item => ({
+        productId: item.product.id,
+        productName: item.product.name,
+        systemStock: item.product.stock,
+        physicalCount: item.physicalCount,
+        difference: item.difference,
+        differenceValue: item.differenceValue,
+    }));
+
+    const totalAdjustmentValue = adjustedItems.reduce((sum, item) => sum + item.differenceValue, 0);
+
+    // Save the opname history record
+    const opnameHistoryRef = doc(collection(db, 'stockOpnames'), generateDocumentId("OPN"));
+    const newOpnameRecord: NewStockOpname = {
+        date: Timestamp.fromDate(opnameDate),
+        warehouseId,
+        warehouseName,
+        notes,
+        items: adjustedItems,
+        totalAdjustmentValue,
+    };
+    batch.set(opnameHistoryRef, newOpnameRecord);
+
 
     for (const item of opnameItems) {
       if (item.difference !== 0) {
         const productRef = doc(db, 'products', item.product.id);
         batch.update(productRef, { stock: item.physicalCount });
-        totalAdjustmentValue += item.differenceValue;
       }
     }
 
@@ -55,6 +79,7 @@ export async function processStockOpname(opnameItems: OpnameItem[], opnameDate: 
             entries: journalEntries,
             total: Math.abs(totalAdjustmentValue)
         };
+        // This function handles its own batching/committing, so we don't include it in the main batch
         await addJournalEntry(newJournal);
     }
     

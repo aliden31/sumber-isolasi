@@ -1,4 +1,5 @@
 
+
 export type ProductUnit = {
   name: string; // e.g., 'Pcs', 'Box', 'Lusin'
   price: number;
@@ -330,6 +331,27 @@ export type StockTransfer = {
 export type NewStockTransfer = Omit<StockTransfer, 'id' | 'date'> & {
     date: Date;
 };
+
+export type StockOpnameItem = {
+  productId: string;
+  productName: string;
+  systemStock: number;
+  physicalCount: number;
+  difference: number;
+  differenceValue: number;
+};
+
+export type StockOpname = {
+  id: string;
+  date: any; // Timestamp
+  warehouseId: string;
+  warehouseName: string;
+  notes?: string;
+  items: StockOpnameItem[];
+  totalAdjustmentValue: number;
+};
+
+export type NewStockOpname = Omit<StockOpname, 'id'>;
 
 
 export type Tax = {
