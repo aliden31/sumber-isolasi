@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 
 const createResponse = (error: string | null = null) => ({ error });
 
-export const COLLECTIONS = {
+const COLLECTIONS = {
     TRANSACTIONAL: [
         "transactions", "journals", "salesReturns", "parkedTransactions",
         "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",

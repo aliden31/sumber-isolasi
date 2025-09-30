@@ -16,9 +16,23 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { deleteTransactionalData, deleteMasterData, deleteCoaData, COLLECTIONS } from './actions';
+import { deleteTransactionalData, deleteMasterData, deleteCoaData } from './actions';
 import { Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+
+const COLLECTIONS = {
+    TRANSACTIONAL: [
+        "transactions", "journals", "salesReturns", "parkedTransactions",
+        "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
+        "purchasePayments", "purchaseReturns", "stockTransfers", "periodClosings",
+        "stockOpnames"
+    ],
+    MASTER: [
+        "products", "customers", "suppliers", "productCategories", 
+        "warehouses", "taxes", "currencies", "marketplaceStores"
+    ],
+    ACCOUNTING: ["coa"],
+}
 
 interface ResetActionProps {
   title: string;
