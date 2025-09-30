@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -8,7 +9,8 @@ import {
   Timestamp,
   runTransaction,
   getDoc,
-  writeBatch
+  writeBatch,
+  setDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { NewTransaction, Product, JournalEntry, NewJournal, NewParkedTransaction, NewSalesReturn, Transaction } from "@/lib/types";
@@ -64,9 +66,18 @@ export async function createTransaction(transactionData: NewTransaction, isPOS: 
 
         let totalCost = 0;
 
-        for (const item of transactionData.items) {
+        // --- 1. Perform all reads first ---
+        const productReads = transactionData.items.map(item => {
             const productRef = doc(productsCol, item.productId);
-            const productSnap = await t.get(productRef);
+            return t.get(productRef);
+        });
+        const productSnaps = await Promise.all(productReads);
+
+        // --- 2. Perform all writes now ---
+        for (let i = 0; i < productSnaps.length; i++) {
+            const productSnap = productSnaps[i];
+            const item = transactionData.items[i];
+            
             if (!productSnap.exists()) {
                 throw new Error(`Produk dengan ID ${item.productId} tidak ditemukan.`);
             }
@@ -76,7 +87,9 @@ export async function createTransaction(transactionData: NewTransaction, isPOS: 
                 throw new Error(`Stok untuk produk ${productData.name} tidak mencukupi.`);
             }
             totalCost += (productData.cost || 0) * item.quantity;
-            t.update(productRef, { stock: newStock });
+            
+            // This is the write operation
+            t.update(productSnap.ref, { stock: newStock });
         }
         
         const status = transactionData.paymentMethod === 'Kredit' ? 'Belum Lunas' : 'Lunas';
@@ -311,3 +324,5 @@ export async function settleReceivable(transaction: Transaction, paymentAccountI
         return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
     }
 }
+
+    
