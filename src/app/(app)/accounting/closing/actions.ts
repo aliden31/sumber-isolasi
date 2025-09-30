@@ -17,7 +17,7 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
             throw new Error("Akun Ikhtisar Laba Rugi atau Laba Ditahan belum diatur di Pengaturan Akuntansi.");
         }
 
-        // 1. Get all relevant accounts (Revenue & Expense)
+        // 1. Get all relevant accounts (Revenue, COGS, Expense types)
         const accountTypesToClose = ['Pendapatan', 'Pendapatan Lainnya', 'Beban Pokok Penjualan', 'Beban Operasional', 'Beban Lainnya'];
         const accountsCol = collection(db, "coa");
         const accountsQuery = query(accountsCol, where("type", "in", accountTypesToClose));
@@ -39,55 +39,61 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
         );
         const journalsSnapshot = await getDocs(journalsQuery);
         
-        // 3. Calculate balances for each account
+        // 3. Calculate balances for each account for the period
         const accountBalances: { [accountId: string]: number } = {};
         journalsSnapshot.docs.forEach(doc => {
             const journal = doc.data();
             journal.entries.forEach((entry: JournalEntry) => {
                 if (accountBalances[entry.accountId] === undefined) accountBalances[entry.accountId] = 0;
+                // Debit increases balance, Credit decreases it
                 accountBalances[entry.accountId] += entry.debit - entry.credit;
             });
         });
 
-        // 4. Prepare closing journal entries
+        // 4. Prepare closing journal entries to close to Income Summary
         const closingDate = new Date(year, month, 0, 23, 59, 58); // End of the month
-        const closingEntries: JournalEntry[] = [];
-        let netIncome = 0;
+        const closingEntries1: JournalEntry[] = [];
+        let totalRevenue = 0;
+        let totalExpenses = 0;
 
         accounts.forEach(account => {
             const balance = accountBalances[account.id] || 0;
             if (balance === 0) return;
 
-            // Revenue and Contra-Expense accounts have credit balances (balance < 0)
-            if (account.type.includes('Pendapatan')) {
-                closingEntries.push({ accountId: account.id, accountName: account.name, debit: -balance, credit: 0 });
-                netIncome += -balance;
-            } 
-            // Expense and Contra-Revenue accounts have debit balances (balance > 0)
-            else {
-                closingEntries.push({ accountId: account.id, accountName: account.name, debit: 0, credit: balance });
-                netIncome -= balance;
+            const isRevenueType = account.type.includes('Pendapatan');
+
+            if (isRevenueType) {
+                // Revenue accounts have credit balances, so balance is negative
+                // To close, we debit the revenue account
+                closingEntries1.push({ accountId: account.id, accountName: account.name, debit: -balance, credit: 0 });
+                totalRevenue += -balance;
+            } else { // Expense and COGS accounts
+                // Expense accounts have debit balances, so balance is positive
+                // To close, we credit the expense account
+                closingEntries1.push({ accountId: account.id, accountName: account.name, debit: 0, credit: balance });
+                totalExpenses += balance;
             }
         });
         
-        if (closingEntries.length === 0) {
-            return createResponse(`Tidak ada saldo pada akun pendapatan/beban untuk periode ${startDate.toLocaleString('default', { month: 'long' })} ${year}.`);
+        if (closingEntries1.length === 0) {
+            return createResponse(`Tidak ada saldo pada akun pendapatan/beban untuk periode ${getMonthName(month)} ${year}.`);
         }
 
+        const netIncome = totalRevenue - totalExpenses;
 
-        // 5. Close all revenue/expense accounts to Income Summary
+        // 5. Create entry to close totals to Income Summary
         if (netIncome > 0) { // Profit
-            closingEntries.push({ accountId: incomeSummaryAccountId, accountName: 'Ikhtisar Laba Rugi', debit: 0, credit: netIncome });
+            closingEntries1.push({ accountId: incomeSummaryAccountId, accountName: 'Ikhtisar Laba Rugi', debit: 0, credit: netIncome });
         } else { // Loss
-            closingEntries.push({ accountId: incomeSummaryAccountId, accountName: 'Ikhtisar Laba Rugi', debit: -netIncome, credit: 0 });
+            closingEntries1.push({ accountId: incomeSummaryAccountId, accountName: 'Ikhtisar Laba Rugi', debit: -netIncome, credit: 0 });
         }
         
         const closingJournal1: NewJournal = {
             date: closingDate,
             description: `Jurnal Penutup Pendapatan & Beban - ${getMonthName(month)} ${year}`,
-            refNumber: `JE-CLOSE-1-${year}-${month}`,
-            entries: closingEntries,
-            total: Math.abs(netIncome),
+            refNumber: `JNP-1-${year}-${month}`,
+            entries: closingEntries1,
+            total: totalRevenue > totalExpenses ? totalRevenue : totalExpenses,
         };
         await addJournalEntry(closingJournal1);
 
@@ -95,10 +101,12 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
         // 6. Close Income Summary to Retained Earnings
         const closingJournal2: NewJournal = {
             date: new Date(closingDate.getTime() + 1000), // 1 second later
-            description: `Jurnal Penutup Ikhtisar L/R - ${getMonthName(month)} ${year}`,
-            refNumber: `JE-CLOSE-2-${year}-${month}`,
+            description: `Jurnal Penutup Ikhtisar L/R ke Laba Ditahan - ${getMonthName(month)} ${year}`,
+            refNumber: `JNP-2-${year}-${month}`,
             entries: [
+                // Debit Income Summary if profit, Credit if loss
                 { accountId: incomeSummaryAccountId, accountName: 'Ikhtisar Laba Rugi', debit: netIncome > 0 ? netIncome : 0, credit: netIncome < 0 ? -netIncome : 0 },
+                // Credit Retained Earnings if profit, Debit if loss
                 { accountId: retainedEarningsAccountId, accountName: 'Laba Ditahan', debit: netIncome < 0 ? -netIncome : 0, credit: netIncome > 0 ? netIncome : 0 },
             ],
             total: Math.abs(netIncome),

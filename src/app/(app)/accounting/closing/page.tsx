@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -33,11 +32,31 @@ const getMonthName = (month: number) => {
 
 export default function PeriodClosingPage() {
     const [year, setYear] = useState(new Date().getFullYear());
-    const [month, setMonth] = useState(new Date().getMonth() + 1);
+    const [month, setMonth] = useState(new Date().getMonth()); // Default to last month
     const [isPending, startTransition] = useTransition();
     const { toast } = useToast();
 
+    // If current month is January, default to December of last year.
+    React.useEffect(() => {
+      const today = new Date();
+      if (today.getMonth() === 0) { // January
+        setMonth(12);
+        setYear(today.getFullYear() - 1);
+      } else {
+        setMonth(today.getMonth());
+      }
+    }, []);
+
     const handleClosing = () => {
+        if (month === 0) {
+            toast({
+                title: 'Bulan tidak valid',
+                description: 'Silakan pilih bulan yang valid.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
         startTransition(async () => {
             const result = await performPeriodClosing({ year, month });
             if (result.error) {
@@ -103,7 +122,7 @@ export default function PeriodClosingPage() {
                 <CardFooter className="flex justify-end">
                      <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <Button variant="destructive">
+                            <Button variant="destructive" disabled={month === 0}>
                                 <BookLock className="mr-2 h-4 w-4" /> Mulai Proses Tutup Buku
                             </Button>
                         </AlertDialogTrigger>
