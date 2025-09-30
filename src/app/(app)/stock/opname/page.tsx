@@ -73,6 +73,20 @@ export default function StockOpnamePage() {
     }));
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    setOpnameItems(prev => prev.map(item => ({
+        ...item,
+        physicalCount: checked ? item.product.stock : null
+    })));
+  };
+
+  const allCheckedState = useMemo(() => {
+    const checkedCount = opnameItems.filter(item => item.physicalCount === item.product.stock).length;
+    if (checkedCount === 0) return 'none';
+    if (checkedCount === opnameItems.length) return 'all';
+    return 'some';
+  }, [opnameItems]);
+
   const processedItems = useMemo(() => {
     return opnameItems.map(item => {
         const difference = (item.physicalCount ?? item.product.stock) - item.product.stock;
@@ -147,7 +161,18 @@ export default function StockOpnamePage() {
                   <TableHead className="text-center">Stok Sistem</TableHead>
                   <TableHead className="w-[150px] text-center">Stok Fisik</TableHead>
                   <TableHead className="text-center">Selisih</TableHead>
-                  <TableHead className="text-center">Sesuai (Set 0)</TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                       Sesuai
+                       <Checkbox
+                          id="check-all"
+                          checked={allCheckedState === 'all'}
+                          onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
+                          aria-label="Pilih Semua"
+                          data-state={allCheckedState === 'some' ? 'indeterminate' : allCheckedState === 'all' ? 'checked' : 'unchecked'}
+                       />
+                    </div>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
