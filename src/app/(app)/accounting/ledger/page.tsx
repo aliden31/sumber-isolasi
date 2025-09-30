@@ -101,7 +101,7 @@ export default function GeneralLedgerPage() {
           runningBalance += entry.debit - entry.credit;
           entries.push({
             date: journal.date,
-            ref: journal.id,
+            ref: journal.refNumber || journal.id,
             desc: journal.description,
             debit: entry.debit,
             credit: entry.credit,
