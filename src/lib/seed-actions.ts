@@ -50,23 +50,20 @@ export async function seedInitialAccounts() {
       return createResponse(result.error);
   }
 
-  // After seeding COA, let's seed the accounting settings with the new account IDs
   try {
     const docRefs = result.docRefs;
 
-    // We need to get the IDs of the accounts we just created.
-    // The `seedCollection` function was modified to return the docRefs map.
     const settingsData: AccountingSettings = {
         cashAccountId: docRefs['Kas Kecil'],
         bankAccountId: docRefs['Kas pada Bank ABC'],
         accountsReceivableAccountId: docRefs['Piutang Usaha'],
         accountsPayableAccountId: docRefs['Utang Usaha'],
+        accruedPayableAccountId: docRefs['Utang Barang Diterima'],
         salesRevenueAccountId: docRefs['Pendapatan Penjualan Produk'],
         cogsAccountId: docRefs['Beban Pokok Penjualan'],
         inventoryAccountId: docRefs['Persediaan Barang Dagang'],
     };
 
-    // Check if all required accounts were found
     if (Object.values(settingsData).some(id => !id)) {
         console.error("Could not find all required accounts in the seed data to create mappings.", settingsData);
         return createResponse("Gagal membuat pemetaan akun otomatis: tidak semua akun standar ditemukan.");

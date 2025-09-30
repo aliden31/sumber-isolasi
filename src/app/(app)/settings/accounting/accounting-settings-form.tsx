@@ -33,6 +33,8 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
   const [inventoryAccountId, setInventoryAccountId] = useState(initialData.inventoryAccountId || '');
   const [accountsReceivableAccountId, setAccountsReceivableAccountId] = useState(initialData.accountsReceivableAccountId || '');
   const [accountsPayableAccountId, setAccountsPayableAccountId] = useState(initialData.accountsPayableAccountId || '');
+  const [accruedPayableAccountId, setAccruedPayableAccountId] = useState(initialData.accruedPayableAccountId || '');
+
 
   const handleSaveChanges = () => {
     startTransition(async () => {
@@ -44,6 +46,7 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
         inventoryAccountId,
         accountsReceivableAccountId,
         accountsPayableAccountId,
+        accruedPayableAccountId,
       });
 
       if (result.error) {
@@ -136,6 +139,21 @@ export function AccountingSettingsForm({ initialData, accounts }: AccountingSett
           </SelectContent>
         </Select>
       </div>
+
+      <div className="space-y-2">
+        <Label>Akun Utang Barang Diterima (GRNI)</Label>
+        <Select value={accruedPayableAccountId} onValueChange={setAccruedPayableAccountId} disabled={isPending}>
+          <SelectTrigger>
+            <SelectValue placeholder="Pilih akun utang barang diterima..." />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.filter(a => a.type === 'Kewajiban Jangka Pendek').map(acc => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
 
       <div className="space-y-2">
         <Label>Akun Beban Pokok Penjualan (HPP)</Label>

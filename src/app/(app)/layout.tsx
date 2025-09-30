@@ -3,6 +3,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function AppLayout({
   children,
@@ -11,6 +12,7 @@ export default function AppLayout({
 }) {
   return (
     <SidebarProvider>
+    <TooltipProvider>
       <div className="flex min-h-screen flex-col">
         <AppHeader />
         <div className="flex flex-1">
@@ -22,6 +24,7 @@ export default function AppLayout({
           </main>
         </div>
       </div>
+    </TooltipProvider>
     </SidebarProvider>
   );
 }

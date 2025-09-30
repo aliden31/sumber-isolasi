@@ -13,6 +13,7 @@ export type AccountingSettings = {
   inventoryAccountId?: string;
   accountsReceivableAccountId?: string;
   accountsPayableAccountId?: string;
+  accruedPayableAccountId?: string; // Goods Received Not Invoiced
 };
 
 const settingsDocRef = doc(db, "settings", "accounting");

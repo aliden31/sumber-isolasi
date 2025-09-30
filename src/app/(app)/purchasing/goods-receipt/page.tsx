@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useTransition, useMemo } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { PurchaseOrder, GoodsReceipt, NewGoodsReceipt, GoodsReceiptItem, Account, Product } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -23,7 +23,8 @@ export default function GoodsReceiptPage() {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
 
   useEffect(() => {
-    const poUnsub = onSnapshot(query(collection(db, "purchaseOrders"), where("status", "==", "Sent")), (snapshot) => {
+    const poQuery = query(collection(db, "purchaseOrders"), where("status", "==", "Sent"));
+    const poUnsub = onSnapshot(poQuery, (snapshot) => {
       const pos = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -33,12 +34,13 @@ export default function GoodsReceiptPage() {
       setLoading(false);
     });
 
-    const grUnsub = onSnapshot(collection(db, "goodsReceipts"), (snapshot) => {
+    const grQuery = query(collection(db, "goodsReceipts"), orderBy("date", "desc"));
+    const grUnsub = onSnapshot(grQuery, (snapshot) => {
         const grs = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
             date: doc.data().date.toDate()
-        } as GoodsReceipt)).sort((a,b) => b.date.getTime() - a.date.getTime());
+        } as GoodsReceipt));
         setGoodsReceipts(grs);
     });
 
@@ -110,6 +112,7 @@ export default function GoodsReceiptPage() {
                           <TableHead>No. GRN</TableHead>
                           <TableHead>Referensi PO</TableHead>
                           <TableHead>Supplier</TableHead>
+                          <TableHead>Status</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -119,6 +122,7 @@ export default function GoodsReceiptPage() {
                               <TableCell className="font-mono text-xs">{gr.id}</TableCell>
                               <TableCell className="font-mono text-xs">{gr.purchaseOrderId}</TableCell>
                               <TableCell>{gr.supplierName}</TableCell>
+                              <TableCell><Badge variant={gr.status === 'Invoiced' ? 'secondary' : 'outline'}>{gr.status}</Badge></TableCell>
                           </TableRow>
                       ))}
                   </TableBody>
@@ -159,6 +163,11 @@ function GoodsReceiptForm({ po, onBack }: { po: PurchaseOrder; onBack: () => voi
       toast({ title: "Tidak ada barang yang diterima", description: "Masukkan jumlah barang yang diterima.", variant: "destructive" });
       return;
     }
+     if (receivedItems.some(item => item.receivedQuantity > item.quantity)) {
+        toast({ title: "Jumlah diterima melebihi pesanan", variant: "destructive" });
+        return;
+    }
+
 
     const newGR: NewGoodsReceipt = {
       date: receiptDate,

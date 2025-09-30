@@ -137,11 +137,37 @@ export type GoodsReceipt = {
     supplierId: string;
     supplierName: string;
     items: GoodsReceiptItem[];
+    status: 'Pending Invoice' | 'Invoiced';
 };
 
-export type NewGoodsReceipt = Omit<GoodsReceipt, 'id' | 'date'> & {
+export type NewGoodsReceipt = Omit<GoodsReceipt, 'id' | 'date' | 'status'> & {
     date: Date | any;
 };
+
+export type SupplierInvoice = {
+    id: string;
+    date: Date;
+    invoiceNumber: string;
+    goodsReceiptId: string;
+    purchaseOrderId: string;
+    supplierId: string;
+    supplierName: string;
+    total: number;
+    status: 'Unpaid' | 'Paid';
+}
+
+export type NewSupplierInvoice = Omit<SupplierInvoice, 'id' | 'status'>;
+
+export type PurchasePayment = {
+    id: string;
+    date: Date;
+    invoiceId: string;
+    invoiceNumber: string;
+    amount: number;
+    paymentAccountId: string; // ID of the cash/bank account
+}
+
+export type NewPurchasePayment = Omit<PurchasePayment, 'id'>;
 
 
 export type Account = {

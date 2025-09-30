@@ -114,9 +114,9 @@ const navItems = [
       { href: "/purchasing/request", label: "Permintaan Pembelian", icon: FilePlus, isDev: true },
       { href: "/purchasing/order", label: "Pesanan Pembelian", icon: PackagePlus },
       { href: "/purchasing/goods-receipt", label: "Penerimaan Barang", icon: PackageCheck },
-      { href: "/purchasing/invoice", label: "Faktur Pemasok", icon: FileKey2, isDev: true },
+      { href: "/purchasing/invoice", label: "Faktur Pemasok", icon: FileKey2 },
       { href: "/purchasing/returns", label: "Retur Pembelian", icon: ArrowRightLeft, isDev: true },
-      { href: "/purchasing/payables", label: "Utang Usaha", icon: Handshake, isDev: true },
+      { href: "/purchasing/payables", label: "Utang Usaha", icon: Handshake },
     ],
   },
   {
