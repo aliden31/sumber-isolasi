@@ -9,14 +9,16 @@ import { SidebarInset } from '@/components/ui/sidebar';
 
 export function AppShell({
   children,
+  companyName
 }: {
   children: React.ReactNode;
+  companyName: string;
 }) {
   return (
     <>
-      <AppSidebar />
+      <AppSidebar companyName={companyName} />
       <SidebarInset>
-        <AppHeader />
+        <AppHeader companyName={companyName} />
         <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
             <Suspense
             fallback={
