@@ -10,8 +10,8 @@ import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, DollarSign, ShoppingCart, Truck, TrendingUp } from 'lucide-react';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { Loader2, DollarSign, ShoppingCart, Truck } from 'lucide-react';
+import { Bar, BarChart, XAxis, YAxis, Tooltip } from 'recharts';
 import { ChartTooltip, ChartTooltipContent, ChartContainer } from "@/components/ui/chart";
 import { Badge } from '@/components/ui/badge';
 import { id } from 'date-fns/locale';
@@ -117,7 +117,7 @@ export default function PurchasingReportPage() {
               </CardHeader>
               <CardContent>
                   <ChartContainer config={{}} className="min-h-[250px] w-full">
-                      <BarChart data={top5Suppliers} layout="vertical" margin={{ right: 20 }}>
+                      <BarChart data={top5Suppliers} layout="vertical" margin={{ left: 20 }}>
                            <XAxis type="number" hide />
                            <YAxis dataKey="supplierName" type="category" tickLine={false} axisLine={false} stroke="hsl(var(--foreground))" fontSize={12} width={150} />
                            <Tooltip content={<ChartTooltipContent indicator="dot" />} />
@@ -133,7 +133,7 @@ export default function PurchasingReportPage() {
               <CardDescription>
                 Daftar pesanan pembelian untuk periode yang dipilih.
               </CardDescription>
-            </CardHeader>
+            </Header>
             <CardContent>
               <Table>
                 <TableHeader>
@@ -146,15 +146,19 @@ export default function PurchasingReportPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {purchaseOrders.map(po => (
-                    <TableRow key={po.id}>
-                        <TableCell>{format(po.date, "dd MMM yyyy", { locale: id })}</TableCell>
-                        <TableCell className="font-mono text-xs">{po.id}</TableCell>
-                        <TableCell>{po.supplierName}</TableCell>
-                        <TableCell><Badge variant={po.status === 'Completed' ? 'secondary' : (po.status === 'Draft' ? 'outline' : 'default')}>{po.status}</Badge></TableCell>
-                        <TableCell className="text-right font-mono">Rp {po.total.toLocaleString('id-ID')}</TableCell>
-                    </TableRow>
-                  ))}
+                  {purchaseOrders.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center h-24 text-muted-foreground">Tidak ada pesanan pembelian.</TableCell></TableRow>
+                  ) : (
+                    purchaseOrders.map(po => (
+                      <TableRow key={po.id}>
+                          <TableCell>{format(po.date, "dd MMM yyyy", { locale: id })}</TableCell>
+                          <TableCell className="font-mono text-xs">{po.id}</TableCell>
+                          <TableCell>{po.supplierName}</TableCell>
+                          <TableCell><Badge variant={po.status === 'Completed' ? 'secondary' : (po.status === 'Draft' ? 'outline' : 'default')}>{po.status}</Badge></TableCell>
+                          <TableCell className="text-right font-mono">Rp {po.total.toLocaleString('id-ID')}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -195,5 +199,3 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
-
-    

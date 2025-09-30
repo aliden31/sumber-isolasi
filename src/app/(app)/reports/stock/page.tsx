@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Product } from '@/lib/types';
+import type { Product, ProductCategory } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Archive, DollarSign } from 'lucide-react';
@@ -14,26 +14,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export default function StockReportsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
-    const q = query(collection(db, 'products'), orderBy('name'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const qProducts = query(collection(db, 'products'), orderBy('name'));
+    const unsubscribeProducts = onSnapshot(qProducts, (snapshot) => {
       setProducts(snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
       } as Product)));
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    const qCategories = query(collection(db, 'productCategories'), orderBy('name'));
+    const unsubscribeCategories = onSnapshot(qCategories, (snapshot) => {
+        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductCategory)))
+    });
+
+
+    return () => {
+        unsubscribeProducts();
+        unsubscribeCategories();
+    };
   }, []);
 
-  const categories = useMemo(() => {
-    const cats = new Set(products.map(p => p.category));
-    return ['all', ...Array.from(cats)];
-  }, [products]);
+  const categoryOptions = useMemo(() => {
+    return ['all', ...categories.map(c => c.name)];
+  }, [categories]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
@@ -98,7 +108,7 @@ export default function StockReportsPage() {
                   <SelectValue placeholder="Filter kategori" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map(cat => (
+                  {categoryOptions.map(cat => (
                     <SelectItem key={cat} value={cat}>
                       {cat === 'all' ? 'Semua Kategori' : cat}
                     </SelectItem>
@@ -139,5 +149,3 @@ export default function StockReportsPage() {
     </div>
   );
 }
-
-    

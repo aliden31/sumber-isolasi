@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Transaction, ProductSalesSummary, SalesMetric, SalesTrendData } from '@/lib/types';
+import type { Transaction, ProductSalesSummary, SalesMetric, SalesTrendData, Product } from '@/lib/types';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
@@ -16,6 +16,7 @@ import { ChartTooltip, ChartTooltipContent, ChartContainer } from "@/components/
 
 export default function SalesReportPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -24,8 +25,12 @@ export default function SalesReportPage() {
 
   useEffect(() => {
     setLoading(true);
-    const transCol = collection(db, 'journals');
-    let q = query(transCol, orderBy('date', 'asc'));
+
+    const productsUnsub = onSnapshot(collection(db, 'products'), (snapshot) => {
+        setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+    });
+
+    let q = query(collection(db, 'transactions'), orderBy('date', 'desc'));
 
     if (dateRange?.from) {
         const from = Timestamp.fromDate(dateRange.from);
@@ -34,12 +39,10 @@ export default function SalesReportPage() {
         toDayEnd.setHours(23, 59, 59, 999);
         to = Timestamp.fromDate(toDayEnd);
         
-        q = query(collection(db, 'transactions'), where("date", ">=", from), where("date", "<=", to));
-    } else {
-        q = query(collection(db, 'transactions'));
+        q = query(collection(db, 'transactions'), where("date", ">=", from), where("date", "<=", to), orderBy("date", "asc"));
     }
 
-    const unsub = onSnapshot(q, (snapshot) => {
+    const transUnsub = onSnapshot(q, (snapshot) => {
         setTransactions(snapshot.docs.map(doc => {
             const data = doc.data();
             return { id: doc.id, ...data, date: data.date.toDate() } as Transaction;
@@ -50,7 +53,10 @@ export default function SalesReportPage() {
         setLoading(false);
     });
 
-    return () => unsub();
+    return () => {
+        transUnsub();
+        productsUnsub();
+    };
   }, [dateRange]);
 
   const { metrics, productSummary, salesTrend } = useMemo(() => {
@@ -73,6 +79,9 @@ export default function SalesReportPage() {
 
       tx.items.forEach(item => {
         metrics.productsSold += item.quantity;
+        const product = products.find(p => p.id === item.productId);
+        const cost = product?.cost || item.cost || 0; // use master product cost if available
+
         if (!productSummaryMap[item.productId]) {
           productSummaryMap[item.productId] = {
             productId: item.productId,
@@ -85,7 +94,7 @@ export default function SalesReportPage() {
         const summary = productSummaryMap[item.productId];
         summary.quantitySold += item.quantity;
         summary.grossRevenue += item.price * item.quantity;
-        summary.grossProfit += (item.price - item.cost) * item.quantity;
+        summary.grossProfit += (item.price - cost) * item.quantity;
       });
     });
 
@@ -100,7 +109,7 @@ export default function SalesReportPage() {
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return { metrics, productSummary, salesTrend };
-  }, [transactions]);
+  }, [transactions, products]);
   
   const top5Products = useMemo(() => {
     return [...productSummary].sort((a,b) => b.quantitySold - a.quantitySold).slice(0, 5);
@@ -132,7 +141,7 @@ export default function SalesReportPage() {
                   <CardContent>
                       <ChartContainer config={{}} className="min-h-[250px] w-full">
                           <LineChart data={salesTrend}>
-                              <XAxis dataKey="date" tickFormatter={(val) => format(new Date(val), 'dd MMM')} stroke="hsl(var(--foreground))" fontSize={12} />
+                              <XAxis dataKey="date" tickFormatter={(val) => format(new Date(val), 'dd MMM', { locale: id })} stroke="hsl(var(--foreground))" fontSize={12} />
                               <YAxis tickFormatter={(val) => `Rp${Number(val) / 1000}k`} stroke="hsl(var(--foreground))" fontSize={12}/>
                               <Tooltip content={<ChartTooltipContent indicator="dot" />} />
                               <Legend />
@@ -147,7 +156,7 @@ export default function SalesReportPage() {
                   </CardHeader>
                   <CardContent>
                        <ChartContainer config={{}} className="min-h-[250px] w-full">
-                          <BarChart data={top5Products} layout="vertical">
+                          <BarChart data={top5Products} layout="vertical" margin={{ left: 20 }}>
                                <XAxis type="number" hide />
                                <YAxis dataKey="productName" type="category" tickLine={false} axisLine={false} stroke="hsl(var(--foreground))" fontSize={12} width={120} />
                                <Tooltip content={<ChartTooltipContent indicator="dot" />} />
@@ -162,9 +171,9 @@ export default function SalesReportPage() {
             <CardHeader>
               <CardTitle>Rangkuman Penjualan per Produk</CardTitle>
               <CardDescription>
-                Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy') : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy') : '...'}
+                Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}
               </CardDescription>
-            </CardHeader>
+            </Header>
             <CardContent>
               <Table>
                 <TableHeader>
@@ -224,3 +233,5 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
+
+    

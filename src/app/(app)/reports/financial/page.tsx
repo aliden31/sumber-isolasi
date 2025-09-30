@@ -12,6 +12,8 @@ import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { id } from 'date-fns/locale';
+
 
 type ReportRow = {
   accountName: string;
@@ -47,6 +49,8 @@ export default function FinancialReportsPage() {
   }, []);
   
   useEffect(() => {
+    if (accounts.length === 0) return; // Wait for accounts to be loaded
+
     setLoading(true);
     const journalsCol = collection(db, 'journals');
     let q = query(journalsCol, orderBy('date', 'asc'));
@@ -55,7 +59,6 @@ export default function FinancialReportsPage() {
         const from = Timestamp.fromDate(dateRange.from);
         let to = dateRange.to ? Timestamp.fromDate(dateRange.to) : from;
 
-        // Adjust to include the whole 'to' day
         const toDayEnd = new Date(dateRange.to || dateRange.from);
         toDayEnd.setHours(23, 59, 59, 999);
         to = Timestamp.fromDate(toDayEnd);
@@ -75,7 +78,7 @@ export default function FinancialReportsPage() {
     });
 
     return () => unsubJournals();
-  }, [dateRange]);
+  }, [dateRange, accounts]);
 
 
   const reportData: FinancialReport = useMemo(() => {
@@ -87,13 +90,11 @@ export default function FinancialReportsPage() {
 
     journals.forEach(journal => {
       journal.entries.forEach(entry => {
-        if (!accountBalances[entry.accountId]) {
-          accountBalances[entry.accountId] = 0;
-        }
         const account = accounts.find(a => a.id === entry.accountId);
         if (account && [...revenueAccountTypes, ...cogsAccountTypes, ...expenseAccountTypes].includes(account.type)) {
-           // For income & revenue, credits increase the balance (positive value)
-           // For expenses & COGS, debits increase the balance (positive value)
+           if (!accountBalances[entry.accountId]) {
+             accountBalances[entry.accountId] = 0;
+           }
            const balanceEffect = (revenueAccountTypes.includes(account.type)) 
                 ? entry.credit - entry.debit
                 : entry.debit - entry.credit;
@@ -104,14 +105,8 @@ export default function FinancialReportsPage() {
     });
 
     const report: FinancialReport = {
-      revenues: [],
-      cogs: [],
-      expenses: [],
-      totalRevenue: 0,
-      totalCogs: 0,
-      grossProfit: 0,
-      totalExpense: 0,
-      netIncome: 0,
+      revenues: [], cogs: [], expenses: [],
+      totalRevenue: 0, totalCogs: 0, grossProfit: 0, totalExpense: 0, netIncome: 0,
     };
 
     Object.entries(accountBalances).forEach(([accountId, balance]) => {
@@ -120,17 +115,17 @@ export default function FinancialReportsPage() {
         const row = { accountName: account.name, amount: balance };
         if (revenueAccountTypes.includes(account.type)) {
           report.revenues.push(row);
-          report.totalRevenue += balance;
         } else if (cogsAccountTypes.includes(account.type)) {
           report.cogs.push(row);
-          report.totalCogs += balance;
         } else if (expenseAccountTypes.includes(account.type)) {
           report.expenses.push(row);
-          report.totalExpense += balance;
         }
       }
     });
     
+    report.totalRevenue = report.revenues.reduce((sum, r) => sum + r.amount, 0);
+    report.totalCogs = report.cogs.reduce((sum, c) => sum + c.amount, 0);
+    report.totalExpense = report.expenses.reduce((sum, e) => sum + e.amount, 0);
     report.grossProfit = report.totalRevenue - report.totalCogs;
     report.netIncome = report.grossProfit - report.totalExpense;
 
@@ -148,7 +143,7 @@ export default function FinancialReportsPage() {
           <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
         </TableRow>
       ))}
-      {isTotal && (
+      {isTotal && rows.length > 0 && (
         <TableRow className={cn("font-bold", className)}>
             <TableCell className="pl-8">Total {title}</TableCell>
             <TableCell className="text-right font-mono">{total.toLocaleString('id-ID')}</TableCell>
@@ -167,7 +162,7 @@ export default function FinancialReportsPage() {
         <CardHeader>
           <CardTitle>Laporan Laba Rugi</CardTitle>
           <CardDescription>
-            Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy') : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy') : '...'}
+            Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -193,12 +188,12 @@ export default function FinancialReportsPage() {
                     <TableCell className="text-right font-mono">{reportData.grossProfit.toLocaleString('id-ID')}</TableCell>
                 </TableRow>
 
-                {renderSection("Beban Operasional", reportData.expenses, reportData.totalExpense)}
+                {renderSection("Beban", reportData.expenses, reportData.totalExpense)}
               </TableBody>
               <TableFooter>
                 <TableRow className="text-lg font-bold bg-secondary/50 hover:bg-secondary">
                   <TableCell>Laba Bersih</TableCell>
-                  <TableCell className="text-right font-mono">{reportData.netIncome.toLocaleString('id-ID')}</TableCell>
+                  <TableCell className={cn("text-right font-mono", reportData.netIncome < 0 && "text-destructive")}>{reportData.netIncome.toLocaleString('id-ID')}</TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
