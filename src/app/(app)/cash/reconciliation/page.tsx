@@ -38,6 +38,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx';
 
 
 type LedgerEntry = {
@@ -170,39 +171,64 @@ export default function BankReconciliationPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
         try {
-          const parsedData = results.data.map((row: any, index: number) => {
-            // This is a common format, might need adjustment
-            // Assumes columns: 'Tanggal', 'Deskripsi', 'Jumlah'
-            const date = parse(row.Tanggal, 'dd/MM/yyyy', new Date());
-            const amount = parseFloat(row.Jumlah.replace(/[^0-9\.-]+/g, ""));
-            
-            if (isNaN(date.getTime()) || isNaN(amount)) {
-                throw new Error(`Baris ${index + 2} tidak valid.`);
-            }
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet);
 
-            return {
-              id: `bank-${index}`,
-              date: date,
-              description: row.Deskripsi,
-              amount: amount,
-            };
-          });
-          setBankStatementItems(parsedData);
-          toast({ title: 'Berhasil', description: `${parsedData.length} transaksi bank berhasil di-parse.` });
-        } catch(e) {
-          const err = e as Error;
-          toast({ title: 'Gagal Parse File', description: `Format CSV tidak sesuai. ${err.message}`, variant: 'destructive' });
+            const parsedData = json.map((row: any, index: number) => {
+                // Common headers: Tanggal, Keterangan, Mutasi, Saldo. Adjust as needed.
+                const dateValue = row.Tanggal || row.Date;
+                // Excel dates can be tricky. This handles serial numbers and string dates.
+                let date;
+                if (typeof dateValue === 'number') {
+                    date = XLSX.SSF.parse_date_code(dateValue);
+                    date = new Date(date.y, date.m - 1, date.d);
+                } else {
+                    // Try parsing various string formats
+                    date = parse(dateValue, 'dd/MM/yyyy', new Date());
+                    if (isNaN(date.getTime())) {
+                       date = parse(dateValue, 'MM/dd/yyyy', new Date());
+                    }
+                    if (isNaN(date.getTime())) {
+                       date = new Date(dateValue);
+                    }
+                }
+                
+                const description = row.Keterangan || row.Deskripsi || row.Description;
+                const amountValue = row.Mutasi || row.Amount || row.Jumlah;
+                const amount = parseFloat(String(amountValue).replace(/[^0-9\.-]+/g, ""));
+                
+                if (isNaN(date.getTime()) || !description || isNaN(amount)) {
+                    console.warn(`Skipping invalid row ${index + 2}:`, row);
+                    return null;
+                }
+
+                return {
+                    id: `bank-${index}`,
+                    date: date,
+                    description: description,
+                    amount: amount,
+                };
+            }).filter(Boolean) as BankStatementItem[]; // Filter out null values
+            
+            setBankStatementItems(parsedData);
+            toast({ title: 'Berhasil', description: `${parsedData.length} transaksi bank berhasil diimpor.` });
+
+        } catch (err) {
+            console.error(err);
+            toast({ title: 'Gagal Memproses File', description: 'Pastikan file Excel Anda memiliki format yang benar dengan kolom Tanggal, Deskripsi, dan Jumlah/Mutasi.', variant: 'destructive' });
         }
-      },
-      error: (error: any) => {
-        toast({ title: 'Gagal Membaca File', description: error.message, variant: 'destructive' });
-      }
-    });
+    };
+    reader.onerror = (err) => {
+        console.error(err);
+        toast({ title: 'Gagal Membaca File', description: 'Terjadi kesalahan saat membaca file.', variant: 'destructive' });
+    }
+    reader.readAsArrayBuffer(file);
   };
   
   return (
@@ -223,7 +249,7 @@ export default function BankReconciliationPage() {
         <CardHeader>
           <CardTitle className="font-headline">Proses Rekonsiliasi</CardTitle>
           <CardDescription>
-            Pilih akun bank dan periode, lalu unggah laporan koran (format CSV) dan centang transaksi yang cocok.
+            Pilih akun bank dan periode, lalu unggah laporan koran (format .xlsx) dan centang transaksi yang cocok.
           </CardDescription>
           <div className="grid md:grid-cols-2 gap-4 pt-4">
              <Select onValueChange={setSelectedAccountId} disabled={loading}>
@@ -237,13 +263,13 @@ export default function BankReconciliationPage() {
               </SelectContent>
             </Select>
             <Button onClick={() => fileInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" /> gunakan file excell atau pdf saja
+                <Upload className="mr-2 h-4 w-4" /> Unggah Laporan Koran (.xlsx)
             </Button>
             <input 
                 type="file" 
                 ref={fileInputRef} 
                 className="hidden" 
-                accept=".xlsx,.xls,.pdf"
+                accept=".xlsx,.xls"
                 onChange={handleFileUpload}
             />
           </div>
