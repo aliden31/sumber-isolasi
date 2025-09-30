@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -173,7 +174,7 @@ export default function SalesReportPage() {
               <CardDescription>
                 Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}
               </CardDescription>
-            </Header>
+            </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
@@ -233,5 +234,3 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
-
-    
