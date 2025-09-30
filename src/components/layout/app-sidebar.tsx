@@ -59,6 +59,7 @@ import {
   Scale,
   AreaChart,
   Store,
+  Palette,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -81,7 +82,6 @@ import {
   useSidebar,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { TokoKilatLogo } from "../icons/logo";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -186,6 +186,7 @@ const navItems = [
     icon: Settings,
     subItems: [
       { href: "/settings", label: "Profil Perusahaan", icon: Building },
+      { href: "/settings/theme", label: "Tema & Tampilan", icon: Palette },
       { href: "/settings/accounting", label: "Akuntansi", icon: SlidersHorizontal },
       { href: "/settings/marketplace", label: "Marketplace", icon: Store },
       { href: "/settings/danger", label: "Data & Reset", icon: DatabaseZap },
@@ -193,7 +194,7 @@ const navItems = [
   },
 ];
 
-export function AppSidebar({ companyName }: { companyName?: string }) {
+export function AppSidebar() {
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href;
@@ -205,10 +206,6 @@ export function AppSidebar({ companyName }: { companyName?: string }) {
       className="border-r"
     >
        <SidebarHeader className="flex items-center gap-2">
-        <TokoKilatLogo className="size-8" />
-        <span className="text-lg font-headline font-semibold text-primary">
-          {companyName || 'Toko Kilat'}
-        </span>
       </SidebarHeader>
         <SidebarContent>
         <SidebarMenu>

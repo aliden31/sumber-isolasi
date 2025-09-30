@@ -3,9 +3,8 @@
 
 import { cn } from '@/lib/utils';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
-import { TokoKilatLogo } from '@/components/icons/logo';
 
-export function AppHeader({ companyName }: { companyName?: string }) {
+export function AppHeader() {
   const { isMobile } = useSidebar();
   return (
     <header
@@ -16,9 +15,8 @@ export function AppHeader({ companyName }: { companyName?: string }) {
       <SidebarTrigger className="-ml-2" />
 
       <div className="flex items-center gap-2">
-        <TokoKilatLogo className="size-7" />
         <span className="text-lg font-headline font-semibold text-primary">
-          {companyName || 'Toko Kilat'}
+          Toko Kilat
         </span>
       </div>
     </header>

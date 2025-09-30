@@ -5,6 +5,23 @@
 
 @layer base {
   :root {
+    --font-body: 'Alegreya', serif;
+    --font-headline: 'Belleza', sans-serif;
+  }
+
+  body {
+    @apply font-body;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline;
+  }
+}
+
+
+@layer base {
+  /* Default: Kilat (Orange & Warm) */
+  :root, .theme-kilat {
     --background: 40 100% 94.1%;
     --foreground: 25 15% 15%;
     --card: 40 100% 97%;
@@ -24,22 +41,18 @@
     --border: 39 100% 85%;
     --input: 39 100% 88%;
     --ring: 39 100% 50%;
+    --radius: 0.5rem;
     --chart-1: 39 100% 50%;
     --chart-2: 51 100% 50%;
     --chart-3: 30 90% 55%;
     --chart-4: 20 85% 60%;
     --chart-5: 10 80% 55%;
-    --radius: 0.5rem;
     --sidebar-background: 40 100% 92%;
     --sidebar-foreground: 25 15% 20%;
-    --sidebar-primary: 39 100% 50%;
-    --sidebar-primary-foreground: 25 15% 10%;
     --sidebar-accent: 40 100% 88%;
-    --sidebar-accent-foreground: 25 15% 10%;
-    --sidebar-border: 39 100% 80%;
-    --sidebar-ring: 39 100% 50%;
   }
-  .dark {
+ 
+  .dark, .dark.theme-kilat {
     --background: 25 15% 10%;
     --foreground: 40 100% 94.1%;
     --card: 25 15% 12%;
@@ -59,20 +72,136 @@
     --border: 39 100% 25%;
     --input: 39 100% 22%;
     --ring: 39 100% 50%;
-    --chart-1: 39 100% 50%;
-    --chart-2: 51 100% 50%;
-    --chart-3: 30 90% 55%;
-    --chart-4: 20 85% 60%;
-    --chart-5: 10 80% 55%;
     --sidebar-background: 25 15% 12%;
     --sidebar-foreground: 40 100% 94.1%;
-    --sidebar-primary: 39 100% 50%;
-    --sidebar-primary-foreground: 25 15% 10%;
     --sidebar-accent: 39 100% 18%;
-    --sidebar-accent-foreground: 40 100% 94.1%;
-    --sidebar-border: 39 100% 25%;
-    --sidebar-ring: 39 100% 50%;
   }
+
+  /* Theme: Senja (Purple & Pink) */
+  .theme-senja {
+    --font-body: 'Lora', serif;
+    --font-headline: 'Playfair Display', serif;
+    --background: 270 50% 96%;
+    --foreground: 270 30% 20%;
+    --card: 270 50% 99%;
+    --primary: 265 80% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 330 80% 94%;
+    --accent: 330 90% 70%;
+    --border: 270 50% 90%;
+    --input: 270 50% 92%;
+    --ring: 265 80% 60%;
+    --sidebar-background: 270 50% 94%;
+    --sidebar-accent: 330 80% 92%;
+  }
+  .dark.theme-senja {
+    --background: 270 20% 10%;
+    --foreground: 270 30% 95%;
+    --card: 270 20% 13%;
+    --primary: 265 80% 70%;
+    --secondary: 330 30% 20%;
+    --accent: 330 90% 60%;
+    --border: 270 20% 25%;
+    --input: 270 20% 22%;
+    --ring: 265 80% 70%;
+    --sidebar-background: 270 20% 12%;
+    --sidebar-accent: 330 30% 18%;
+  }
+
+  /* Theme: Hutan (Green & Brown) */
+  .theme-hutan {
+    --font-body: 'Inter', sans-serif;
+    --font-headline: 'Merriweather', serif;
+    --background: 90 20% 95%;
+    --foreground: 90 25% 15%;
+    --card: 90 20% 98%;
+    --primary: 130 60% 35%;
+    --primary-foreground: 90 20% 98%;
+    --secondary: 40 30% 90%;
+    --accent: 40 70% 50%;
+    --border: 90 20% 88%;
+    --input: 90 20% 92%;
+    --ring: 130 60% 35%;
+    --sidebar-background: 90 20% 93%;
+    --sidebar-accent: 40 30% 88%;
+  }
+  .dark.theme-hutan {
+    --background: 90 15% 8%;
+    --foreground: 90 20% 95%;
+    --card: 90 15% 11%;
+    --primary: 130 60% 45%;
+    --secondary: 40 20% 15%;
+    --accent: 40 70% 40%;
+    --border: 90 15% 25%;
+    --input: 90 15% 22%;
+    --ring: 130 60% 45%;
+    --sidebar-background: 90 15% 10%;
+    --sidebar-accent: 40 20% 14%;
+  }
+
+  /* Theme: Laut (Blue & Cyan) */
+  .theme-laut {
+    --font-body: 'Poppins', sans-serif;
+    --font-headline: 'Montserrat', sans-serif;
+    --background: 210 40% 97%;
+    --foreground: 215 30% 25%;
+    --card: 0 0% 100%;
+    --primary: 220 90% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 190 70% 93%;
+    --accent: 190 95% 60%;
+    --border: 210 40% 88%;
+    --input: 210 40% 92%;
+    --ring: 220 90% 55%;
+    --sidebar-background: 210 40% 95%;
+    --sidebar-accent: 190 70% 90%;
+  }
+  .dark.theme-laut {
+    --background: 220 30% 10%;
+    --foreground: 210 40% 95%;
+    --card: 220 30% 13%;
+    --primary: 220 90% 65%;
+    --secondary: 190 40% 18%;
+    --accent: 190 95% 50%;
+    --border: 220 30% 28%;
+    --input: 220 30% 25%;
+    --ring: 220 90% 65%;
+    --sidebar-background: 220 30% 12%;
+    --sidebar-accent: 190 40% 16%;
+  }
+
+  /* Theme: Modern (Grayscale & Slate) */
+  .theme-modern {
+    --font-body: 'System-UI', sans-serif;
+    --font-headline: 'System-UI', sans-serif;
+    --background: 0 0% 98%;
+    --foreground: 0 0% 5%;
+    --card: 0 0% 100%;
+    --primary: 220 15% 25%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 220 10% 90%;
+    --accent: 220 15% 45%;
+    --border: 0 0% 89%;
+    --input: 0 0% 92%;
+    --ring: 220 15% 25%;
+    --sidebar-background: 0 0% 96%;
+    --sidebar-accent: 220 10% 88%;
+  }
+  .dark.theme-modern {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 12%;
+    --primary: 220 10% 80%;
+    --primary-foreground: 0 0% 10%;
+    --secondary: 220 10% 20%;
+    --accent: 220 10% 60%;
+    --border: 0 0% 25%;
+    --input: 0 0% 22%;
+    --ring: 220 10% 80%;
+    --sidebar-background: 0 0% 10%;
+    --sidebar-accent: 220 10% 18%;
+  }
+
 }
 
 @layer base {
