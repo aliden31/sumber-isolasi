@@ -75,7 +75,9 @@ export async function importMarketplaceTransactions(
         date: new Date(row.tanggal_order),
       };
     }
-    const cost = row.mappedProduct.cost || 0;
+    
+    // Use cost from mapped product if available, otherwise from the report
+    const cost = row.mappedProduct.cost || row.cost || 0;
     const itemSubtotal = row.unit_price * row.qty;
 
     acc[orderId].items.push({
@@ -194,3 +196,4 @@ export async function importMarketplaceTransactions(
     );
   }
 }
+

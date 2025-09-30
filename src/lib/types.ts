@@ -3,6 +3,7 @@
 
 
 
+
 export type ProductUnit = {
   name: string; // e.g., 'Pcs', 'Box', 'Lusin'
   price: number;
@@ -367,6 +368,7 @@ export type ParsedRow = {
   sku: string;
   qty: number;
   unit_price: number;
+  cost: number;
   subtotal: number;
   shipping: number;
   fee: number;
@@ -378,3 +380,4 @@ export type MappedRow = ParsedRow & {
     id: string;
     mappedProduct: Product | null;
 };
+

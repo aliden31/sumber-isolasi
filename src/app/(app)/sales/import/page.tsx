@@ -61,18 +61,20 @@ const COLUMN_MAPPINGS: { [key: string]: keyof MappedRow | 'harga_awal_produk' } 
   'jumlah': 'qty',
   'jumlah produk dibeli': 'qty',
   'kuantitas': 'qty',
-  'harga asli produk': 'harga_awal_produk', // Prioritize original price
+  'harga asli produk': 'harga_awal_produk',
   'harga awal': 'harga_awal_produk',
   'harga satuan': 'unit_price',
   'harga jual (rp)': 'unit_price',
+  'harga modal': 'cost', // Added to read cost directly
+  'harga pokok': 'cost',
   'subtotal produk': 'subtotal',
   'total penjualan (rp)': 'subtotal',
   'ongkos kirim': 'shipping',
   'biaya pengiriman': 'shipping',
-  'biaya pengelolaan': 'fee', // This will be added to other fees
-  'biaya transaksi': 'fee',   // This will be added to other fees
+  'biaya pengelolaan': 'fee', 
+  'biaya transaksi': 'fee',   
   'diskon dari penjual': 'discount',
-  'diskon marketplace': 'discount', // This will be added to other discounts
+  'diskon marketplace': 'discount', 
   'voucher': 'discount',
   'voucher toko': 'discount',
 };
@@ -169,6 +171,8 @@ export default function ImportMarketplacePage() {
                     const harga_satuan = normalizeNumber(getVal(['harga satuan', 'harga jual (rp)']));
                     const unit_price = harga_awal > 0 ? harga_awal : harga_satuan;
 
+                    const cost = normalizeNumber(getVal(['harga modal', 'harga pokok']));
+
                     const subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)'])) || (unit_price * qty);
                     const shipping = normalizeNumber(getVal(['ongkos kirim', 'biaya pengiriman']));
 
@@ -198,7 +202,7 @@ export default function ImportMarketplacePage() {
                         id: `${nomor_order}-${rowIndex}`,
                         tanggal_order: tanggal_order_formatted,
                         nomor_order, channel, nama_pembeli, sku, qty, unit_price,
-                        subtotal, shipping, fee, discount, net_total,
+                        cost, subtotal, shipping, fee, discount, net_total,
                         mappedProduct
                     };
                 }).filter(row => row.nomor_order && row.sku);
@@ -285,6 +289,7 @@ export default function ImportMarketplacePage() {
                                 <TableHead className="min-w-[200px]">Produk Terpetakan</TableHead>
                                 <TableHead>Qty</TableHead>
                                 <TableHead>Harga Satuan</TableHead>
+                                <TableHead>Harga Modal</TableHead>
                                 <TableHead className="text-right">Subtotal</TableHead>
                                 <TableHead className="text-right">Diskon</TableHead>
                                 <TableHead className="text-right">Fee</TableHead>
@@ -304,6 +309,7 @@ export default function ImportMarketplacePage() {
                                     </TableCell>
                                     <TableCell>{row.qty}</TableCell>
                                     <TableCell className="text-right font-mono">Rp {row.unit_price.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right font-mono">Rp {row.cost.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono">Rp {row.subtotal.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono text-destructive">Rp {row.discount.toLocaleString('id-ID')}</TableCell>
                                     <TableCell className="text-right font-mono text-destructive">Rp {row.fee.toLocaleString('id-ID')}</TableCell>
@@ -383,3 +389,4 @@ function ProductMappingCell({ product, allProducts, onMap }: { product: Product 
         </Popover>
     );
 }
+
