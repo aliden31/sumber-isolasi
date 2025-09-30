@@ -374,31 +374,22 @@ function ReportRowComponent({ row, isSubRow = false, isSubSubRow = false }: { ro
   const isClickable = row.sourceType === 'journal';
   const isLink = row.sourceType === 'account' || row.sourceType === 'report';
 
-  const cellContent = (
-      <TableCell className={cn(isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "", (isClickable || isLink) && "cursor-pointer hover:underline")}>
-          {row.description}
-          {(isClickable || isLink) && <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground"/>}
-      </TableCell>
-  );
-
   return (
     <>
       <TableRow onClick={isClickable ? handleClick : undefined} className={cn(isClickable && "cursor-pointer")}>
-        {isLink ? (
-            <Link href={getLink()} passHref legacyBehavior>
-                <td colSpan={1} className={cn("p-0")}>
-                    <div className={cn("flex items-center", isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "pl-4", "py-4")}>
-                        {row.description}
-                        <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground"/>
-                    </div>
-                </td>
+        <TableCell className={cn(isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "", isClickable && "group")}>
+          {isLink ? (
+            <Link href={getLink()} className="flex items-center hover:underline">
+              {row.description}
+              <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground"/>
             </Link>
-        ) : (
-             <TableCell className={cn(isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "", isClickable && "group")}>
-                {row.description}
-                {isClickable && <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground group-hover:text-primary"/>}
-            </TableCell>
-        )}
+          ) : (
+            <>
+              {row.description}
+              {isClickable && <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground group-hover:text-primary"/>}
+            </>
+          )}
+        </TableCell>
         <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
       </TableRow>
 
@@ -447,5 +438,3 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
-
-    
