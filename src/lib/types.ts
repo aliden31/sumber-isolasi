@@ -1,5 +1,6 @@
 
 
+
 export type Product = {
   id: string;
   name: string;
@@ -225,6 +226,29 @@ export type PurchasePayment = {
 }
 
 export type NewPurchasePayment = Omit<PurchasePayment, 'id' | 'date'> & {
+    date: Date | any;
+};
+
+
+export type PurchaseReturnItem = {
+  productId: string;
+  productName: string;
+  returnQuantity: number;
+  cost: number;
+};
+
+export type PurchaseReturn = {
+  id: string;
+  date: Date;
+  goodsReceiptId: string;
+  supplierId: string;
+  supplierName: string;
+  items: PurchaseReturnItem[];
+  total: number;
+  reason: string;
+};
+
+export type NewPurchaseReturn = Omit<PurchaseReturn, 'id' | 'date'> & {
     date: Date | any;
 };
 

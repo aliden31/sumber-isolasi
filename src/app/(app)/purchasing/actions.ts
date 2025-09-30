@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { collection, addDoc, doc, updateDoc, Timestamp, runTransaction, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewPurchaseOrder, NewGoodsReceipt, Product, JournalEntry, NewJournal, GoodsReceipt, NewSupplierInvoice, NewPurchasePayment, SupplierInvoice, NewPurchaseRequest, PurchaseRequest, PurchaseOrder } from "@/lib/types";
+import type { NewPurchaseOrder, NewGoodsReceipt, Product, JournalEntry, NewJournal, GoodsReceipt, NewSupplierInvoice, NewPurchasePayment, SupplierInvoice, NewPurchaseRequest, PurchaseRequest, PurchaseOrder, NewPurchaseReturn } from "@/lib/types";
 import { addJournalEntry } from "@/app/(app)/accounting/journal/actions";
 import { getAccountingSettings } from "@/app/(app)/settings/accounting/actions";
 
@@ -196,6 +196,70 @@ export async function paySupplierInvoice(paymentData: NewPurchasePayment) {
         revalidatePath("/(app)/accounting/ledger");
         return createResponse(null, newPaymentRef.id);
     } catch(e) {
+        return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
+    }
+}
+
+
+export async function processPurchaseReturn(returnData: NewPurchaseReturn) {
+    try {
+        const newReturnRef = await runTransaction(db, async (transaction) => {
+            const returnsCol = collection(db, "purchaseReturns");
+            const newDocRef = doc(returnsCol);
+            
+            // 1. Update product stock
+            for (const item of returnData.items) {
+                const productRef = doc(db, "products", item.productId);
+                const productSnap = await transaction.get(productRef);
+                if (!productSnap.exists()) throw new Error(`Produk ${item.productName} tidak ditemukan.`);
+                
+                const productData = productSnap.data() as Product;
+                const newStock = productData.stock - item.returnQuantity;
+                if (newStock < 0) throw new Error(`Stok ${item.productName} akan menjadi negatif.`);
+                
+                transaction.update(productRef, { stock: newStock });
+            }
+
+            // 2. Save the return document
+            transaction.set(newDocRef, { ...returnData, date: Timestamp.fromDate(returnData.date as Date) });
+            return newDocRef;
+        });
+
+        // 3. Create reversing journal entry
+        const settings = await getAccountingSettings();
+        const { accountsPayableAccountId, inventoryAccountId } = settings;
+
+        if (!accountsPayableAccountId || !inventoryAccountId) {
+            throw new Error('Akun Utang Usaha atau Persediaan belum diatur di Pengaturan Akuntansi.');
+        }
+
+        const journalDescription = `Retur Pembelian ke ${returnData.supplierName} (Ref GRN: ${returnData.goodsReceiptId})`;
+        const journalEntries: JournalEntry[] = [
+            { accountId: accountsPayableAccountId, accountName: '', debit: returnData.total, credit: 0 },
+            { accountId: inventoryAccountId, accountName: '', debit: 0, credit: returnData.total }
+        ];
+
+        const newJournal: NewJournal = {
+            date: returnData.date,
+            description: journalDescription,
+            refNumber: newReturnRef.id,
+            entries: journalEntries,
+            total: returnData.total,
+        };
+
+        await addJournalEntry(newJournal);
+
+        // 4. Revalidate paths
+        revalidatePath("/(app)/purchasing/returns");
+        revalidatePath("/(app)/products");
+        revalidatePath("/(app)/accounting/ledger");
+        revalidatePath("/(app)/purchasing/payables");
+        revalidatePath("/(app)/reports/stock");
+
+
+        return createResponse(null, newReturnRef.id);
+    } catch (e) {
+        console.error("Error processing purchase return: ", e);
         return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
     }
 }
