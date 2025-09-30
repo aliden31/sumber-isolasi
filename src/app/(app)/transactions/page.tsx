@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar as CalendarIcon, Wallet, User, CheckCircle2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Wallet, User, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter
 } from '@/components/ui/card';
 import {
   Table,
@@ -33,56 +34,104 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, Timestamp, orderBy, limit, startAfter, DocumentData, getDocs, Query, endBefore, limitToLast } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Loader2 } from 'lucide-react';
+
+const TRANSACTIONS_PER_PAGE = 100;
 
 export default function TransactionsPage() {
   const [date, setDate] = useState<DateRange | undefined>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
+  const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   useEffect(() => {
+    fetchTransactions();
+  }, [date, currentPage]);
+
+  const fetchTransactions = async (direction: 'next' | 'prev' | 'initial' = 'initial') => {
     setLoading(true);
     const transactionsCol = collection(db, "transactions");
     
-    let q = query(transactionsCol, orderBy("date", "desc"));
+    let baseQuery: Query<DocumentData> = query(transactionsCol, orderBy("date", "desc"));
 
     if (date?.from) {
         const from = Timestamp.fromDate(date.from);
         let to;
-
         if (date.to) {
-            // Adjust to include the whole 'to' day
             const toDayEnd = new Date(date.to);
             toDayEnd.setHours(23, 59, 59, 999);
             to = Timestamp.fromDate(toDayEnd);
         } else {
-            // If only 'from' is selected, filter for that day
             const fromDayEnd = new Date(date.from);
             fromDayEnd.setHours(23, 59, 59, 999);
             to = Timestamp.fromDate(fromDayEnd);
         }
-        q = query(q, where("date", ">=", from), where("date", "<=", to));
+        baseQuery = query(baseQuery, where("date", ">=", from), where("date", "<=", to));
     }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const transactionList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          date: data.date.toDate(), // Convert Firestore Timestamp to JS Date
-        } as Transaction;
-      });
-      setTransactions(transactionList);
-      setLoading(false);
-    }, (error) => {
-        console.error("Error fetching transactions: ", error);
-        setLoading(false);
+    let q: Query<DocumentData>;
+    if (direction === 'next' && lastVisible) {
+        q = query(baseQuery, startAfter(lastVisible), limit(TRANSACTIONS_PER_PAGE));
+    } else if (direction === 'prev' && firstVisible) {
+        q = query(baseQuery, endBefore(firstVisible), limitToLast(TRANSACTIONS_PER_PAGE));
+    } else {
+        q = query(baseQuery, limit(TRANSACTIONS_PER_PAGE));
+    }
+    
+    // For checking if there's a next page
+    let nextPageQuery: Query<DocumentData>;
+    if (direction === 'next' && lastVisible) {
+      nextPageQuery = query(baseQuery, startAfter(lastVisible), limit(TRANSACTIONS_PER_PAGE + 1));
+    } else if (direction === 'prev' && firstVisible) {
+        // Can't easily check for next page when going back, so we assume it exists if we are not on page 1.
+        nextPageQuery = query(baseQuery, startAfter(firstVisible), limit(1));
+    } else {
+      nextPageQuery = query(baseQuery, limit(TRANSACTIONS_PER_PAGE + 1));
+    }
+
+    const [snapshot, nextSnapshot] = await Promise.all([getDocs(q), getDocs(nextPageQuery)]);
+
+    const transactionList = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        date: data.date.toDate(),
+      } as Transaction;
     });
 
-    return () => unsubscribe();
-  }, [date]);
+    setTransactions(transactionList);
+    setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+    setFirstVisible(snapshot.docs[0]);
+    setHasNextPage(nextSnapshot.docs.length > TRANSACTIONS_PER_PAGE && direction !== 'prev');
+    if (direction === 'initial' && nextSnapshot.docs.length <= TRANSACTIONS_PER_PAGE) {
+        setHasNextPage(false);
+    }
+    if (direction === 'next' && nextSnapshot.docs.length <= transactionList.length) {
+        setHasNextPage(false);
+    }
+
+
+    setLoading(false);
+  };
+  
+  const handleNextPage = () => {
+    if (lastVisible) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
+
 
   const totalSales = useMemo(() => {
     return transactions.reduce((sum, tx) => sum + tx.total, 0);
@@ -110,7 +159,10 @@ export default function TransactionsPage() {
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Riwayat Transaksi</h1>
          <DateRangePicker 
             className="w-full sm:w-[300px]" 
-            onSelect={setDate}
+            onSelect={(newDate) => {
+                setDate(newDate);
+                setCurrentPage(1); // Reset to first page on date change
+            }}
         />
       </div>
 
@@ -119,7 +171,7 @@ export default function TransactionsPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div>
                     <CardTitle className="font-headline">Semua Transaksi</CardTitle>
-                    <CardDescription>Total penjualan untuk periode yang dipilih.</CardDescription>
+                    <CardDescription>Total penjualan untuk periode yang dipilih (pada halaman ini).</CardDescription>
                 </div>
                 <div className="text-left sm:text-right">
                     <p className="text-sm text-muted-foreground">Total Penjualan</p>
@@ -130,7 +182,7 @@ export default function TransactionsPage() {
         <CardContent>
           <Accordion type="single" collapsible className="w-full">
             {loading ? (
-                <div className="text-center py-10">Memuat data transaksi...</div>
+                <div className="text-center py-10 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin mr-2"/>Memuat data transaksi...</div>
             ) : transactions.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">Tidak ada transaksi pada periode ini.</div>
             ) : (
@@ -180,6 +232,17 @@ export default function TransactionsPage() {
             )}
           </Accordion>
         </CardContent>
+        <CardFooter className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Halaman {currentPage}</span>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={() => handlePrevPage()} disabled={currentPage === 1 || loading}>
+                    <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
+                </Button>
+                <Button variant="outline" onClick={() => handleNextPage()} disabled={!hasNextPage || loading}>
+                    Berikutnya <ArrowRight className="ml-2 h-4 w-4"/>
+                </Button>
+            </div>
+        </CardFooter>
       </Card>
     </div>
   );
