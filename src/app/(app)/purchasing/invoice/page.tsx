@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
@@ -172,7 +173,7 @@ function InvoiceForm({ gr, onBack }: { gr: GoodsReceipt; onBack: () => void }) {
           </Table>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button onClick={handleSave} disabled={isPending}>
+          <Button onClick={handleSave} disabled={isPending || !invoiceNumber}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileKey2 className="mr-2 h-4 w-4" />}
             Simpan & Catat Utang
           </Button>

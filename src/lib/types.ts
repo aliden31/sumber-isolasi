@@ -207,7 +207,9 @@ export type SupplierInvoice = {
     status: 'Unpaid' | 'Paid';
 }
 
-export type NewSupplierInvoice = Omit<SupplierInvoice, 'id' | 'status'>;
+export type NewSupplierInvoice = Omit<SupplierInvoice, 'id' | 'status'> & {
+  date: Date | any;
+};
 
 export type PurchasePayment = {
     id: string;
