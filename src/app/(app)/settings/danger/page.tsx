@@ -18,8 +18,22 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { deleteAllData, deleteMasterData, deleteTransactionalData, deleteCoaData } from './actions';
 import { Loader2, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 type ActionType = 'transactional' | 'master' | 'coa' | 'all';
+
+const COLLECTIONS = {
+    TRANSACTIONAL: [
+        "transactions", "journals", "salesReturns", "parkedTransactions",
+        "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
+        "purchasePayments", "purchaseReturns", "stockTransfers"
+    ],
+    MASTER: [
+        "products", "customers", "suppliers", "productCategories", 
+        "warehouses", "taxes", "currencies", "marketplaceStores"
+    ],
+    ACCOUNTING: ["coa"],
+}
 
 export default function DangerZonePage() {
   const { toast } = useToast();
@@ -73,6 +87,7 @@ export default function DangerZonePage() {
             buttonText="Hapus Data Transaksional"
             actionType="transactional"
             onConfirm={handleAction}
+            collectionsToDelete={COLLECTIONS.TRANSACTIONAL}
           />
           <ResetAction
             title="Hapus Data Master"
@@ -80,6 +95,7 @@ export default function DangerZonePage() {
             buttonText="Hapus Data Master"
             actionType="master"
             onConfirm={handleAction}
+            collectionsToDelete={COLLECTIONS.MASTER}
           />
            <ResetAction
             title="Hapus Bagan Akun (COA)"
@@ -87,6 +103,7 @@ export default function DangerZonePage() {
             buttonText="Hapus Bagan Akun"
             actionType="coa"
             onConfirm={handleAction}
+            collectionsToDelete={COLLECTIONS.ACCOUNTING}
           />
           <ResetAction
             title="Reset Pabrik (Factory Reset)"
@@ -94,6 +111,7 @@ export default function DangerZonePage() {
             buttonText="Reset Semua Data"
             actionType="all"
             onConfirm={handleAction}
+            collectionsToDelete={[...COLLECTIONS.TRANSACTIONAL, ...COLLECTIONS.MASTER, ...COLLECTIONS.ACCOUNTING]}
           />
         </CardContent>
       </Card>
@@ -107,9 +125,10 @@ interface ResetActionProps {
   buttonText: string;
   actionType: ActionType;
   onConfirm: (actionType: ActionType) => Promise<void>;
+  collectionsToDelete: string[];
 }
 
-function ResetAction({ title, description, buttonText, actionType, onConfirm }: ResetActionProps) {
+function ResetAction({ title, description, buttonText, actionType, onConfirm, collectionsToDelete }: ResetActionProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleConfirm = () => {
@@ -135,7 +154,12 @@ function ResetAction({ title, description, buttonText, actionType, onConfirm }: 
           <AlertDialogHeader>
             <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tindakan ini tidak dapat diurungkan. Ini akan menghapus data secara permanen.
+              <p>Tindakan ini tidak dapat diurungkan. Ini akan menghapus data berikut secara permanen:</p>
+              <div className="flex flex-wrap gap-1 py-2">
+                {collectionsToDelete.map(col => (
+                  <Badge key={col} variant="outline" className="font-mono">{col}</Badge>
+                ))}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
