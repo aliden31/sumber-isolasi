@@ -155,12 +155,12 @@ function ResetAction({ title, description, buttonText, actionType, onConfirm, co
             <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
             <AlertDialogDescription>
               Tindakan ini tidak dapat diurungkan. Ini akan menghapus data berikut secara permanen:
-              <div className="flex flex-wrap gap-1 py-2">
-                {collectionsToDelete.map(col => (
-                  <Badge key={col} variant="outline" className="font-mono">{col}</Badge>
-                ))}
-              </div>
             </AlertDialogDescription>
+            <div className="flex flex-wrap gap-1 pt-2">
+              {collectionsToDelete.map(col => (
+                <Badge key={col} variant="outline" className="font-mono">{col}</Badge>
+              ))}
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
