@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useState, useTransition, useEffect } from 'react';
-import { Plus, MoreHorizontal, Loader2, Edit, Trash2, Database, PlusCircle, XCircle } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, Edit, Trash2, Database, PlusCircle, XCircle, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -48,7 +49,7 @@ import { db } from '@/lib/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 
-export function ProductActions({ hasProducts }: { hasProducts: boolean }) {
+export function ProductActions({ products }: { products: Product[] }) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -61,13 +62,36 @@ export function ProductActions({ hasProducts }: { hasProducts: boolean }) {
         toast({ title: 'Berhasil', description: 'Contoh data produk berhasil ditambahkan.' });
       }
     });
-  }
+  };
+
+  const handleExport = () => {
+    const dataToExport = products.map(p => {
+        const baseUnit = p.units?.find(u => u.conversionRate === 1) || p.units?.[0];
+        return {
+            'Nama Produk': p.name,
+            'SKU': p.sku || '',
+            'Kategori': p.category,
+            'Stok': p.stock,
+            'Harga Pokok': p.cost || 0,
+            'Satuan Dasar': p.baseUnit,
+            'Harga Jual (Satuan Dasar)': baseUnit?.price || 0,
+            'Batas Stok Minimum': p.minStockThreshold || 0,
+        };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Daftar Produk');
+    XLSX.writeFile(workbook, 'Daftar_Produk.xlsx');
+    
+    toast({ title: "Ekspor Berhasil", description: "File Excel berhasil diunduh." });
+  };
 
   return (
      <div className="flex gap-2">
         <AlertDialog>
           <AlertDialogTrigger asChild>
-             <Button variant="outline" disabled={hasProducts || isPending}>
+             <Button variant="outline" disabled={products.length > 0 || isPending}>
                 <Database className="mr-2 h-4 w-4" /> Seed Produk
             </Button>
           </AlertDialogTrigger>
@@ -88,6 +112,10 @@ export function ProductActions({ hasProducts }: { hasProducts: boolean }) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        
+        <Button variant="outline" onClick={handleExport} disabled={products.length === 0}>
+          <Download className="mr-2 h-4 w-4" /> Ekspor Excel
+        </Button>
        
         <ProductFormDialog>
             <Button>
