@@ -10,8 +10,7 @@ export function AppHeader({ companyName }: { companyName?: string }) {
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6',
-        isMobile ? 'flex' : 'hidden'
+        'sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6'
       )}
     >
       <SidebarTrigger className="-ml-2" />
