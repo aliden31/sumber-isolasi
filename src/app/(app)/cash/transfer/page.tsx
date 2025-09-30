@@ -46,7 +46,6 @@ export default function CashTransferPage() {
   const filteredToAccounts = cashBankAccounts.filter(acc => acc.id !== fromAccountId);
   const filteredFromAccounts = cashBankAccounts.filter(acc => acc.id !== toAccountId);
 
-
   const resetForm = () => {
     setDate(new Date());
     setDescription('');
@@ -80,7 +79,7 @@ export default function CashTransferPage() {
 
     const newJournal: NewJournal = {
       date,
-      description,
+      description: `Transfer: ${description}`,
       refNumber: '',
       entries: journalEntries,
       total: amount,
@@ -153,7 +152,7 @@ export default function CashTransferPage() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button onClick={handleSave} disabled={isPending}>
+          <Button onClick={handleSave} disabled={isPending || amount <= 0 || !toAccountId || !fromAccountId || !description}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Simpan Transaksi
           </Button>

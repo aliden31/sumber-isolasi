@@ -39,7 +39,9 @@ export default function CashInPage() {
     const unsub = onSnapshot(collection(db, 'coa'), (snapshot) => {
       const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)).sort((a,b) => a.code.localeCompare(b.code));
       setAllAccounts(accounts);
-      setSourceAccounts(accounts.filter(a => ['Ekuitas', 'Pendapatan', 'Pendapatan Lainnya', 'Kewajiban Jangka Pendek', 'Kewajiban Jangka Panjang'].includes(a.type)));
+      // Source accounts are typically non-cash accounts like Equity, Revenue, or Liabilities
+      setSourceAccounts(accounts.filter(a => !['Kas & Bank', 'Aset Tetap', 'Beban Pokok Penjualan', 'Beban Operasional'].includes(a.type)));
+      // Destination accounts for cash in are always cash/bank accounts
       setDestinationAccounts(accounts.filter(a => a.type === 'Kas & Bank'));
     });
     return () => unsub();
@@ -67,6 +69,7 @@ export default function CashInPage() {
         return;
     }
 
+    // Debit (toAccount) and Credit (fromAccount)
     const journalEntries: JournalEntry[] = [
       { accountId: toAccountId, accountName: toAccount.name, debit: amount, credit: 0 },
       { accountId: fromAccountId, accountName: fromAccount.name, debit: 0, credit: amount },
@@ -74,7 +77,7 @@ export default function CashInPage() {
 
     const newJournal: NewJournal = {
       date,
-      description,
+      description: `Kas Masuk: ${description}`,
       refNumber: '',
       entries: journalEntries,
       total: amount,
@@ -98,31 +101,31 @@ export default function CashInPage() {
         <CardHeader>
           <CardTitle className="font-headline">Catat Pemasukan Kas</CardTitle>
           <CardDescription>
-            Gunakan form ini untuk mencatat semua pemasukan kas di luar dari transaksi penjualan utama (POS atau Sales).
+            Gunakan form ini untuk mencatat semua pemasukan kas di luar dari transaksi penjualan utama (misalnya, setoran modal, pendapatan bunga).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
            <div className="space-y-2">
-            <Label htmlFor="cash-in-from">Masuk Dari Akun (Kredit)</Label>
-            <Select value={fromAccountId} onValueChange={setFromAccountId} disabled={isPending}>
-              <SelectTrigger id="cash-in-from">
-                <SelectValue placeholder="Pilih akun asal dana" />
-              </SelectTrigger>
-              <SelectContent>
-                {sourceAccounts.map(acc => (
-                  <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-           <div className="space-y-2">
-            <Label htmlFor="cash-in-to">Masuk Ke Akun (Debit)</Label>
+            <Label htmlFor="cash-in-to">Masuk Ke Akun Kas/Bank (Debit)</Label>
             <Select value={toAccountId} onValueChange={setToAccountId} disabled={isPending}>
               <SelectTrigger id="cash-in-to">
                 <SelectValue placeholder="Pilih akun kas/bank tujuan" />
               </SelectTrigger>
               <SelectContent>
                  {destinationAccounts.map(acc => (
+                  <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="cash-in-from">Dari Akun Sumber (Kredit)</Label>
+            <Select value={fromAccountId} onValueChange={setFromAccountId} disabled={isPending}>
+              <SelectTrigger id="cash-in-from">
+                <SelectValue placeholder="Pilih akun asal dana (misal: modal, pendapatan lain)" />
+              </SelectTrigger>
+              <SelectContent>
+                {sourceAccounts.map(acc => (
                   <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -144,7 +147,7 @@ export default function CashInPage() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button onClick={handleSave} disabled={isPending}>
+          <Button onClick={handleSave} disabled={isPending || amount <= 0 || !toAccountId || !fromAccountId || !description}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
             Simpan Transaksi
           </Button>

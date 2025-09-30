@@ -39,8 +39,10 @@ export default function CashOutPage() {
     const unsub = onSnapshot(collection(db, 'coa'), (snapshot) => {
       const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)).sort((a,b) => a.code.localeCompare(b.code));
       setAllAccounts(accounts);
+      // Source for cash out is always a cash/bank account
       setSourceAccounts(accounts.filter(a => a.type === 'Kas & Bank'));
-      setDestinationAccounts(accounts.filter(a => a.type.startsWith('Beban')));
+      // Destination is typically an expense or asset account
+      setDestinationAccounts(accounts.filter(a => a.type.startsWith('Beban') || a.type.startsWith('Aset')));
     });
     return () => unsub();
   }, []);
@@ -67,6 +69,7 @@ export default function CashOutPage() {
         return;
     }
 
+    // Debit (toAccount/Expense) and Credit (fromAccount/Cash)
     const journalEntries: JournalEntry[] = [
       { accountId: toAccountId, accountName: toAccount.name, debit: amount, credit: 0 },
       { accountId: fromAccountId, accountName: fromAccount.name, debit: 0, credit: amount },
@@ -74,7 +77,7 @@ export default function CashOutPage() {
 
     const newJournal: NewJournal = {
       date,
-      description,
+      description: `Kas Keluar: ${description}`,
       refNumber: '',
       entries: journalEntries,
       total: amount,
@@ -98,7 +101,7 @@ export default function CashOutPage() {
         <CardHeader>
           <CardTitle className="font-headline">Catat Pengeluaran Kas</CardTitle>
           <CardDescription>
-            Gunakan form ini untuk mencatat semua pengeluaran kas operasional atau pembelian non-inventaris.
+            Gunakan form ini untuk mencatat semua pengeluaran kas operasional (misalnya, bayar listrik, gaji) atau pembelian aset.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -106,7 +109,7 @@ export default function CashOutPage() {
             <Label htmlFor="cash-out-from">Keluar Dari Akun Kas/Bank (Kredit)</Label>
             <Select value={fromAccountId} onValueChange={setFromAccountId} disabled={isPending}>
               <SelectTrigger id="cash-out-from">
-                <SelectValue placeholder="Pilih akun kas/bank" />
+                <SelectValue placeholder="Pilih akun kas/bank sumber dana" />
               </SelectTrigger>
               <SelectContent>
                 {sourceAccounts.map(acc => (
@@ -116,10 +119,10 @@ export default function CashOutPage() {
             </Select>
           </div>
            <div className="space-y-2">
-            <Label htmlFor="cash-out-to">Untuk Akun Beban (Debit)</Label>
+            <Label htmlFor="cash-out-to">Untuk Akun Tujuan (Debit)</Label>
             <Select value={toAccountId} onValueChange={setToAccountId} disabled={isPending}>
               <SelectTrigger id="cash-out-to">
-                <SelectValue placeholder="Pilih akun beban tujuan" />
+                <SelectValue placeholder="Pilih akun beban atau aset" />
               </SelectTrigger>
               <SelectContent>
                 {destinationAccounts.map(acc => (
@@ -144,7 +147,7 @@ export default function CashOutPage() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button onClick={handleSave} disabled={isPending}>
+          <Button onClick={handleSave} disabled={isPending || amount <= 0 || !toAccountId || !fromAccountId || !description}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Simpan Transaksi
           </Button>
