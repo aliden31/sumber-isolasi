@@ -3,11 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { collection, addDoc, doc, updateDoc, Timestamp, runTransaction, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { NewPurchaseOrder, NewGoodsReceipt, Product, JournalEntry, NewJournal, GoodsReceipt, NewSupplierInvoice, NewPurchasePayment, SupplierInvoice } from "@/lib/types";
+import type { NewPurchaseOrder, NewGoodsReceipt, Product, JournalEntry, NewJournal, GoodsReceipt, NewSupplierInvoice, NewPurchasePayment, SupplierInvoice, NewPurchaseRequest, PurchaseRequest } from "@/lib/types";
 import { addJournalEntry } from "@/app/(app)/accounting/journal/actions";
 import { getAccountingSettings } from "@/app/(app)/settings/accounting/actions";
 
 const createResponse = (error: string | null = null, id: string | null = null) => ({ error, id });
+
+export async function addPurchaseRequest(prData: NewPurchaseRequest) {
+  try {
+    const prCol = collection(db, "purchaseRequests");
+    const prWithTimestamp = { ...prData, date: Timestamp.fromDate(prData.date as Date) };
+    const docRef = await addDoc(prCol, prWithTimestamp);
+    revalidatePath("/(app)/purchasing/request");
+    return createResponse(null, docRef.id);
+  } catch (e) {
+    return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
+  }
+}
+
+export async function updatePurchaseRequestStatus(prId: string, status: PurchaseRequest['status']) {
+    try {
+        const prRef = doc(db, "purchaseRequests", prId);
+        await updateDoc(prRef, { status });
+        revalidatePath("/(app)/purchasing/request");
+        return createResponse();
+    } catch(e) {
+        return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
+    }
+}
 
 export async function addPurchaseOrder(poData: NewPurchaseOrder) {
   try {

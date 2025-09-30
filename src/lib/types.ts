@@ -134,6 +134,25 @@ export type Supplier = {
 
 export type NewSupplier = Omit<Supplier, 'id'>;
 
+
+export type PurchaseRequestItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+};
+
+export type PurchaseRequest = {
+  id: string;
+  date: Date;
+  requestedBy: string;
+  items: PurchaseRequestItem[];
+  notes?: string;
+  status: 'Draft' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Processed';
+};
+
+export type NewPurchaseRequest = Omit<PurchaseRequest, 'id'>;
+
+
 export type PurchaseOrderItem = {
   productId: string;
   productName: string;
@@ -149,6 +168,7 @@ export type PurchaseOrder = {
   items: PurchaseOrderItem[];
   total: number;
   status: 'Draft' | 'Sent' | 'Completed' | 'Cancelled';
+  purchaseRequestId?: string;
 };
 
 export type NewPurchaseOrder = Omit<PurchaseOrder, 'id'>;
