@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -83,51 +84,43 @@ export default function PrintReceiptPage() {
       </div>
 
       {receipt && (
-        <Dialog open={!!receipt} onOpenChange={() => setReceipt(null)}>
-          <DialogContent className="max-w-sm print:shadow-none print:border-none">
-            <div className="printable-area">
-              <DialogHeader className="text-center">
-                <DialogTitle className="font-headline text-2xl mx-auto">Toko Kilat</DialogTitle>
-                <DialogDescription>
-                  {new Date(receipt.date).toLocaleString('id-ID')} <br/>
-                  #{receipt.id}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="my-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Produk</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {receipt.items.map(item => (
-                       <TableRow key={item.productId}>
-                          <TableCell>
-                            {item.productName}
-                            <div className="text-muted-foreground">
-                              {item.quantity} x Rp {item.price.toLocaleString('id-ID')}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            Rp {(item.quantity * item.price).toLocaleString('id-ID')}
-                          </TableCell>
-                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+         <Dialog open={!!receipt} onOpenChange={() => setReceipt(null)}>
+          <DialogContent className="max-w-[80mm] print:max-w-full print:shadow-none print:border-none print:p-0">
+            <div className="printable-area font-mono text-xs p-2">
+              <div className="text-center space-y-1 mb-4">
+                <h2 className="text-base font-bold font-headline">Toko Kilat</h2>
+                <p>{new Date(receipt.date).toLocaleString('id-ID')}</p>
+                <p>#{receipt.id}</p>
               </div>
-              <Separator className="my-2" />
-               <div className="flex justify-between w-full text-md font-bold my-2">
-                <span>Total</span>
-                <span>Rp {receipt.total.toLocaleString('id-ID')}</span>
+
+              <div className="space-y-1 border-t border-dashed pt-2">
+                {receipt.items.map(item => (
+                  <div key={item.productId}>
+                    <p>{item.productName}</p>
+                    <div className="flex justify-between">
+                      <span>{item.quantity} x {item.price.toLocaleString('id-ID')}</span>
+                      <span>{(item.quantity * item.price).toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-               <div className="flex justify-between w-full text-sm">
-                <span>Metode Pembayaran</span>
-                <span>{receipt.paymentMethod}</span>
+              
+              <div className="border-t border-dashed my-2"></div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between font-bold">
+                  <span>Total</span>
+                  <span>Rp {receipt.total.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pembayaran</span>
+                  <span>{receipt.paymentMethod}</span>
+                </div>
               </div>
-              <p className="text-center text-muted-foreground text-sm mt-6">Terima kasih telah berbelanja!</p>
+
+              <div className="border-t border-dashed my-2"></div>
+              
+              <p className="text-center mt-4">Terima kasih telah berbelanja!</p>
             </div>
             <DialogFooter className="print:hidden">
               <Button onClick={printReceipt} className="w-full">
@@ -140,6 +133,10 @@ export default function PrintReceiptPage() {
 
       <style jsx global>{`
         @media print {
+           body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
           body * {
             visibility: hidden;
           }
@@ -151,6 +148,10 @@ export default function PrintReceiptPage() {
             left: 0;
             top: 0;
             width: 100%;
+            margin: 0;
+            padding: 0;
+            border: none;
+            font-size: 10px !important;
           }
         }
       `}</style>
