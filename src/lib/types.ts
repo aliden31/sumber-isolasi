@@ -103,17 +103,25 @@ export type Supplier = {
 
 export type NewSupplier = Omit<Supplier, 'id'>;
 
+export type PurchaseOrderItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  cost: number;
+};
+
 export type PurchaseOrder = {
   id: string;
   supplierId: string;
   supplierName: string;
   date: Date;
-  items: TransactionItem[];
+  items: PurchaseOrderItem[];
   total: number;
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Completed';
+  status: 'Draft' | 'Sent' | 'Completed' | 'Cancelled';
 };
 
 export type NewPurchaseOrder = Omit<PurchaseOrder, 'id'>;
+
 
 export type Account = {
   id: string;

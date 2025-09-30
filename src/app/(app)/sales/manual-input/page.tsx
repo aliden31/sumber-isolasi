@@ -209,6 +209,7 @@ export default function ManualSalesInputPage() {
 
 function ProductPicker({ products, onSelect }: { products: Product[], onSelect: (product: Product) => void }) {
   const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -220,7 +221,7 @@ function ProductPicker({ products, onSelect }: { products: Product[], onSelect: 
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
-          <CommandInput placeholder="Cari produk..." />
+          <CommandInput placeholder="Cari produk..." onValueChange={setValue} />
           <CommandList>
             <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
             <CommandGroup>
@@ -233,6 +234,7 @@ function ProductPicker({ products, onSelect }: { products: Product[], onSelect: 
                     setOpen(false);
                   }}
                 >
+                  <Check className={cn("mr-2 h-4 w-4", value === product.name ? "opacity-100" : "opacity-0")} />
                   {product.name} (Stok: {product.stock})
                 </CommandItem>
               ))}
