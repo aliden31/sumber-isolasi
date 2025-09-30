@@ -5,6 +5,7 @@
 
 
 
+
 export type ProductUnit = {
   name: string; // e.g., 'Pcs', 'Box', 'Lusin'
   price: number;
@@ -57,6 +58,7 @@ export type Transaction = {
   status: 'Lunas' | 'Belum Lunas';
   customerId?: string;
   customerName?: string;
+  channel?: string;
 };
 
 export type NewTransaction = Omit<Transaction, 'id' | 'date'> & {

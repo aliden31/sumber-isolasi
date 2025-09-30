@@ -76,6 +76,7 @@ export async function importMarketplaceTransactions(
         fee: 0,
         netTotal: 0,
         customerName: row.nama_pembeli || `Pelanggan ${row.channel}`,
+        channel: row.channel,
         date: new Date(row.tanggal_order),
       };
     }
@@ -139,7 +140,8 @@ export async function importMarketplaceTransactions(
         netTotal: order.netTotal,
         paymentMethod: 'Transfer',
         customerName: order.customerName,
-        status: 'Lunas'
+        status: 'Lunas',
+        channel: order.channel,
       };
       batch.set(newTxRef, newTransaction);
 
