@@ -35,7 +35,7 @@ export default function CurrenciesPage() {
         <h1 className="text-2xl md:text-3xl font-headline font-bold">
           Manajemen Mata Uang
         </h1>
-        <CurrencyActions />
+        <CurrencyActions hasCurrencies={currencies.length > 0} />
       </div>
       <Card>
         <CardHeader>

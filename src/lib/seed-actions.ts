@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -9,6 +10,7 @@ import { COA_SEED_DATA } from "@/lib/coa-seed";
 import { CUSTOMERS_SEED_DATA } from "@/lib/customers-seed";
 import { PRODUCTS_SEED_DATA } from "@/lib/products-seed";
 import { SUPPLIERS_SEED_DATA } from "@/lib/suppliers-seed";
+import { CURRENCIES_SEED_DATA } from "@/lib/currencies-seed";
 import type { NewAccount } from "./types";
 import type { AccountingSettings } from "@/app/(app)/settings/accounting/actions";
 
@@ -93,4 +95,8 @@ export async function seedInitialProducts() {
 
 export async function seedInitialSuppliers() {
   return seedCollection("suppliers", SUPPLIERS_SEED_DATA, "/(app)/suppliers");
+}
+
+export async function seedInitialCurrencies() {
+  return seedCollection("currencies", CURRENCIES_SEED_DATA, "/(app)/currencies");
 }

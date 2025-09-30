@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Plus, MoreHorizontal, Loader2, Edit, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, Edit, Trash2, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
   DialogTrigger
 } from '@/components/ui/dialog';
@@ -22,15 +23,68 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { addCurrency, updateCurrency, deleteCurrency } from '@/app/(app)/currencies/actions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { seedInitialCurrencies } from '@/lib/seed-actions';
 
-export function CurrencyActions() {
+
+export function CurrencyActions({ hasCurrencies }: { hasCurrencies: boolean }) {
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleSeed = () => {
+    startTransition(async () => {
+      const result = await seedInitialCurrencies();
+      if (result.error) {
+        toast({ title: 'Gagal', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Berhasil', description: 'Contoh data mata uang berhasil ditambahkan.' });
+      }
+    });
+  }
+
   return (
-    <CurrencyFormDialog>
-      <Button>
-        <Plus className="mr-2 h-4 w-4" />
-        Tambah Mata Uang
-      </Button>
-    </CurrencyFormDialog>
+     <div className="flex gap-2">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+             <Button variant="outline" disabled={hasCurrencies || isPending}>
+                <Database className="mr-2 h-4 w-4" /> Seed Mata Uang
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tindakan ini akan menambahkan beberapa contoh data mata uang ke database Anda.
+                Tindakan ini hanya bisa dilakukan jika daftar mata uang Anda masih kosong.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSeed} disabled={isPending}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Lanjutkan
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+       
+        <CurrencyFormDialog>
+            <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Tambah Mata Uang
+            </Button>
+        </CurrencyFormDialog>
+    </div>
   );
 }
 
