@@ -1,3 +1,4 @@
+
 import type { Customer } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CustomerTable } from '@/components/customers/customer-table';
@@ -15,6 +16,7 @@ async function getCustomers(): Promise<Customer[]> {
       name: data.name,
       email: data.email,
       phone: data.phone,
+      address: data.address,
     } as Customer;
   });
   return customerList;
@@ -40,3 +42,4 @@ export default async function CustomersPage() {
     </div>
   );
 }
+

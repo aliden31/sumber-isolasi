@@ -6,6 +6,7 @@
 
 
 
+
 export type ProductUnit = {
   name: string; // e.g., 'Pcs', 'Box', 'Lusin'
   price: number;
@@ -143,6 +144,7 @@ export type Customer = {
   name: string;
   phone: string;
   email: string;
+  address: string;
 };
 
 export type NewCustomer = Omit<Customer, 'id'>;
@@ -383,3 +385,4 @@ export type MappedRow = ParsedRow & {
     id: string;
     mappedProduct: Product | null;
 };
+

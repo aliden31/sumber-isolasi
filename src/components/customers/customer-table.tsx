@@ -80,7 +80,7 @@ export function CustomerTable({ data }: CustomerTableProps) {
             <TableHeader>
             <TableRow>
                 <TableHead className="min-w-[200px]">Nama Pelanggan</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Alamat</TableHead>
                 <TableHead>No. Telepon</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
@@ -95,7 +95,7 @@ export function CustomerTable({ data }: CustomerTableProps) {
                         </Button>
                     </DialogTrigger>
                 </TableCell>
-                <TableCell>{customer.email}</TableCell>
+                <TableCell>{customer.address}</TableCell>
                 <TableCell>{customer.phone}</TableCell>
                 <TableCell className="text-right">
                     <CustomerRowActions customer={customer} />
@@ -145,4 +145,5 @@ export function CustomerTable({ data }: CustomerTableProps) {
     </Dialog>
   );
 }
+
 

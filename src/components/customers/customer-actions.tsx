@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -35,6 +36,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { seedInitialCustomers } from '@/lib/seed-actions';
+import { Textarea } from '../ui/textarea';
 
 
 export function CustomerActions({ hasCustomers }: { hasCustomers: boolean }) {
@@ -169,6 +171,7 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
   const [name, setName] = useState(customer?.name || '');
   const [email, setEmail] = useState(customer?.email || '');
   const [phone, setPhone] = useState(customer?.phone || '');
+  const [address, setAddress] = useState(customer?.address || '');
   
   const isEditing = !!customer;
   const isDropdownItem = React.isValidElement(children) && (children.type as any).displayName === 'DropdownMenuItem';
@@ -177,7 +180,7 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
-      const customerData = { name, email, phone };
+      const customerData = { name, email, phone, address };
       const result = isEditing
         ? await updateCustomer(customer.id, customerData)
         : await addCustomer(customerData);
@@ -204,6 +207,7 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
       setName(customer?.name || '');
       setEmail(customer?.email || '');
       setPhone(customer?.phone || '');
+      setAddress(customer?.address || '');
     }
     setOpen(isOpen);
   }
@@ -233,6 +237,10 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
               <Label htmlFor="phone">No. Telepon</Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required disabled={isPending} />
             </div>
+             <div className="space-y-2">
+              <Label htmlFor="address">Alamat</Label>
+              <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={isPending} />
+            </div>
           <DialogFooter>
              <Button type="submit" disabled={isPending}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -244,3 +252,4 @@ function CustomerFormDialog({ children, customer }: { children: React.ReactNode,
     </Dialog>
   );
 }
+
