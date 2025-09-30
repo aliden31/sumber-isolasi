@@ -10,56 +10,59 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 
-type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop' | 'bigseller';
+type Marketplace = 'tokopedia' | 'shopee' | 'tiktok_shop' | 'bigseller' | 'generic';
 
 type ParsedRow = {
-  orderId: string;
-  totalAmount: number;
-  productName: string;
-  quantity: number;
-  status: string;
-  finishTime?: string;
+  tanggal_order: string;
+  nomor_order: string;
+  channel: string;
+  nama_pembeli: string;
+  sku: string;
+  qty: number;
+  unit_price: number;
+  subtotal: number;
+  shipping: number;
+  fee: number;
+  discount: number;
+  net_total: number;
 };
 
-const COLUMN_MAPPINGS: { [key in Marketplace]: { [key: string]: keyof ParsedRow } } = {
-  tokopedia: {
-    'nomor pesanan': 'orderId',
-    'order id': 'orderId',
-    'nama produk': 'productName',
-    'jumlah produk dibeli': 'quantity',
-    'status terakhir': 'status',
-    'total perkiraan jumlah pelepasan': 'totalAmount',
-    'waktu selesai': 'finishTime',
-  },
-  shopee: {
-    'no. pesanan': 'orderId',
-    'nama produk': 'productName',
-    'jumlah': 'quantity',
-    'status pesanan': 'status',
-    'total jumlah pelepasan': 'totalAmount',
-    'waktu pesanan selesai': 'finishTime',
-  },
-  tiktok_shop: {
-    'id pesanan': 'orderId',
-    'nama produk': 'productName',
-    'kuantitas': 'quantity',
-    'status pesanan': 'status',
-    'subtotal pesanan': 'totalAmount',
-    'waktu pembayaran': 'finishTime',
-  },
-  bigseller: {
-    'nomor pesanan': 'orderId',
-    'nama produk': 'productName',
-    'jumlah': 'quantity',
-    'total perkiraan jumlah pelepasan': 'totalAmount',
-    'waktu selesai': 'finishTime',
-  },
+// Expanded mapping to handle various column names from different marketplaces
+const COLUMN_MAPPINGS: { [key: string]: keyof ParsedRow } = {
+  'waktu pesanan dibuat': 'tanggal_order',
+  'tanggal order': 'tanggal_order',
+  'nomor pesanan': 'nomor_order',
+  'order id': 'nomor_order',
+  'no. pesanan': 'nomor_order',
+  'marketplace': 'channel',
+  'channel': 'channel',
+  'nama pembeli': 'nama_pembeli',
+  'nama produk': 'sku', // Assuming product name can be used as SKU for simplicity
+  'sku induk': 'sku',
+  'informasi sku': 'sku',
+  'jumlah': 'qty',
+  'jumlah produk dibeli': 'qty',
+f  'kuantitas': 'qty',
+  'harga satuan': 'unit_price',
+  'harga jual (rp)': 'unit_price',
+  'subtotal produk': 'subtotal',
+  'total penjualan (rp)': 'subtotal',
+  'ongkos kirim': 'shipping',
+  'biaya pengiriman': 'shipping',
+  'biaya pengelolaan': 'fee', // This will be added to other fees
+  'biaya transaksi': 'fee',   // This will be added to other fees
+  'diskon penjual': 'discount', // This will be added to other discounts
+  'diskon marketplace': 'discount', // This will be added to other discounts
+  'voucher': 'discount',
+  'total pesanan': 'net_total', // This will be used in calculation
+  'total perkiraan jumlah pelepasan': 'net_total',
 };
+
 
 export default function ImportMarketplacePage() {
-  const [marketplace, setMarketplace] = useState<Marketplace | ''>('');
+  const [marketplace, setMarketplace] = useState<Marketplace | ''>('generic');
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [isParsing, startParsing] = useTransition();
@@ -69,19 +72,27 @@ export default function ImportMarketplacePage() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      const allowedTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+      const allowedTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'];
       if (!allowedTypes.includes(selectedFile.type)) {
-        toast({ title: "File tidak valid", description: "Mohon unggah file dengan format .xlsx atau .xls", variant: "destructive" });
+        toast({ title: "File tidak valid", description: "Mohon unggah file dengan format .xlsx, .xls atau .csv", variant: "destructive" });
         return;
       }
       setFile(selectedFile);
       setParsedData([]); // Reset preview on new file
     }
   };
+  
+  const normalizeNumber = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+        return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
+    }
+    return 0;
+  }
 
   const handleParse = () => {
-    if (!file || !marketplace) {
-      toast({ title: "Data tidak lengkap", description: "Pilih marketplace dan file terlebih dahulu.", variant: "destructive" });
+    if (!file) {
+      toast({ title: "File belum dipilih", description: "Pilih file laporan penjualan terlebih dahulu.", variant: "destructive" });
       return;
     }
 
@@ -93,46 +104,75 @@ export default function ImportMarketplacePage() {
                 const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet, { raw: false }) as any[];
+                const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false }) as any[][];
 
-                const mapping = COLUMN_MAPPINGS[marketplace];
-                const lowerCaseMapping: { [key: string]: keyof ParsedRow } = {};
-                for (const key in mapping) {
-                    lowerCaseMapping[key.toLowerCase()] = mapping[key as keyof typeof mapping];
-                }
-
-                const mappedData: ParsedRow[] = json.map(row => {
-                    const normalizedRow: Partial<ParsedRow> = {};
-                    for (const col in row) {
-                        const mappedKey = lowerCaseMapping[col.toLowerCase().trim()];
-                        if (mappedKey) {
-                            (normalizedRow[mappedKey] as any) = row[col];
+                if (json.length < 2) throw new Error("File tidak berisi data yang cukup.");
+                
+                const header = json[0].map(h => String(h).toLowerCase().trim());
+                const dataRows = json.slice(1);
+                
+                const mappedData: ParsedRow[] = dataRows.map(row => {
+                    const rowData: {[key: string]: any} = {};
+                    header.forEach((h, index) => {
+                        rowData[h] = row[index];
+                    });
+                    
+                    const getVal = (keys: string[]) => {
+                        for (const key of keys) {
+                            if(rowData[key] !== undefined) return rowData[key];
                         }
+                        return undefined;
                     }
 
-                    // Data Cleaning and Normalization
-                    const orderId = String(normalizedRow.orderId || '');
-                    const totalAmountStr = String(normalizedRow.totalAmount || '0').replace(/[^0-9.-]+/g, '');
-                    const totalAmount = parseFloat(totalAmountStr) || 0;
+                    // --- Extraction & Normalization ---
+                    const tanggal_order_raw = getVal(['waktu pesanan dibuat', 'tanggal order']);
+                    const nomor_order = String(getVal(['nomor pesanan', 'order id', 'no. pesanan']) || '');
+                    const channel = String(getVal(['marketplace', 'channel']) || 'N/A');
+                    const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
+                    const sku = String(getVal(['nama produk', 'sku induk', 'informasi sku']) || '');
+                    const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
+                    const unit_price = normalizeNumber(getVal(['harga satuan', 'harga jual (rp)']));
+                    const subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)']));
+                    const shipping = normalizeNumber(getVal(['ongkos kirim', 'biaya pengiriman']));
+
+                    // Calculate composite fields
+                    const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
+                    const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
+                    const fee = fee_pengelolaan + fee_transaksi;
                     
-                    let finishTime: string | undefined;
-                    if (normalizedRow.finishTime) {
-                        try {
-                           finishTime = format(new Date(normalizedRow.finishTime), 'yyyy-MM-dd HH:mm:ss');
-                        } catch {
-                           finishTime = normalizedRow.finishTime; // fallback to original string if date is invalid
-                        }
+                    const diskon_penjual = normalizeNumber(getVal(['diskon penjual']));
+                    const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace']));
+                    const voucher = normalizeNumber(getVal(['voucher']));
+                    const discount = diskon_penjual + diskon_marketplace + voucher;
+                    
+                    const total_pesanan = normalizeNumber(getVal(['total pesanan', 'total perkiraan jumlah pelepasan']));
+                    // Net Total Calculation
+                    const net_total = total_pesanan > 0 ? (total_pesanan - fee - discount) : (subtotal + shipping - discount);
+
+                    let tanggal_order_formatted = 'N/A';
+                    if (tanggal_order_raw) {
+                       try {
+                         tanggal_order_formatted = format(new Date(tanggal_order_raw), 'yyyy-MM-dd HH:mm:ss');
+                       } catch {
+                         tanggal_order_formatted = String(tanggal_order_raw); // fallback if parsing fails
+                       }
                     }
 
                     return {
-                      orderId: orderId,
-                      productName: String(normalizedRow.productName || 'N/A'),
-                      quantity: parseInt(String(normalizedRow.quantity || '1'), 10) || 1,
-                      totalAmount: totalAmount,
-                      status: String(normalizedRow.status || 'N/A'),
-                      finishTime: finishTime,
+                        tanggal_order: tanggal_order_formatted,
+                        nomor_order,
+                        channel,
+                        nama_pembeli,
+                        sku,
+                        qty,
+                        unit_price,
+                        subtotal,
+                        shipping,
+                        fee,
+                        discount,
+                        net_total
                     };
-                }).filter(row => row.orderId && row.orderId !== 'null' && row.totalAmount > 0);
+                }).filter(row => row.nomor_order); // Filter out rows without an order number
 
                 setParsedData(mappedData);
                 toast({ title: 'Berhasil', description: `${mappedData.length} baris berhasil di-parse.` });
@@ -153,42 +193,27 @@ export default function ImportMarketplacePage() {
       <Card>
         <CardHeader>
           <CardTitle>Langkah 1: Unggah Laporan Penjualan</CardTitle>
-          <CardDescription>Pilih marketplace dan unggah file laporan penjualan (.xlsx) yang Anda unduh dari seller center.</CardDescription>
+          <CardDescription>Pilih dan unggah file laporan penjualan (.xlsx atau .csv) yang Anda unduh dari seller center.</CardDescription>
         </CardHeader>
-        <CardContent className="grid md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label>Pilih Marketplace</label>
-            <Select value={marketplace} onValueChange={(value) => setMarketplace(value as Marketplace)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih asal marketplace..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tokopedia">Tokopedia</SelectItem>
-                <SelectItem value="bigseller">BigSeller</SelectItem>
-                <SelectItem value="shopee">Shopee</SelectItem>
-                <SelectItem value="tiktok_shop">TikTok Shop</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <label>Unggah File Laporan</label>
-            <div className="flex gap-2">
-                <Button variant="outline" className="w-full justify-start" onClick={() => fileInputRef.current?.click()}>
+        <CardContent>
+            <div className="flex flex-col md:flex-row gap-4 items-center">
+                <Button variant="outline" className="w-full md:w-auto justify-start" onClick={() => fileInputRef.current?.click()}>
                     <File className="mr-2 h-4 w-4" />
-                    {file ? file.name : 'Pilih file .xlsx...'}
+                    {file ? file.name : 'Pilih file...'}
                 </Button>
-                 <Button onClick={handleParse} disabled={isParsing || !file || !marketplace}>
-                    {isParsing ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+                <p className="text-sm text-muted-foreground">Lalu</p>
+                 <Button onClick={handleParse} disabled={isParsing || !file} className="w-full md:w-auto">
+                    {isParsing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                    Proses dan Tampilkan Pratinjau
                 </Button>
             </div>
             <input 
                 type="file" 
                 ref={fileInputRef} 
                 className="hidden" 
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileChange}
             />
-          </div>
         </CardContent>
       </Card>
 
@@ -203,23 +228,31 @@ export default function ImportMarketplacePage() {
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted">
                             <TableRow>
-                                <TableHead>Order ID</TableHead>
-                                <TableHead>Produk</TableHead>
-                                <TableHead>Jumlah</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Waktu Selesai</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
+                                <TableHead>Tanggal</TableHead>
+                                <TableHead>Order</TableHead>
+                                <TableHead>Pembeli</TableHead>
+                                <TableHead>SKU</TableHead>
+                                <TableHead>Qty</TableHead>
+                                <TableHead className="text-right">Harga Satuan</TableHead>
+                                <TableHead className="text-right">Ongkir</TableHead>
+                                <TableHead className="text-right">Diskon</TableHead>
+                                <TableHead className="text-right">Fee</TableHead>
+                                <TableHead className="text-right">Total Bersih</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {parsedData.map((row, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="font-mono text-xs">{row.orderId}</TableCell>
-                                    <TableCell>{row.productName}</TableCell>
-                                    <TableCell>{row.quantity}</TableCell>
-                                    <TableCell>{row.status}</TableCell>
-                                    <TableCell>{row.finishTime || 'N/A'}</TableCell>
-                                    <TableCell className="text-right font-medium">Rp {row.totalAmount.toLocaleString('id-ID')}</TableCell>
+                                <TableRow key={`${row.nomor_order}-${index}`}>
+                                    <TableCell className="text-xs whitespace-nowrap">{row.tanggal_order}</TableCell>
+                                    <TableCell className="font-mono text-xs">{row.nomor_order}</TableCell>
+                                    <TableCell>{row.nama_pembeli}</TableCell>
+                                    <TableCell className="text-xs">{row.sku}</TableCell>
+                                    <TableCell>{row.qty}</TableCell>
+                                    <TableCell className="text-right font-mono">Rp {row.unit_price.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right font-mono">Rp {row.shipping.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right font-mono text-destructive">Rp {row.discount.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right font-mono text-destructive">Rp {row.fee.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right font-bold font-mono">Rp {row.net_total.toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
