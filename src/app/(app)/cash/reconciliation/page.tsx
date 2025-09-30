@@ -36,7 +36,6 @@ import { format, parse } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 
@@ -201,7 +200,7 @@ export default function BankReconciliationPage() {
                 
                 const description = row.Keterangan || row.Deskripsi || row.Description;
                 const amountValue = row.Mutasi || row.Amount || row.Jumlah;
-                const amount = parseFloat(String(amountValue).replace(/[^0-9\.-]+/g, ""));
+                const amount = parseFloat(String(amountValue).replace(/[^0-9\\.-]+/g, ""));
                 
                 if (isNaN(date.getTime()) || !description || isNaN(amount)) {
                     console.warn(`Skipping invalid row ${index + 2}:`, row);
