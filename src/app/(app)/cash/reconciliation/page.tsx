@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useTransition } from 'react';
 import {
   Card,
   CardContent,
@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, Upload, AlertCircle } from 'lucide-react';
+import { Download, Loader2, Upload, AlertCircle, Plus, FilePlus } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { collection, onSnapshot, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -38,6 +38,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { createAdjustmentJournal } from './actions';
 
 
 type LedgerEntry = {
@@ -56,7 +67,7 @@ type BankStatementItem = {
 }
 
 export default function BankReconciliationPage() {
-  const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [journals, setJournals] = useState<Journal[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -71,9 +82,9 @@ export default function BankReconciliationPage() {
 
 
   useEffect(() => {
-    const q = query(collection(db, 'coa'), where('type', '==', 'Kas & Bank'));
+    const q = query(collection(db, 'coa'), orderBy('name'));
     const unsubAccounts = onSnapshot(q, (snapshot) => {
-      setBankAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)).sort((a,b) => a.code.localeCompare(b.code)));
+      setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)).sort((a,b) => a.code.localeCompare(b.code)));
     });
 
     return () => unsubAccounts();
@@ -147,7 +158,7 @@ export default function BankReconciliationPage() {
       if (type === 'bank') setClearedBankIds(updater);
   }
 
-  const { unclearedLedger, unclearedBank, difference } = useMemo(() => {
+  const { unclearedLedgerTotal, unclearedBankTotal, difference, allBankItemsAccountedFor } = useMemo(() => {
       const clearedLedgerTotal = ledgerEntries
         .filter(e => clearedLedgerIds.has(e.id))
         .reduce((sum, e) => sum + e.amount, 0);
@@ -155,14 +166,14 @@ export default function BankReconciliationPage() {
       const clearedBankTotal = bankStatementItems
         .filter(e => clearedBankIds.has(e.id))
         .reduce((sum, e) => sum + e.amount, 0);
-
-      const unclearedLedger = closingBalance - clearedLedgerTotal;
-      const unclearedBank = 0 - clearedBankTotal; // Assuming starting bank balance 0 for now
+      
+      const allBankItemsAccountedFor = bankStatementItems.every(item => clearedBankIds.has(item.id));
 
       return {
-          unclearedLedger,
-          unclearedBank,
-          difference: unclearedLedger - unclearedBank,
+          unclearedLedgerTotal: closingBalance - clearedLedgerTotal,
+          unclearedBankTotal: bankStatementItems.reduce((sum, item) => sum + item.amount, 0) - clearedBankTotal,
+          difference: (closingBalance - clearedLedgerTotal) - (bankStatementItems.reduce((sum, item) => sum + item.amount, 0) - clearedBankTotal),
+          allBankItemsAccountedFor,
       }
   }, [clearedLedgerIds, clearedBankIds, ledgerEntries, closingBalance, bankStatementItems]);
   
@@ -181,7 +192,7 @@ export default function BankReconciliationPage() {
 
             const parsedData = json.map((row: any, index: number) => {
                 const dateValue = row.Tanggal || row.Date;
-                if (!dateValue) {
+                 if (!dateValue) {
                     console.warn(`Skipping row ${index + 2} due to missing date.`);
                     return null;
                 }
@@ -201,8 +212,17 @@ export default function BankReconciliationPage() {
                 }
                 
                 const description = row.Keterangan || row.Deskripsi || row.Description;
-                const amountValue = row.Mutasi || row.Amount || row.Jumlah;
-                const amount = parseFloat(String(amountValue).replace(/[^0-9\\.-]+/g, ""));
+                const amountValue = row.Mutasi || row.Amount || row.Jumlah || row.Credit || row.Debit;
+                
+                let amount = 0;
+                if (amountValue) {
+                   amount = parseFloat(String(amountValue).replace(/[^0-9\\.-]+/g, ""));
+                } else if (row.Debit) {
+                    amount = -parseFloat(String(row.Debit).replace(/[^0-9\\.-]+/g, ""));
+                } else if (row.Credit) {
+                     amount = parseFloat(String(row.Credit).replace(/[^0-9\\.-]+/g, ""));
+                }
+
                 
                 if (isNaN(date.getTime()) || !description || isNaN(amount)) {
                     console.warn(`Skipping invalid row ${index + 2}:`, row);
@@ -217,12 +237,12 @@ export default function BankReconciliationPage() {
                 };
             }).filter(Boolean) as BankStatementItem[];
             
-            setBankStatementItems(parsedData);
+            setBankStatementItems(parsedData.sort((a,b) => b.date.getTime() - a.date.getTime()));
             toast({ title: 'Berhasil', description: `${parsedData.length} transaksi bank berhasil diimpor.` });
 
         } catch (err) {
             console.error(err);
-            toast({ title: 'Gagal Memproses File', description: 'Pastikan file Excel Anda memiliki format yang benar dengan kolom Tanggal, Deskripsi, dan Jumlah/Mutasi.', variant: 'destructive' });
+            toast({ title: 'Gagal Memproses File', description: 'Pastikan file Excel Anda memiliki format yang benar.', variant: 'destructive' });
         }
     };
     reader.onerror = (err) => {
@@ -232,6 +252,8 @@ export default function BankReconciliationPage() {
     reader.readAsArrayBuffer(file);
   };
   
+  const bankAccounts = accounts.filter(a => a.type === 'Kas & Bank');
+
   return (
     <div className="flex flex-col gap-6">
        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -318,11 +340,12 @@ export default function BankReconciliationPage() {
                                     <TableHead>Tanggal</TableHead>
                                     <TableHead>Deskripsi</TableHead>
                                     <TableHead className="text-right">Jumlah</TableHead>
+                                    <TableHead className="w-10 text-right"></TableHead>
                                 </TableRow>
                             </TableHeader>
                              <TableBody>
                                  {bankStatementItems.length === 0 ? (
-                                     <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Unggah laporan koran.</TableCell></TableRow>
+                                     <TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">Unggah laporan koran.</TableCell></TableRow>
                                 ) : bankStatementItems.map(entry => (
                                     <TableRow key={entry.id} data-state={clearedBankIds.has(entry.id) && 'selected'}>
                                         <TableCell><Checkbox checked={clearedBankIds.has(entry.id)} onCheckedChange={() => handleToggleCleared(entry.id, 'bank')} /></TableCell>
@@ -330,6 +353,17 @@ export default function BankReconciliationPage() {
                                         <TableCell className="text-xs">{entry.description}</TableCell>
                                         <TableCell className={`text-right font-mono text-xs ${entry.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                             {entry.amount.toLocaleString('id-ID')}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {!clearedBankIds.has(entry.id) && (
+                                                <AdjustmentJournalDialog
+                                                    triggerButton={<Button size="icon" variant="ghost" className="h-6 w-6"><Plus className="h-4 w-4"/></Button>}
+                                                    bankItem={entry}
+                                                    reconciledAccountId={selectedAccountId}
+                                                    allAccounts={accounts}
+                                                    onJournalCreated={() => setClearedBankIds(prev => new Set(prev.add(entry.id)))}
+                                                />
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -347,12 +381,12 @@ export default function BankReconciliationPage() {
                     <p className="font-bold text-lg">Rp {closingBalance.toLocaleString('id-ID')}</p>
                 </Card>
                  <Card className="p-4">
-                    <p className="text-sm text-muted-foreground">Item Belum Clear</p>
-                     <p className="font-bold text-lg">Rp {(unclearedLedger - unclearedBank).toLocaleString('id-ID')}</p>
+                    <p className="text-sm text-muted-foreground">Selisih Belum Clear</p>
+                     <p className="font-bold text-lg">Rp {difference.toLocaleString('id-ID')}</p>
                 </Card>
                  <Card className="p-4">
                     <p className="text-sm text-muted-foreground">Saldo Disesuaikan</p>
-                    <p className="font-bold text-lg">Rp {(closingBalance - (unclearedLedger - unclearedBank)).toLocaleString('id-ID')}</p>
+                    <p className="font-bold text-lg">Rp {(closingBalance - difference).toLocaleString('id-ID')}</p>
                 </Card>
             </div>
             {difference !== 0 && (
@@ -360,15 +394,93 @@ export default function BankReconciliationPage() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Tidak Seimbang</AlertTitle>
                     <AlertDescription>
-                        Masih ada selisih sebesar Rp {difference.toLocaleString('id-ID')} antara pembukuan dan laporan koran. Mohon periksa kembali.
+                        Masih ada selisih sebesar Rp {difference.toLocaleString('id-ID')} antara pembukuan dan laporan koran. Mohon periksa kembali transaksi yang dicentang atau buat jurnal penyesuaian.
                     </AlertDescription>
                 </Alert>
             )}
-            <Button disabled={difference !== 0}>Selesaikan Rekonsiliasi (Segera Hadir)</Button>
+            <Button disabled={difference !== 0 || !allBankItemsAccountedFor}>Selesaikan Rekonsiliasi</Button>
         </CardFooter>
        </Card>
     </div>
   );
+}
+
+
+interface AdjustmentJournalDialogProps {
+  triggerButton: React.ReactNode;
+  bankItem: BankStatementItem;
+  reconciledAccountId: string | null;
+  allAccounts: Account[];
+  onJournalCreated: () => void;
+}
+
+function AdjustmentJournalDialog({ triggerButton, bankItem, reconciledAccountId, allAccounts, onJournalCreated }: AdjustmentJournalDialogProps) {
+    const [open, setOpen] = useState(false);
+    const [isPending, startTransition] = useTransition();
+    const { toast } = useToast();
+    const [contraAccountId, setContraAccountId] = useState('');
+
+    const handleSubmit = () => {
+        if (!reconciledAccountId || !contraAccountId) {
+            toast({ title: 'Data tidak lengkap', variant: 'destructive'});
+            return;
+        }
+        startTransition(async () => {
+            const result = await createAdjustmentJournal(
+                bankItem.date,
+                bankItem.description,
+                bankItem.amount,
+                reconciledAccountId,
+                contraAccountId
+            );
+            if (result.error) {
+                toast({ title: 'Gagal Membuat Jurnal', description: result.error, variant: 'destructive'});
+            } else {
+                toast({ title: 'Jurnal Penyesuaian Dibuat'});
+                onJournalCreated();
+                setOpen(false);
+            }
+        });
+    }
+
+    const nonCashAccounts = allAccounts.filter(a => a.type !== 'Kas & Bank');
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>{triggerButton}</DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Buat Jurnal Penyesuaian</DialogTitle>
+                    <DialogDescription>Buat entri jurnal untuk transaksi bank yang belum tercatat di pembukuan.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div className="flex justify-between items-center bg-muted p-2 rounded-md">
+                        <span className="text-sm">{bankItem.description}</span>
+                        <span className="text-sm font-mono font-bold">Rp {bankItem.amount.toLocaleString('id-ID')}</span>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Akun Lawan (Kontra)</Label>
+                        <Select value={contraAccountId} onValueChange={setContraAccountId}>
+                            <SelectTrigger><SelectValue placeholder="Pilih akun..."/></SelectTrigger>
+                            <SelectContent>
+                                {nonCashAccounts.map(acc => (
+                                    <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Pilih akun yang sesuai, misal: Beban Admin Bank, Pendapatan Bunga.</p>
+                     </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>Batal</Button>
+                    <Button onClick={handleSubmit} disabled={!contraAccountId || isPending}>
+                        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                        Buat Jurnal
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
 }
 
 declare module '@/components/ui/date-range-picker' {
