@@ -7,6 +7,7 @@ export type Product = {
   cost: number; // Harga pokok produk
   stock: number;
   category: string;
+  minStockThreshold?: number;
 };
 
 export type NewProduct = Omit<Product, 'id'>;
@@ -228,3 +229,28 @@ export type Journal = {
 export type NewJournal = Omit<Journal, 'id' | 'date'> & {
   date: Date | any; // Allow for server timestamp
 };
+
+export type Warehouse = {
+    id: string;
+    name: string;
+    address: string;
+    isDefault: boolean;
+};
+export type NewWarehouse = Omit<Warehouse, 'id'>;
+
+export type Tax = {
+    id: string;
+    name: string;
+    rate: number; // in percent, e.g., 11 for 11%
+    description: string;
+};
+export type NewTax = Omit<Tax, 'id'>;
+
+export type Currency = {
+    id: string;
+    name: string;
+    code: string; // e.g., USD, IDR
+    symbol: string; // e.g., $, Rp
+    exchangeRate: number; // relative to base currency
+};
+export type NewCurrency = Omit<Currency, 'id'>;

@@ -181,6 +181,7 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
   const [price, setPrice] = useState(product?.price || 0);
   const [cost, setCost] = useState(product?.cost || 0);
   const [stock, setStock] = useState(product?.stock || 0);
+  const [minStockThreshold, setMinStockThreshold] = useState(product?.minStockThreshold || 10);
   
   const [categories, setCategories] = useState<ProductCategory[]>([]);
 
@@ -201,7 +202,7 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
         return;
     }
     startTransition(async () => {
-      const productData = { name, category, price, cost, stock };
+      const productData = { name, category, price, cost, stock, minStockThreshold };
       const result = isEditing 
         ? await updateProduct(product.id, productData)
         : await addProduct(productData);
@@ -231,6 +232,7 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
       setPrice(product?.price || 0);
       setCost(product?.cost || 0);
       setStock(product?.stock || 0);
+      setMinStockThreshold(product?.minStockThreshold || 10);
     }
     setOpen(isOpen);
   }
@@ -240,7 +242,7 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
       <DialogTrigger asChild>
         { isDropdownItem ? <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><Edit className="mr-2 h-4 w-4" /> Edit</div> : children }
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-headline">{isEditing ? 'Edit Produk' : 'Tambah Produk Baru'}</DialogTitle>
           <DialogDescription>
@@ -275,9 +277,15 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
               <Input id="cost" type="number" value={cost} onChange={(e) => setCost(Number(e.target.value))} required disabled={isPending}/>
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="stock">Stok Awal</Label>
-            <Input id="stock" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} required disabled={isPending}/>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="stock">Stok Awal</Label>
+              <Input id="stock" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} required disabled={isPending}/>
+            </div>
+             <div className="space-y-2">
+              <Label htmlFor="minStockThreshold">Batas Stok Min.</Label>
+              <Input id="minStockThreshold" type="number" value={minStockThreshold} onChange={(e) => setMinStockThreshold(Number(e.target.value))} required disabled={isPending}/>
+            </div>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isPending}>

@@ -115,7 +115,7 @@ const navItems = [
       { href: "/purchasing/order", label: "Pesanan Pembelian", icon: PackagePlus },
       { href: "/purchasing/goods-receipt", label: "Penerimaan Barang", icon: PackageCheck },
       { href: "/purchasing/invoice", label: "Faktur Pemasok", icon: FileKey2 },
-      { href: "/purchasing/returns", label: "Retur Pembelian", icon: ArrowRightLeft },
+      { href: "/purchasing/returns", label: "Retur Pembelian", icon: ArrowRightLeft, isDev: true },
       { href: "/purchasing/payables", label: "Utang Usaha", icon: Handshake },
     ],
   },
@@ -125,11 +125,11 @@ const navItems = [
     subItems: [
       { href: "/products", label: "Master Produk", icon: Package },
       { href: "/products/categories", label: "Kategori Produk", icon: BookUser },
-      { href: "/stock/warehouses", label: "Multi-Gudang", icon: Warehouse, isDev: true },
+      { href: "/stock/warehouses", label: "Multi-Gudang", icon: Warehouse },
       { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft, isDev: true },
       { href: "/stock/opname", label: "Penyesuaian Stok", icon: ClipboardCheck, isDev: true },
       { href: "/stock-estimation", label: "Estimasi Stok (AI)", icon: BrainCircuit },
-      { href: "/stock/notifications", label: "Notifikasi Stok", icon: Bell, isDev: true },
+      { href: "/stock/notifications", label: "Notifikasi Stok", icon: Bell },
     ],
   },
   {
@@ -169,8 +169,8 @@ const navItems = [
       { href: "/customers", label: "Pelanggan", icon: Users },
       { href: "/suppliers", label: "Pemasok", icon: Factory },
       { href: "/users", label: "Pengguna & Hak Akses", icon: UserCheck, isDev: true },
-      { href: "/taxes", label: "Pajak", icon: Percent, isDev: true },
-      { href: "/currencies", label: "Mata Uang", icon: Coins, isDev: true },
+      { href: "/taxes", label: "Pajak", icon: Percent },
+      { href: "/currencies", label: "Mata Uang", icon: Coins },
     ],
   },
   {
