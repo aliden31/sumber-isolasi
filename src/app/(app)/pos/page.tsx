@@ -110,12 +110,20 @@ export default function POSPage() {
   }, [searchQuery, products]);
 
   const addToCart = (product: Product) => {
+    const baseUnit = product.units.find(u => u.conversionRate === 1) || product.units[0];
+    if (!baseUnit) {
+        toast({ title: 'Produk tidak valid', description: 'Satuan dasar produk tidak ditemukan.', variant: 'destructive' });
+        return;
+    }
+
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.product.id === product.id);
+      const existingItem = prevCart.find(item => item.product.id === product.id && item.unit.name === baseUnit.name);
       if (existingItem) {
         if (existingItem.quantity < product.stock) {
           return prevCart.map(item =>
-            item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+            item.product.id === product.id && item.unit.name === baseUnit.name 
+            ? { ...item, quantity: item.quantity + 1 } 
+            : item
           );
         } else {
           toast({
@@ -127,7 +135,7 @@ export default function POSPage() {
         }
       }
       if (product.stock > 0) {
-        return [...prevCart, { product, quantity: 1 }];
+        return [...prevCart, { product, quantity: 1, unit: baseUnit }];
       } else {
         toast({
           title: 'Stok habis',
@@ -139,12 +147,12 @@ export default function POSPage() {
     });
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (productId: string, unitName: string, quantity: number) => {
     setCart(prevCart => {
       if (quantity <= 0) {
-        return prevCart.filter(item => item.product.id !== productId);
+        return prevCart.filter(item => !(item.product.id === productId && item.unit.name === unitName));
       }
-      const itemToUpdate = prevCart.find(item => item.product.id === productId);
+      const itemToUpdate = prevCart.find(item => item.product.id === productId && item.unit.name === unitName);
       const productInStock = products.find(p => p.id === productId);
       
       if(itemToUpdate && productInStock && quantity > productInStock.stock) {
@@ -154,17 +162,17 @@ export default function POSPage() {
           variant: 'destructive',
         });
         return prevCart.map(item =>
-          item.product.id === productId ? { ...item, quantity: productInStock.stock } : item
+          item.product.id === productId && item.unit.name === unitName ? { ...item, quantity: productInStock.stock } : item
         );
       }
       return prevCart.map(item =>
-        item.product.id === productId ? { ...item, quantity } : item
+        item.product.id === productId && item.unit.name === unitName ? { ...item, quantity } : item
       );
     });
   };
 
   const cartTotal = useMemo(() => {
-    return cart.reduce((total, item) => total + item.product.price * item.quantity, 0);
+    return cart.reduce((total, item) => total + item.unit.price * item.quantity, 0);
   }, [cart]);
 
   const handleParkTransaction = () => {
@@ -209,8 +217,9 @@ export default function POSPage() {
           productId: item.product.id,
           productName: item.product.name,
           quantity: item.quantity,
-          price: item.product.price,
-          cost: item.product.cost,
+          price: item.unit.price,
+          cost: item.unit.cost,
+          unit: item.unit.name
         })),
         total: cartTotal,
         paymentMethod,
@@ -266,17 +275,20 @@ export default function POSPage() {
           </CardHeader>
           <CardContent className="flex-1 h-0 overflow-y-auto">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {products.map(product => (
-                <Card key={product.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => addToCart(product)}>
-                  <CardContent className="p-3 sm:p-4 flex flex-col items-center justify-center text-center">
-                    <p className="font-semibold text-xs sm:text-sm">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">Rp {product.price.toLocaleString('id-ID')}</p>
-                    <Badge className="mt-2" variant={product.stock > 0 ? 'secondary' : 'destructive'}>
-                      Stok: {product.stock}
-                    </Badge>
-                  </CardContent>
-                </Card>
-              ))}
+              {products.map(product => {
+                const baseUnit = product.units.find(u => u.conversionRate === 1) || product.units[0];
+                return (
+                    <Card key={product.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => addToCart(product)}>
+                      <CardContent className="p-3 sm:p-4 flex flex-col items-center justify-center text-center">
+                        <p className="font-semibold text-xs sm:text-sm">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">Rp {baseUnit?.price.toLocaleString('id-ID')}</p>
+                        <Badge className="mt-2" variant={product.stock > 0 ? 'secondary' : 'destructive'}>
+                          Stok: {product.stock}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
@@ -294,27 +306,27 @@ export default function POSPage() {
                 <Table>
                   <TableBody>
                     {cart.map(item => (
-                      <TableRow key={item.product.id}>
+                      <TableRow key={`${item.product.id}-${item.unit.name}`}>
                         <TableCell className="px-2 sm:px-4">
-                          <p className="font-medium text-sm sm:text-base">{item.product.name}</p>
-                          <p className="text-xs sm:text-sm text-muted-foreground">Rp {item.product.price.toLocaleString('id-ID')}</p>
+                          <p className="font-medium text-sm sm:text-base">{item.product.name} ({item.unit.name})</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground">Rp {item.unit.price.toLocaleString('id-ID')}</p>
                         </TableCell>
                         <TableCell className="px-1 sm:px-4">
                           <div className="flex items-center gap-1 sm:gap-2">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.unit.name, item.quantity - 1)}>
                               <MinusCircle className="h-4 w-4" />
                             </Button>
                             <span className="text-sm sm:text-base">{item.quantity}</span>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.unit.name, item.quantity + 1)}>
                               <PlusCircle className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-medium px-2 sm:px-4 text-sm sm:text-base">
-                          Rp {(item.product.price * item.quantity).toLocaleString('id-ID')}
+                          Rp {(item.unit.price * item.quantity).toLocaleString('id-ID')}
                         </TableCell>
                         <TableCell className="px-1 sm:px-4">
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, 0)}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, item.unit.name, 0)}>
                             <X className="h-4 w-4 text-destructive" />
                           </Button>
                         </TableCell>
@@ -498,4 +510,5 @@ function ProductPicker({ products, onSelect }: { products: Product[], onSelect: 
 }
 
 
+    
     
