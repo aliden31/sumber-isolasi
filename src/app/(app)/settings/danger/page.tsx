@@ -1,8 +1,7 @@
-
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -16,82 +15,85 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { deleteTransactionalData, deleteMasterData, deleteCoaData } from './actions';
+import { deleteSingleCollection } from './actions';
 import { Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-const COLLECTIONS = {
-    TRANSACTIONAL: [
-        "transactions", "journals", "salesReturns", "parkedTransactions",
-        "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
-        "purchasePayments", "purchaseReturns", "stockTransfers", "periodClosings",
-        "stockOpnames"
-    ],
-    MASTER: [
-        "products", "customers", "suppliers", "productCategories", 
-        "warehouses", "taxes", "currencies", "marketplaceStores"
-    ],
-    ACCOUNTING: ["coa"],
+const ALL_COLLECTIONS = [
+    { name: "transactions", group: 'Transaksional', description: 'Semua riwayat penjualan.' },
+    { name: "journals", group: 'Transaksional', description: 'Semua entri jurnal akuntansi.' },
+    { name: "salesReturns", group: 'Transaksional', description: 'Semua riwayat retur penjualan.' },
+    { name: "parkedTransactions", group: 'Transaksional', description: 'Semua transaksi kasir yang diparkir.' },
+    { name: "purchaseRequests", group: 'Transaksional', description: 'Semua permintaan pembelian.' },
+    { name: "purchaseOrders", group: 'Transaksional', description: 'Semua pesanan pembelian (PO).' },
+    { name: "goodsReceipts", group: 'Transaksional', description: 'Semua penerimaan barang (GRN).' },
+    { name: "supplierInvoices", group: 'Transaksional', description: 'Semua faktur dari pemasok.' },
+    { name: "purchasePayments", group: 'Transaksional', description: 'Semua pembayaran utang.' },
+    { name: "purchaseReturns", group: 'Transaksional', description: 'Semua riwayat retur pembelian.' },
+    { name: "stockTransfers", group: 'Transaksional', description: 'Semua riwayat transfer stok.' },
+    { name: "periodClosings", group: 'Transaksional', description: 'Semua riwayat tutup buku.' },
+    { name: "stockOpnames", group: 'Transaksional', description: 'Semua riwayat stock opname.' },
+    { name: "products", group: 'Master', description: 'Semua data produk.' },
+    { name: "customers", group: 'Master', description: 'Semua data pelanggan.' },
+    { name: "suppliers", group: 'Master', description: 'Semua data pemasok.' },
+    { name: "productCategories", group: 'Master', description: 'Semua kategori produk.' },
+    { name: "warehouses", group: 'Master', description: 'Semua data gudang.' },
+    { name: "taxes", group: 'Master', description: 'Semua tarif pajak.' },
+    { name: "currencies", group: 'Master', description: 'Semua data mata uang.' },
+    { name: "marketplaceStores", group: 'Master', description: 'Semua pengaturan toko marketplace.' },
+    { name: "coa", group: 'Akuntansi', description: 'Seluruh Bagan Akun (Chart of Accounts).' },
+];
+
+interface DeleteActionProps {
+  collection: { name: string; group: string; description: string };
 }
 
-interface ResetActionProps {
-  title: string;
-  description: string;
-  buttonLabel: string;
-  onConfirm: () => Promise<any>;
-  collectionsToDelete: string[];
-}
-
-function ResetAction({ title, description, buttonLabel, onConfirm, collectionsToDelete }: ResetActionProps) {
+function DeleteAction({ collection }: DeleteActionProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
   const handleConfirm = () => {
     startTransition(async () => {
-      const result = await onConfirm();
+      const result = await deleteSingleCollection(collection.name);
       if (result.error) {
         toast({ title: 'Gagal Menghapus Data', description: result.error, variant: 'destructive' });
       } else {
-        toast({ title: 'Berhasil', description: 'Data yang dipilih telah berhasil dihapus.' });
+        toast({ title: 'Berhasil', description: `Koleksi data "${collection.name}" telah berhasil dihapus.` });
       }
     });
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-start justify-between rounded-lg border p-4">
-      <div className="space-y-0.5">
-        <h3 className="font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="destructive" className="mt-2 sm:mt-0">
-            <Trash2 className="mr-2 h-4 w-4" />
-            {buttonLabel}
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apakah Anda benar-benar yakin?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tindakan ini tidak dapat diurungkan. Ini akan menghapus data berikut secara permanen:
-            </AlertDialogDescription>
-            <div className="flex flex-wrap gap-1 pt-2">
-                {collectionsToDelete.map(col => (
-                    <Badge key={col} variant="outline" className="font-mono">{col}</Badge>
-                ))}
-            </div>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirm} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Ya, Hapus Data
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+    <TableRow>
+        <TableCell><Badge variant="secondary" className="font-mono">{collection.name}</Badge></TableCell>
+        <TableCell>{collection.description}</TableCell>
+        <TableCell>
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Hapus
+                </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Hapus Koleksi Data "{collection.name}"?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Tindakan ini tidak dapat diurungkan. Ini akan menghapus semua dokumen di dalam koleksi <code className="bg-muted px-1 rounded-sm">{collection.name}</code> secara permanen.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirm} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Ya, Hapus Koleksi
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </TableCell>
+    </TableRow>
   );
 }
 
@@ -107,31 +109,24 @@ export default function DangerZonePage() {
             Zona Berbahaya
           </CardTitle>
           <CardDescription>
-            Hapus grup data secara permanen. Tindakan ini tidak dapat diurungkan. Lakukan dengan hati-hati.
+            Hapus koleksi data secara individual dan permanen. Tindakan ini tidak dapat diurungkan. Lakukan dengan sangat hati-hati.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <ResetAction
-            title="Hapus Data Transaksional"
-            description="Menghapus semua transaksi, jurnal, retur, dan piutang. Data master (produk, pelanggan) tidak akan terhapus."
-            buttonLabel="Hapus Data Transaksional"
-            onConfirm={deleteTransactionalData}
-            collectionsToDelete={COLLECTIONS.TRANSACTIONAL}
-          />
-          <ResetAction
-            title="Hapus Data Master"
-            description="Menghapus semua produk, pelanggan, dan supplier. Data transaksi akan tetap ada tetapi mungkin kehilangan referensi."
-            buttonLabel="Hapus Data Master"
-            onConfirm={deleteMasterData}
-            collectionsToDelete={COLLECTIONS.MASTER}
-          />
-          <ResetAction
-            title="Hapus Bagan Akun (COA)"
-            description="Menghapus seluruh struktur bagan akun Anda. Tindakan ini akan merusak penjurnalan otomatis. Anda perlu melakukan seed ulang."
-            buttonLabel="Hapus Bagan Akun"
-            onConfirm={deleteCoaData}
-            collectionsToDelete={COLLECTIONS.ACCOUNTING}
-          />
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Nama Koleksi</TableHead>
+                        <TableHead>Deskripsi</TableHead>
+                        <TableHead>Aksi</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {ALL_COLLECTIONS.map(collection => (
+                        <DeleteAction key={collection.name} collection={collection} />
+                    ))}
+                </TableBody>
+            </Table>
         </CardContent>
       </Card>
     </div>

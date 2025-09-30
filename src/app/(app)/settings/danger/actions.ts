@@ -1,4 +1,3 @@
-
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -6,20 +5,6 @@ import { collection, writeBatch, getDocs, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const createResponse = (error: string | null = null) => ({ error });
-
-const COLLECTIONS = {
-    TRANSACTIONAL: [
-        "transactions", "journals", "salesReturns", "parkedTransactions",
-        "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
-        "purchasePayments", "purchaseReturns", "stockTransfers", "periodClosings",
-        "stockOpnames"
-    ],
-    MASTER: [
-        "products", "customers", "suppliers", "productCategories", 
-        "warehouses", "taxes", "currencies", "marketplaceStores"
-    ],
-    ACCOUNTING: ["coa"],
-}
 
 async function deleteCollection(collectionName: string, batch: FirebaseFirestore.WriteBatch) {
     const colRef = collection(db, collectionName);
@@ -29,10 +14,19 @@ async function deleteCollection(collectionName: string, batch: FirebaseFirestore
     });
 }
 
+// Re-export individual delete functions if they are needed elsewhere,
+// but for this page, we'll use a single handler.
+
 export async function deleteTransactionalData() {
+    const COLLECTIONS = [
+        "transactions", "journals", "salesReturns", "parkedTransactions",
+        "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
+        "purchasePayments", "purchaseReturns", "stockTransfers", "periodClosings",
+        "stockOpnames"
+    ];
     try {
         const batch = writeBatch(db);
-        for (const colName of COLLECTIONS.TRANSACTIONAL) {
+        for (const colName of COLLECTIONS) {
             await deleteCollection(colName, batch);
         }
         await batch.commit();
@@ -43,9 +37,13 @@ export async function deleteTransactionalData() {
     }
 }
 export async function deleteMasterData() {
+    const COLLECTIONS = [
+        "products", "customers", "suppliers", "productCategories", 
+        "warehouses", "taxes", "currencies", "marketplaceStores"
+    ];
     try {
         const batch = writeBatch(db);
-        for (const colName of COLLECTIONS.MASTER) {
+        for (const colName of COLLECTIONS) {
             await deleteCollection(colName, batch);
         }
         await batch.commit();
@@ -57,9 +55,10 @@ export async function deleteMasterData() {
 }
 
 export async function deleteCoaData() {
+    const COLLECTIONS = ["coa"];
     try {
         const batch = writeBatch(db);
-        for (const colName of COLLECTIONS.ACCOUNTING) {
+        for (const colName of COLLECTIONS) {
             await deleteCollection(colName, batch);
         }
         await batch.commit();
@@ -67,6 +66,18 @@ export async function deleteCoaData() {
         return createResponse();
     } catch(e) {
         return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
+    }
+}
+
+export async function deleteSingleCollection(collectionName: string) {
+    try {
+        const batch = writeBatch(db);
+        await deleteCollection(collectionName, batch);
+        await batch.commit();
+        revalidateAllPaths();
+        return createResponse();
+    } catch(e) {
+        return createResponse(e instanceof Error ? e.message : `Gagal menghapus koleksi ${collectionName}.`);
     }
 }
 
