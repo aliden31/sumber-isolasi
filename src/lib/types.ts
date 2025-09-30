@@ -147,7 +147,7 @@ export type PurchaseRequest = {
   requestedBy: string;
   items: PurchaseRequestItem[];
   notes?: string;
-  status: 'Draft' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Processed';
+  status: 'Pending Approval' | 'Approved' | 'Rejected' | 'Processed';
 };
 
 export type NewPurchaseRequest = Omit<PurchaseRequest, 'id' | 'date'> & {

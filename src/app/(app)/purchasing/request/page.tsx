@@ -394,7 +394,6 @@ function ProductPicker({ products, onSelect }: { products: Product[], onSelect: 
 
 function PRStatusBadge({ status }: { status: PurchaseRequest['status'] }) {
     const variants = {
-        Draft: 'default',
         'Pending Approval': 'secondary',
         'Approved': 'outline',
         'Rejected': 'destructive',
