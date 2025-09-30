@@ -15,12 +15,6 @@ export function AppHeader({ companyName }: { companyName: string }) {
     >
       <SidebarTrigger className="-ml-2" />
 
-      <div className="flex items-center gap-2">
-        <TokoKilatLogo />
-        <span className="text-lg font-headline font-semibold text-primary">
-          {companyName}
-        </span>
-      </div>
     </header>
   );
 }
