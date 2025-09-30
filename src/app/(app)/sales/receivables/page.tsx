@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
@@ -159,7 +160,7 @@ function SettlePaymentDialog({ transaction }: { transaction: Transaction }) {
                         Konfirmasi pelunasan untuk invoice #{transaction.id} sebesar Rp {transaction.total.toLocaleString('id-ID')}.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-2">
+                <div className="space-y-2 py-4">
                     <Label htmlFor="payment-account">Akun Penerimaan Pembayaran</Label>
                     <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
                         <SelectTrigger id="payment-account">
@@ -182,3 +183,5 @@ function SettlePaymentDialog({ transaction }: { transaction: Transaction }) {
         </Dialog>
     );
 }
+
+    

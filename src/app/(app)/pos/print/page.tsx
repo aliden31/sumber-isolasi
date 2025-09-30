@@ -86,6 +86,10 @@ export default function PrintReceiptPage() {
       {receipt && (
          <Dialog open={!!receipt} onOpenChange={() => setReceipt(null)}>
           <DialogContent className="max-w-[80mm] print:max-w-full print:shadow-none print:border-none print:p-0">
+             <DialogHeader>
+                <DialogTitle className="sr-only">Struk Transaksi</DialogTitle>
+                <DialogDescription className="sr-only">Cetak ulang struk untuk transaksi #{receipt.id}</DialogDescription>
+            </DialogHeader>
             <div className="printable-area font-mono text-xs p-2">
               <div className="text-center space-y-1 mb-4">
                 <h2 className="text-base font-bold font-headline">Toko Kilat</h2>
@@ -158,3 +162,5 @@ export default function PrintReceiptPage() {
     </>
   );
 }
+
+    
