@@ -51,7 +51,8 @@ const COLUMN_MAPPINGS: { [key in Marketplace]: { [key: string]: keyof ParsedRow 
   },
   bigseller: {
     'nomor pesanan': 'orderId',
-    'nama panggilan toko bigseller': 'productName', // Placeholder, needs better column from BigSeller
+    'nama produk': 'productName',
+    'jumlah': 'quantity',
     'total perkiraan jumlah pelepasan': 'totalAmount',
     'waktu selesai': 'finishTime',
   },
@@ -126,7 +127,7 @@ export default function ImportMarketplacePage() {
                     return {
                       orderId: orderId,
                       productName: String(normalizedRow.productName || 'N/A'),
-                      quantity: parseInt(String(normalizedRow.quantity), 10) || 1,
+                      quantity: parseInt(String(normalizedRow.quantity || '1'), 10) || 1,
                       totalAmount: totalAmount,
                       status: String(normalizedRow.status || 'N/A'),
                       finishTime: finishTime,
@@ -203,6 +204,8 @@ export default function ImportMarketplacePage() {
                         <TableHeader className="sticky top-0 bg-muted">
                             <TableRow>
                                 <TableHead>Order ID</TableHead>
+                                <TableHead>Produk</TableHead>
+                                <TableHead>Jumlah</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Waktu Selesai</TableHead>
                                 <TableHead className="text-right">Total</TableHead>
@@ -212,6 +215,8 @@ export default function ImportMarketplacePage() {
                             {parsedData.map((row, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="font-mono text-xs">{row.orderId}</TableCell>
+                                    <TableCell>{row.productName}</TableCell>
+                                    <TableCell>{row.quantity}</TableCell>
                                     <TableCell>{row.status}</TableCell>
                                     <TableCell>{row.finishTime || 'N/A'}</TableCell>
                                     <TableCell className="text-right font-medium">Rp {row.totalAmount.toLocaleString('id-ID')}</TableCell>
