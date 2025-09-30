@@ -57,6 +57,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Laporan Stok**: Rincian stok dan valuasi persediaan.
 - **Laporan Laba Rugi**: Laporan keuangan untuk mengukur profitabilitas.
 - **Laporan Neraca**: Laporan posisi keuangan (Aset, Kewajiban, Ekuitas).
+- **Laporan Arus Kas**: Laporan keuangan untuk melacak pergerakan kas.
 
 ### Modul: Master Data & Pengaturan
 - **Pelanggan**: Manajemen data pelanggan (CRUD).
@@ -74,6 +75,7 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 Fitur-fitur berikut masih berupa halaman *placeholder* atau dalam tahap pengembangan aktif.
 
 - **Impor Penjualan dari Marketplace**: Antarmuka untuk mengunggah laporan dari Tokopedia, Shopee, dll. Logika pemrosesan file belum ada.
-- **Laporan Arus Kas**: Laporan keuangan untuk melacak pergerakan kas. Halaman *placeholder* sudah ada.
 - **Rekonsiliasi Bank**: Antarmuka untuk mencocokkan transaksi bank sudah ada, namun fungsionalitas inti (unggah laporan koran, pencocokan otomatis) belum ada.
 - **Pengguna & Hak Akses**: Antarmuka untuk menampilkan pengguna sudah ada dengan data statis. Manajemen peran dan integrasi dengan Firebase Auth belum diimplementasikan.
+
+    
