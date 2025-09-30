@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useTransition, useEffect } from 'react';
-import { Plus, MoreHorizontal, Loader2, Edit, Trash2, Database } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, Edit, Trash2, Database, PlusCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductCategory } from '@/lib/types';
+import type { Product, ProductCategory, ProductUnit } from '@/lib/types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/select';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 
 export function ProductActions({ hasProducts }: { hasProducts: boolean }) {
@@ -178,10 +179,9 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
 
   const [name, setName] = useState(product?.name || '');
   const [category, setCategory] = useState(product?.category || '');
-  const [price, setPrice] = useState(product?.price || 0);
-  const [cost, setCost] = useState(product?.cost || 0);
   const [stock, setStock] = useState(product?.stock || 0);
   const [minStockThreshold, setMinStockThreshold] = useState(product?.minStockThreshold || 10);
+  const [units, setUnits] = useState<ProductUnit[]>(product?.units || [{ name: '', price: 0, cost: 0, conversionRate: 1 }]);
   
   const [categories, setCategories] = useState<ProductCategory[]>([]);
 
@@ -194,6 +194,24 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
 
   const isEditing = !!product;
   const isDropdownItem = React.isValidElement(children) && (children.type as any).displayName === 'DropdownMenuItem';
+  
+  const handleUnitChange = (index: number, field: keyof ProductUnit, value: string | number) => {
+    const newUnits = [...units];
+    const unit = newUnits[index];
+    (unit[field] as any) = value;
+    if (index === 0) unit.conversionRate = 1; // Base unit always has conversion rate of 1
+    setUnits(newUnits);
+  };
+
+  const addUnit = () => {
+    setUnits([...units, { name: '', price: 0, cost: 0, conversionRate: 0 }]);
+  };
+
+  const removeUnit = (index: number) => {
+    if (units.length > 1) {
+      setUnits(units.filter((_, i) => i !== index));
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,8 +219,20 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
         toast({ title: "Kategori harus dipilih", variant: "destructive" });
         return;
     }
+    if (units.some(u => !u.name || u.conversionRate <= 0 || u.price <= 0)) {
+        toast({ title: "Data satuan tidak valid", description: "Nama satuan, harga, dan rasio konversi harus diisi dengan benar.", variant: "destructive" });
+        return;
+    }
+
     startTransition(async () => {
-      const productData = { name, category, price, cost, stock, minStockThreshold };
+      const productData = { 
+        name, 
+        category, 
+        stock, 
+        minStockThreshold, 
+        units, 
+        baseUnit: units[0].name 
+      };
       const result = isEditing 
         ? await updateProduct(product.id, productData)
         : await addProduct(productData);
@@ -229,10 +259,9 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
       // Reset form on close
       setName(product?.name || '');
       setCategory(product?.category || '');
-      setPrice(product?.price || 0);
-      setCost(product?.cost || 0);
       setStock(product?.stock || 0);
       setMinStockThreshold(product?.minStockThreshold || 10);
+      setUnits(product?.units || [{ name: '', price: 0, cost: 0, conversionRate: 1 }]);
     }
     setOpen(isOpen);
   }
@@ -242,44 +271,68 @@ function ProductFormDialog({ children, product }: { children: React.ReactNode, p
       <DialogTrigger asChild>
         { isDropdownItem ? <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><Edit className="mr-2 h-4 w-4" /> Edit</div> : children }
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="font-headline">{isEditing ? 'Edit Produk' : 'Tambah Produk Baru'}</DialogTitle>
-          <DialogDescription>
-            {isEditing ? 'Perbarui detail produk di bawah ini.' : 'Isi detail untuk produk baru.'}
-          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nama Produk</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isPending}/>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="category">Kategori</Label>
-             <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger id="category" disabled={isPending}>
-                    <SelectValue placeholder="Pilih kategori" />
-                </SelectTrigger>
-                <SelectContent>
-                    {categories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="price">Harga Jual</Label>
-              <Input id="price" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} required disabled={isPending}/>
+              <Label htmlFor="name">Nama Produk</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isPending}/>
             </div>
-             <div className="space-y-2">
-              <Label htmlFor="cost">Harga Pokok</Label>
-              <Input id="cost" type="number" value={cost} onChange={(e) => setCost(Number(e.target.value))} required disabled={isPending}/>
+            <div className="space-y-2">
+              <Label htmlFor="category">Kategori</Label>
+              <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger id="category" disabled={isPending}>
+                      <SelectValue placeholder="Pilih kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
             </div>
           </div>
+          
+          <div className="space-y-2">
+            <Label>Satuan Produk</Label>
+            <p className="text-xs text-muted-foreground">Satuan pertama akan menjadi satuan dasar (stok dihitung berdasarkan satuan ini).</p>
+            <div className="border rounded-lg p-2">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nama Satuan</TableHead>
+                            <TableHead>Harga Jual</TableHead>
+                            <TableHead>Harga Pokok</TableHead>
+                            <TableHead>Konversi</TableHead>
+                            <TableHead></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {units.map((unit, index) => (
+                            <TableRow key={index}>
+                                <TableCell><Input placeholder={index === 0 ? "Pcs" : "Box"} value={unit.name} onChange={e => handleUnitChange(index, 'name', e.target.value)} required/></TableCell>
+                                <TableCell><Input type="number" placeholder="10000" value={unit.price || ''} onChange={e => handleUnitChange(index, 'price', Number(e.target.value))} required/></TableCell>
+                                <TableCell><Input type="number" placeholder="8000" value={unit.cost || ''} onChange={e => handleUnitChange(index, 'cost', Number(e.target.value))} required/></TableCell>
+                                <TableCell><Input type="number" placeholder={index === 0 ? "1" : "12"} value={unit.conversionRate || ''} onChange={e => handleUnitChange(index, 'conversionRate', Number(e.target.value))} required disabled={index === 0} /></TableCell>
+                                <TableCell>
+                                    {index > 0 && <Button type="button" variant="ghost" size="icon" onClick={() => removeUnit(index)}><XCircle className="w-4 h-4 text-destructive" /></Button>}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+             <Button type="button" variant="outline" size="sm" onClick={addUnit} className="mt-2">
+                <PlusCircle className="mr-2 h-4 w-4" /> Tambah Satuan
+             </Button>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="stock">Stok Awal</Label>
+              <Label htmlFor="stock">Stok Awal (dalam satuan dasar)</Label>
               <Input id="stock" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} required disabled={isPending}/>
             </div>
              <div className="space-y-2">

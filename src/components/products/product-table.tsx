@@ -23,31 +23,34 @@ export function ProductTable({ data }: ProductTableProps) {
           <TableRow>
             <TableHead className="min-w-[200px]">Nama Produk</TableHead>
             <TableHead>Kategori</TableHead>
-            <TableHead>Harga Jual</TableHead>
-            <TableHead>Harga Pokok</TableHead>
-            <TableHead className="text-center">Stok</TableHead>
+            <TableHead>Harga Jual (Satuan Dasar)</TableHead>
+            <TableHead className="text-center">Stok (Satuan Dasar)</TableHead>
             <TableHead className="text-right">Aksi</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((product) => (
-            <TableRow key={product.id}>
-              <TableCell className="font-medium">{product.name}</TableCell>
-              <TableCell>
-                <Badge variant="outline">{product.category}</Badge>
-              </TableCell>
-              <TableCell>Rp {product.price.toLocaleString('id-ID')}</TableCell>
-              <TableCell>Rp {(product.cost || 0).toLocaleString('id-ID')}</TableCell>
-              <TableCell className="text-center">
-                <Badge variant={product.stock < 10 ? 'destructive' : 'secondary'}>
-                  {product.stock}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                <ProductRowActions product={product} />
-              </TableCell>
-            </TableRow>
-          ))}
+          {data.map((product) => {
+            const baseUnit = product.units?.find(u => u.conversionRate === 1) || product.units?.[0];
+            return (
+              <TableRow key={product.id}>
+                <TableCell className="font-medium">{product.name}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">{product.category}</Badge>
+                </TableCell>
+                <TableCell>
+                  {baseUnit ? `Rp ${baseUnit.price.toLocaleString('id-ID')}` : '-'}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Badge variant={product.stock < (product.minStockThreshold || 10) ? 'destructive' : 'secondary'}>
+                    {product.stock} {product.baseUnit}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <ProductRowActions product={product} />
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

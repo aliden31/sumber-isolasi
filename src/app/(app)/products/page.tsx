@@ -1,3 +1,4 @@
+
 import { db } from '@/lib/firebase';
 import type { Product } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,10 +15,10 @@ async function getProducts(): Promise<Product[]> {
     return {
       id: doc.id,
       name: data.name,
-      price: data.price,
-      cost: data.cost,
       stock: data.stock,
       category: data.category,
+      units: data.units || [],
+      baseUnit: data.baseUnit,
     } as Product;
   });
   return productList;

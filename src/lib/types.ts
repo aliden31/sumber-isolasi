@@ -1,16 +1,24 @@
 
 
+export type ProductUnit = {
+  name: string; // e.g., 'Pcs', 'Box', 'Lusin'
+  price: number;
+  cost: number;
+  conversionRate: number; // How many base units are in this unit. Base unit has 1.
+};
+
 export type Product = {
   id: string;
   name: string;
-  price: number;
-  cost: number; // Harga pokok produk
-  stock: number;
   category: string;
+  stock: number; // Total stock in base unit
+  units: ProductUnit[];
+  baseUnit: string; // Name of the base unit, e.g., 'Pcs'
   minStockThreshold?: number;
 };
 
 export type NewProduct = Omit<Product, 'id'>;
+
 
 export type ProductCategory = {
   id: string;
@@ -27,6 +35,7 @@ export type TransactionItem = {
   quantity: number;
   price: number;
   cost: number; // denormalized for COGS calculation
+  unit: string; // The unit of sale, e.g., 'Pcs' or 'Box'
 };
 
 export type Transaction = {
@@ -47,6 +56,7 @@ export type NewTransaction = Omit<Transaction, 'id' | 'date' | 'status'> & {
 export type CartItem = {
   product: Product;
   quantity: number;
+  unit: ProductUnit; // The selected unit for this cart item
 };
 
 export type ParkedTransaction = {
@@ -65,6 +75,7 @@ export type SalesReturnItem = {
   quantity: number;
   price: number;
   cost: number;
+  unit: string;
 }
 
 export type SalesReturn = {
@@ -139,6 +150,7 @@ export type PurchaseRequestItem = {
   productId: string;
   productName: string;
   quantity: number;
+  unit: string;
 };
 
 export type PurchaseRequest = {
@@ -160,6 +172,7 @@ export type PurchaseOrderItem = {
   productName: string;
   quantity: number;
   cost: number;
+  unit: string;
 };
 
 export type PurchaseOrder = {
@@ -183,6 +196,7 @@ export type GoodsReceiptItem = {
     quantity: number; // Jumlah yang dipesan
     receivedQuantity: number;
     cost: number;
+    unit: string;
 };
 
 export type GoodsReceipt = {
@@ -234,6 +248,7 @@ export type PurchaseReturnItem = {
   productName: string;
   returnQuantity: number;
   cost: number;
+  unit: string;
 };
 
 export type PurchaseReturn = {
@@ -294,6 +309,7 @@ export type StockTransferItem = {
   productId: string;
   productName: string;
   quantity: number;
+  unit: string;
 }
 export type StockTransfer = {
     id: string;
