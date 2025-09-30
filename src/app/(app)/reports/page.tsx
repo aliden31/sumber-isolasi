@@ -50,7 +50,7 @@ export default function SalesReportPage() {
     const transUnsub = onSnapshot(q, (snapshot) => {
         setTransactions(snapshot.docs.map(doc => {
             const data = doc.data();
-            return { id: doc.id, ...data, date: doc.data().toDate() } as Transaction;
+            return { id: doc.id, ...data, date: data.date.toDate() } as Transaction;
         }));
         setLoading(false);
     }, (error) => {
