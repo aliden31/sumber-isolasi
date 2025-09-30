@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Loader2, Upload, AlertCircle, Plus, FilePlus, Minus, Banknote } from 'lucide-react';
+import { Loader2, Upload, AlertCircle, Plus, FilePlus, Minus, Banknote, CheckCircle } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { collection, onSnapshot, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -48,6 +48,7 @@ import { Label } from '@/components/ui/label';
 import { createAdjustmentJournal } from './actions';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 type AdjustmentItem = {
