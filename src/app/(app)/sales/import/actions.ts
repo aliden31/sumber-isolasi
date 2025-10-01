@@ -20,9 +20,9 @@ import type {
   Product,
   JournalEntry,
   NewJournal,
+  ImportRow,
   NewCustomer,
   ProductUnit,
-  ImportRow,
 } from '@/lib/types';
 import { addJournalEntry } from '@/app/(app)/accounting/journal/actions';
 import { getAccountingSettings } from '@/app/(app)/settings/accounting/actions';
