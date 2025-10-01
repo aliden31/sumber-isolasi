@@ -57,7 +57,7 @@ function TransactionsPageContent() {
   const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
   const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchId, setSearchId] = useState(initialSearchId);
+  const [searchQuery, setSearchQuery] = useState(initialSearchId);
   const [sortOption, setSortOption] = useState<SortOption>('date_desc');
 
 
@@ -144,11 +144,15 @@ function TransactionsPageContent() {
   const [hasNextPage, setHasNextPage] = useState(false);
 
   const filteredTransactions = useMemo(() => {
-    if (!searchId) {
+    if (!searchQuery) {
       return allTransactions;
     }
-    return allTransactions.filter(tx => tx.id.toLowerCase().includes(searchId.toLowerCase()));
-  }, [allTransactions, searchId]);
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return allTransactions.filter(tx => 
+      tx.id.toLowerCase().includes(lowercasedQuery) ||
+      tx.items.some(item => item.productName.toLowerCase().includes(lowercasedQuery))
+    );
+  }, [allTransactions, searchQuery]);
   
   const handleNextPage = () => {
       setCurrentPage(prev => prev + 1);
@@ -199,10 +203,10 @@ function TransactionsPageContent() {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                     type="search"
-                    placeholder="Cari ID transaksi..."
+                    placeholder="Cari ID atau nama produk..."
                     className="pl-8 sm:w-[200px] md:w-[250px]"
-                    value={searchId}
-                    onChange={(e) => setSearchId(e.target.value)}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                 />
             </div>
              <Select value={sortOption} onValueChange={handleSortChange}>
@@ -244,7 +248,7 @@ function TransactionsPageContent() {
                 <div className="text-center py-10 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin mr-2"/>Memuat data transaksi...</div>
             ) : filteredTransactions.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
-                    {searchId ? `Tidak ada transaksi dengan ID yang cocok dengan "${searchId}".` : "Tidak ada transaksi pada periode ini."}
+                    {searchQuery ? `Tidak ada transaksi yang cocok dengan "${searchQuery}".` : "Tidak ada transaksi pada periode ini."}
                 </div>
             ) : (
                 filteredTransactions.map(tx => (
@@ -348,3 +352,4 @@ declare module '@/components/ui/date-range-picker' {
         className?: string;
     }
 }
+
