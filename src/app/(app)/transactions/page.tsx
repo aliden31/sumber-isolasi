@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Calendar as CalendarIcon, Wallet, User, CheckCircle2, ArrowLeft, ArrowRight, Search } from 'lucide-react';
+import { Calendar as CalendarIcon, Wallet, User, CheckCircle2, ArrowLeft, ArrowRight, Search, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
@@ -41,8 +41,11 @@ import { collection, onSnapshot, query, where, Timestamp, orderBy, limit, startA
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const TRANSACTIONS_PER_PAGE = 300;
+type SortOption = "date_desc" | "total_desc" | "total_asc";
+
 
 function TransactionsPageContent() {
   const searchParams = useSearchParams();
@@ -54,20 +57,39 @@ function TransactionsPageContent() {
   const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
   const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(false);
   const [searchId, setSearchId] = useState(initialSearchId);
+  const [sortOption, setSortOption] = useState<SortOption>('date_desc');
+
 
   useEffect(() => {
-    fetchTransactions();
-  }, [date, currentPage]);
+    fetchTransactions('initial');
+  }, [date, sortOption]);
 
   const fetchTransactions = async (direction: 'next' | 'prev' | 'initial' = 'initial') => {
     setLoading(true);
     const transactionsCol = collection(db, "transactions");
     
-    let baseQuery: Query<DocumentData> = query(transactionsCol, orderBy("date", "desc"));
+    let baseQuery: Query<DocumentData>;
 
-    if (date?.from) {
+    const [sortField, sortDirection] = sortOption.split('_');
+
+    if (sortField === 'date') {
+      baseQuery = query(transactionsCol, orderBy("date", sortDirection as "desc" | "asc"));
+    } else {
+      // For price sort, we must have a date filter for composite index
+      // Default to last 30 days if no date is selected
+      const fromDate = date?.from || new Date(new Date().setDate(new Date().getDate() - 30));
+      const toDate = date?.to || new Date();
+      toDate.setHours(23, 59, 59, 999);
+      
+      baseQuery = query(transactionsCol, 
+        where("date", ">=", fromDate),
+        where("date", "<=", toDate),
+        orderBy("total", sortDirection as "desc" | "asc")
+      );
+    }
+    
+    if (date?.from && sortField === 'date') { // Only apply date filter if sorting by date
         const from = Timestamp.fromDate(date.from);
         let to;
         if (date.to) {
@@ -82,6 +104,7 @@ function TransactionsPageContent() {
         baseQuery = query(baseQuery, where("date", ">=", from), where("date", "<=", to));
     }
 
+
     let q: Query<DocumentData>;
     if (direction === 'next' && lastVisible) {
         q = query(baseQuery, startAfter(lastVisible), limit(TRANSACTIONS_PER_PAGE));
@@ -91,18 +114,7 @@ function TransactionsPageContent() {
         q = query(baseQuery, limit(TRANSACTIONS_PER_PAGE));
     }
     
-    // For checking if there's a next page
-    let nextPageQuery: Query<DocumentData>;
-    if (direction === 'next' && lastVisible) {
-      nextPageQuery = query(baseQuery, startAfter(lastVisible), limit(TRANSACTIONS_PER_PAGE + 1));
-    } else if (direction === 'prev' && firstVisible) {
-        // Can't easily check for next page when going back, so we assume it exists if we are not on page 1.
-        nextPageQuery = query(baseQuery, startAfter(firstVisible), limit(1));
-    } else {
-      nextPageQuery = query(baseQuery, limit(TRANSACTIONS_PER_PAGE + 1));
-    }
-
-    const [snapshot, nextSnapshot] = await Promise.all([getDocs(q), getDocs(nextPageQuery)]);
+    const snapshot = await getDocs(q);
 
     const transactionList = snapshot.docs.map(doc => {
       const data = doc.data();
@@ -116,17 +128,20 @@ function TransactionsPageContent() {
     setAllTransactions(transactionList);
     setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
     setFirstVisible(snapshot.docs[0]);
-    setHasNextPage(nextSnapshot.docs.length > TRANSACTIONS_PER_PAGE && direction !== 'prev');
-    if (direction === 'initial' && nextSnapshot.docs.length <= TRANSACTIONS_PER_PAGE) {
+    
+    // Check for next page
+    if (snapshot.docs.length < TRANSACTIONS_PER_PAGE) {
         setHasNextPage(false);
+    } else {
+        const nextQuery = query(baseQuery, startAfter(snapshot.docs[snapshot.docs.length - 1]), limit(1));
+        const nextSnapshot = await getDocs(nextQuery);
+        setHasNextPage(!nextSnapshot.empty);
     }
-    if (direction === 'next' && nextSnapshot.docs.length <= transactionList.length) {
-        setHasNextPage(false);
-    }
-
-
+    
     setLoading(false);
   };
+  
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   const filteredTransactions = useMemo(() => {
     if (!searchId) {
@@ -136,14 +151,14 @@ function TransactionsPageContent() {
   }, [allTransactions, searchId]);
   
   const handleNextPage = () => {
-    if (lastVisible) {
       setCurrentPage(prev => prev + 1);
-    }
+      fetchTransactions('next');
   };
 
   const handlePrevPage = () => {
     if (currentPage > 1) {
       setCurrentPage(prev => prev - 1);
+      fetchTransactions('prev');
     }
   };
 
@@ -167,12 +182,19 @@ function TransactionsPageContent() {
         </Badge>
       )
   }
+  
+  const handleSortChange = (value: SortOption) => {
+    setSortOption(value);
+    setCurrentPage(1);
+    setLastVisible(null);
+    setFirstVisible(null);
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Riwayat Transaksi</h1>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap">
             <div className="relative flex-1 sm:flex-initial">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -183,6 +205,16 @@ function TransactionsPageContent() {
                     onChange={(e) => setSearchId(e.target.value)}
                 />
             </div>
+             <Select value={sortOption} onValueChange={handleSortChange}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Urutkan berdasarkan..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="date_desc">Tanggal (Terbaru)</SelectItem>
+                    <SelectItem value="total_desc">Harga (Tertinggi)</SelectItem>
+                    <SelectItem value="total_asc">Harga (Terendah)</SelectItem>
+                </SelectContent>
+            </Select>
             <DateRangePicker 
                 className="w-full sm:w-[300px]" 
                 onSelect={(newDate) => {
@@ -221,7 +253,7 @@ function TransactionsPageContent() {
                     <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
                         <div className="mb-2 sm:mb-0">
                             <p className="font-semibold text-sm sm:text-base font-mono">{tx.id}</p>
-                            <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyy 'pukul' HH:mm", { locale: id })}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyyy 'pukul' HH:mm", { locale: id })}</p>
                             {tx.customerName && (
                                 <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1"><User size={12}/>{tx.customerName}</p>
                             )}
@@ -234,49 +266,49 @@ function TransactionsPageContent() {
                     </AccordionTrigger>
                     <AccordionContent>
                     <div className="overflow-x-auto">
-                        <Table>
-                        <TableHeader>
-                            <TableRow>
-                            <TableHead>Produk</TableHead>
-                            <TableHead>Jumlah</TableHead>
-                            <TableHead>Harga</TableHead>
-                            <TableHead className="text-right">Subtotal</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {tx.items.map((item, index) => (
-                            <TableRow key={`${item.productId}-${index}`}>
-                                <TableCell>{item.productName || item.productId}</TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                <TableCell>Rp {item.price.toLocaleString('id-ID')}</TableCell>
-                                <TableCell className="text-right">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                        {(tx.discount || tx.fee) && (
-                            <TableFooter>
+                         <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
-                                    <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
+                                <TableHead>Produk</TableHead>
+                                <TableHead>Jumlah</TableHead>
+                                <TableHead>Harga</TableHead>
+                                <TableHead className="text-right">Subtotal</TableHead>
                                 </TableRow>
-                                {tx.discount ? (
-                                <TableRow>
-                                    <TableCell colSpan={3} className="text-right">Diskon</TableCell>
-                                    <TableCell className="text-right text-destructive">- Rp {tx.discount.toLocaleString('id-ID')}</TableCell>
+                            </TableHeader>
+                            <TableBody>
+                                {tx.items.map((item, index) => (
+                                <TableRow key={`${item.productId}-${index}`}>
+                                    <TableCell>{item.productName || item.productId}</TableCell>
+                                    <TableCell>{item.quantity}</TableCell>
+                                    <TableCell>Rp {item.price.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
-                                ) : null}
-                                {tx.fee ? (
-                                     <TableRow>
-                                        <TableCell colSpan={3} className="text-right">Biaya Marketplace</TableCell>
-                                        <TableCell className="text-right text-destructive">- Rp {tx.fee.toLocaleString('id-ID')}</TableCell>
+                                ))}
+                            </TableBody>
+                            {tx.discount || tx.fee ? (
+                                <TableFooter>
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
+                                        <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
                                     </TableRow>
-                                ) : null}
-                                <TableRow className="font-bold">
-                                    <TableCell colSpan={3} className="text-right">Total Bersih</TableCell>
-                                    <TableCell className="text-right">Rp {tx.netTotal?.toLocaleString('id-ID')}</TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        )}
+                                    {tx.discount ? (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-right">Diskon</TableCell>
+                                        <TableCell className="text-right text-destructive">- Rp {tx.discount.toLocaleString('id-ID')}</TableCell>
+                                    </TableRow>
+                                    ) : null}
+                                    {tx.fee ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="text-right">Biaya Marketplace</TableCell>
+                                            <TableCell className="text-right text-destructive">- Rp {tx.fee.toLocaleString('id-ID')}</TableCell>
+                                        </TableRow>
+                                    ) : null}
+                                    <TableRow className="font-bold">
+                                        <TableCell colSpan={3} className="text-right">Total Bersih</TableCell>
+                                        <TableCell className="text-right">Rp {tx.netTotal?.toLocaleString('id-ID')}</TableCell>
+                                    </TableRow>
+                                </TableFooter>
+                            ) : null}
                         </Table>
                     </div>
                     </AccordionContent>
@@ -288,10 +320,10 @@ function TransactionsPageContent() {
         <CardFooter className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Halaman {currentPage}</span>
             <div className="flex gap-2">
-                <Button variant="outline" onClick={() => handlePrevPage()} disabled={currentPage === 1 || loading}>
+                <Button variant="outline" onClick={handlePrevPage} disabled={currentPage === 1 || loading}>
                     <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
                 </Button>
-                <Button variant="outline" onClick={() => handleNextPage()} disabled={!hasNextPage || loading}>
+                <Button variant="outline" onClick={handleNextPage} disabled={!hasNextPage || loading}>
                     Berikutnya <ArrowRight className="ml-2 h-4 w-4"/>
                 </Button>
             </div>
