@@ -1,13 +1,14 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from '@/components/ui/card';
 import {
   Table,
@@ -25,9 +26,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { collection, onSnapshot, query, orderBy, where, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where, Timestamp, getDocs, limit, startAfter, DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal, JournalEntry } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
@@ -42,77 +43,121 @@ type LedgerEntry = {
   balance: number;
 };
 
+const LEDGER_PAGE_SIZE = 100;
+
 export default function GeneralLedgerPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [journals, setJournals] = useState<Journal[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [loading, setLoading] = useState(true);
+  
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
+  const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
+  const [pageHistory, setPageHistory] = useState<(DocumentData | null)[] >([null]);
+  const [currentPage, setCurrentPage] = useState(1);
+
 
   useEffect(() => {
     const unsubAccounts = onSnapshot(collection(db, 'coa'), (snapshot) => {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)).sort((a,b) => a.code.localeCompare(b.code)));
-    });
-
-    const journalsCol = collection(db, "journals");
-    const q = query(journalsCol, orderBy("date", "desc"));
-    const unsubJournals = onSnapshot(q, (snapshot) => {
-      setJournals(snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          date: data.date.toDate(),
-        } as Journal;
-      }));
       setLoading(false);
     });
 
-    return () => {
-      unsubAccounts();
-      unsubJournals();
-    };
+    return () => unsubAccounts();
   }, []);
+  
+  const fetchLedgerEntries = useCallback(async (page: number, startAfterDoc: DocumentData | null) => {
+    if (!selectedAccountId) return;
+    
+    setLoading(true);
 
-  const ledgerEntries = useMemo(() => {
-    if (!selectedAccountId) return [];
-
-    let runningBalance = 0;
+    let runningBalance = 0; // This will need to be calculated based on previous data
     const entries: LedgerEntry[] = [];
+    let transactionCount = 0;
 
-    const filteredJournals = journals
-      .filter(j => {
-        // Filter by date range if it exists
-        if (dateRange?.from) {
-          const from = dateRange.from;
-          const to = dateRange.to || from; // if no 'to', use 'from'
-           // Adjust to include the whole 'to' day
-            const toDayEnd = new Date(to);
-            toDayEnd.setHours(23, 59, 59, 999);
-          return j.date >= from && j.date <= toDayEnd;
-        }
-        return true; // No date filter
-      })
-      .sort((a, b) => a.date.getTime() - b.date.getTime()); // Sort ascending for balance calculation
+    // This is a simplified approach. A full-featured pagination would require more complex balance calculation.
+    // For now, we fetch ALL journals up to the current page to calculate the balance correctly.
+    // This is not ideal for performance but works for moderate data sizes.
+    
+    let allJournalsQuery = query(
+        collection(db, 'journals'), 
+        orderBy("date", "asc")
+    );
 
-    for (const journal of filteredJournals) {
-      for (const entry of journal.entries) {
-        if (entry.accountId === selectedAccountId) {
-          runningBalance += entry.debit - entry.credit;
-          entries.push({
-            date: journal.date,
-            ref: journal.refNumber || journal.id,
-            desc: journal.description,
-            debit: entry.debit,
-            credit: entry.credit,
-            balance: runningBalance,
-          });
-        }
-      }
+    if (dateRange?.from) {
+        allJournalsQuery = query(allJournalsQuery, where("date", ">=", Timestamp.fromDate(dateRange.from)));
+    }
+    if (dateRange?.to) {
+        const toDayEnd = new Date(dateRange.to);
+        toDayEnd.setHours(23, 59, 59, 999);
+        allJournalsQuery = query(allJournalsQuery, where("date", "<=", Timestamp.fromDate(toDayEnd)));
     }
 
-    return entries.reverse(); // Show most recent first
-  }, [selectedAccountId, journals, dateRange]);
+    const allJournalsSnapshot = await getDocs(allJournalsQuery);
+    const allRelevantEntries: any[] = [];
+    
+    allJournalsSnapshot.docs.forEach(journalDoc => {
+        const journal = journalDoc.data() as Journal;
+        journal.entries.forEach(entry => {
+            if (entry.accountId === selectedAccountId) {
+                allRelevantEntries.push({
+                    journalDate: journal.date.toDate(),
+                    journalRef: journal.refNumber || journal.id,
+                    journalDesc: journal.description,
+                    ...entry
+                });
+            }
+        });
+    });
+
+    const startIndex = (page - 1) * LEDGER_PAGE_SIZE;
+    const endIndex = page * LEDGER_PAGE_SIZE;
+    
+    for (let i = 0; i < Math.min(endIndex, allRelevantEntries.length); i++) {
+        const entry = allRelevantEntries[i];
+        runningBalance += entry.debit - entry.credit;
+
+        if (i >= startIndex) {
+            entries.push({
+                date: entry.journalDate,
+                ref: entry.journalRef,
+                desc: entry.journalDesc,
+                debit: entry.debit,
+                credit: entry.credit,
+                balance: runningBalance,
+            });
+        }
+    }
+    
+    setLedgerEntries(entries.sort((a, b) => b.date.getTime() - a.date.getTime()));
+    setLoading(false);
+
+  }, [selectedAccountId, dateRange]);
+
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setPageHistory([null]);
+    if (selectedAccountId) {
+        fetchLedgerEntries(1, null);
+    } else {
+        setLedgerEntries([]);
+    }
+  }, [selectedAccountId, dateRange, fetchLedgerEntries]);
+
+  const handleNextPage = () => {
+    const newPage = currentPage + 1;
+    setCurrentPage(newPage);
+    fetchLedgerEntries(newPage, lastVisible);
+  };
+
+  const handlePrevPage = () => {
+    const newPage = currentPage - 1;
+    if (newPage > 0) {
+      setCurrentPage(newPage);
+      fetchLedgerEntries(newPage, null); // Simplified, not using pageHistory for now
+    }
+  };
 
 
   return (
@@ -196,6 +241,17 @@ export default function GeneralLedgerPage() {
             </Table>
           </div>
         </CardContent>
+        <CardFooter className="flex justify-between">
+            <span className="text-sm text-muted-foreground">Menampilkan hingga {LEDGER_PAGE_SIZE} transaksi per halaman.</span>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handlePrevPage} disabled={currentPage === 1 || loading}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Sebelumnya
+                </Button>
+                <Button variant="outline" onClick={handleNextPage} disabled={loading || ledgerEntries.length < LEDGER_PAGE_SIZE}>
+                    Berikutnya <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+            </div>
+        </CardFooter>
       </Card>
     </div>
   );
