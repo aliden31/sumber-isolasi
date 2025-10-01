@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -16,9 +16,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { deleteSingleCollection } from './actions';
-import { Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Trash2, AlertTriangle, KeyRound } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const ALL_COLLECTIONS = [
     { name: "transactions", group: 'Transaksional', description: 'Semua riwayat penjualan.' },
@@ -99,6 +101,54 @@ function DeleteAction({ collection }: DeleteActionProps) {
 
 
 export default function DangerZonePage() {
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === '123qwe') {
+      setIsAuthorized(true);
+      setError('');
+    } else {
+      setError('Kata sandi salah. Akses ditolak.');
+    }
+  };
+
+  if (!isAuthorized) {
+    return (
+        <div className="flex flex-col gap-6 items-center justify-center h-[60vh]">
+            <Card className="w-full max-w-sm">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <KeyRound/> Autentikasi Diperlukan
+                    </CardTitle>
+                    <CardDescription>
+                        Anda harus memasukkan kata sandi untuk mengakses halaman ini.
+                    </CardDescription>
+                </CardHeader>
+                <form onSubmit={handleAuth}>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Kata Sandi</Label>
+                            <Input 
+                                id="password" 
+                                type="password" 
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
+                        </div>
+                        {error && <p className="text-sm text-destructive">{error}</p>}
+                    </CardContent>
+                    <CardFooter>
+                        <Button type="submit" className="w-full">Masuk</Button>
+                    </CardFooter>
+                </form>
+            </Card>
+        </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl md:text-3xl font-headline font-bold">Data &amp; Reset</h1>
