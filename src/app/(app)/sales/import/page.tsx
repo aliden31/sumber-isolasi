@@ -102,15 +102,26 @@ export default function ImportMarketplacePage() {
     return () => unsub();
   }, []);
 
-  const allProductsMapped = useMemo(() => {
-    if (parsedData.length === 0) return false;
+  const { allProductsMapped, uniqueOrderCount, totalItems } = useMemo(() => {
+    if (parsedData.length === 0) {
+      return { allProductsMapped: false, uniqueOrderCount: 0, totalItems: 0 };
+    }
     const unmappedSkus = new Set(parsedData.map(row => row.sku));
+    let allMapped = true;
     for (const sku of unmappedSkus) {
         if (!skuToProductMap[sku]) {
-            return false;
+            allMapped = false;
+            break;
         }
     }
-    return true;
+    const uniqueOrders = new Set(parsedData.map(row => row.nomor_order));
+    const totalItems = parsedData.reduce((sum, row) => sum + row.qty, 0);
+
+    return { 
+      allProductsMapped: allMapped, 
+      uniqueOrderCount: uniqueOrders.size,
+      totalItems
+    };
   }, [parsedData, skuToProductMap]);
 
 
@@ -159,7 +170,7 @@ export default function ImportMarketplacePage() {
                 const dataRows = json.slice(1);
                 
                 const initialSkuMap: Record<string, Product | null> = {};
-                const processedTiktokOrders = new Set<string>();
+                const processedOrdersForFee = new Set<string>();
 
 
                 const mappedData: MappedRow[] = dataRows.map((row, rowIndex) => {
@@ -194,19 +205,17 @@ export default function ImportMarketplacePage() {
                     const shipping = normalizeNumber(getVal(['ongkos kirim', 'biaya pengiriman']));
 
                     let fee = 0;
-                    if (channel.toLowerCase() === 'tiktok') {
-                        const dynamicFee = subtotal * 0.08;
-                        const additionalFee = Math.min(subtotal * 0.055, 40000);
-                        let processingFee = 0;
-                        if (!processedTiktokOrders.has(nomor_order)) {
-                            processingFee = 1250;
-                            processedTiktokOrders.add(nomor_order);
+                    if (!processedOrdersForFee.has(nomor_order)) {
+                        if (channel.toLowerCase() === 'tiktok') {
+                            const dynamicFee = subtotal * 0.08;
+                            const additionalFee = Math.min(subtotal * 0.055, 40000);
+                            fee = dynamicFee + additionalFee + 1250;
+                        } else {
+                            const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
+                            const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
+                            fee = fee_pengelolaan + fee_transaksi;
                         }
-                        fee = dynamicFee + additionalFee + processingFee;
-                    } else {
-                        const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
-                        const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
-                        fee = fee_pengelolaan + fee_transaksi;
+                        processedOrdersForFee.add(nomor_order);
                     }
                     
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
@@ -320,7 +329,13 @@ export default function ImportMarketplacePage() {
         <Card>
             <CardHeader>
                 <CardTitle>Langkah 2: Pratinjau & Konfirmasi</CardTitle>
-                <CardDescription>Periksa data yang berhasil di-parse dan petakan produk yang belum ditemukan. SKU di laporan harus cocok dengan SKU Gudang di data produk.</CardDescription>
+                <CardDescription>
+                  Periksa data yang berhasil di-parse dan petakan produk yang belum ditemukan. SKU di laporan harus cocok dengan SKU Gudang di data produk.
+                  <br />
+                  <span className="font-semibold text-foreground">
+                    Terdeteksi {uniqueOrderCount} transaksi unik dengan total {totalItems} item.
+                  </span>
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="max-h-[500px] overflow-y-auto border rounded-md">
@@ -428,3 +443,4 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
