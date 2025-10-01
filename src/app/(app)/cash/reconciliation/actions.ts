@@ -1,3 +1,4 @@
+
 'use server';
 
 import { addJournalEntry } from '@/app/(app)/accounting/journal/actions';
@@ -60,3 +61,5 @@ export async function createAdjustmentJournal(
     return createResponse(e instanceof Error ? e.message : 'An unknown error occurred.');
   }
 }
+
+    
