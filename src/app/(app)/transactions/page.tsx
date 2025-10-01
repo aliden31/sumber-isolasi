@@ -42,7 +42,7 @@ import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
-const TRANSACTIONS_PER_PAGE = 100;
+const TRANSACTIONS_PER_PAGE = 300;
 
 function TransactionsPageContent() {
   const searchParams = useSearchParams();
@@ -253,7 +253,7 @@ function TransactionsPageContent() {
                             </TableRow>
                             ))}
                         </TableBody>
-                         {(tx.discount || tx.fee) && (
+                        {(tx.discount || tx.fee) && (
                             <TableFooter>
                                 <TableRow>
                                     <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
