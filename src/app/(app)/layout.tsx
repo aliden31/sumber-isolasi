@@ -1,8 +1,7 @@
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthGuard } from "@/components/layout/auth-guard";
 import { AppShell } from "@/components/layout/app-shell";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { getCompanySettings } from "./settings/actions";
-import { ThemeProvider } from "@/components/layout/theme-provider";
+
 
 export default async function AppLayout({
   children,
@@ -13,6 +12,8 @@ export default async function AppLayout({
   const companySettings = await getCompanySettings();
 
   return (
-      <AppShell companyName={companySettings?.companyName || "Toko Kilat"}>{children}</AppShell>
+      <AuthGuard>
+        <AppShell companyName={companySettings?.companyName || "Toko Kilat"}>{children}</AppShell>
+      </AuthGuard>
   );
 }
