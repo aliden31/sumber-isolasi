@@ -112,7 +112,7 @@ export async function importMarketplaceTransactions(
 
     acc[orderId].items.push({
       productId: row.mappedProduct.id,
-      productName: row.mappedProduct.name,
+      productName: row.nama_produk || row.mappedProduct.name,
       quantity: row.qty,
       price: row.unit_price,
       cost: cost,
@@ -280,3 +280,4 @@ export async function importMarketplaceTransactions(
     );
   }
 }
+

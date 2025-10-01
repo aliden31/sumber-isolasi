@@ -387,6 +387,7 @@ export type ParsedRow = {
   nama_pembeli: string;
   alamat_lengkap: string;
   sku: string;
+  nama_produk: string;
   qty: number;
   unit_price: number;
   cost: number;
@@ -402,3 +403,4 @@ export type MappedRow = Omit<ParsedRow, 'id'> & { id: string };
 export type ImportRow = MappedRow & {
     mappedProduct: Product | null;
 };
+
