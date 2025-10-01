@@ -106,6 +106,44 @@ export default function ImportMarketplacePage() {
     }
     return 0;
   }
+  
+  const parseDate = (dateString: any): Date | null => {
+    if (!dateString) return null;
+    if (dateString instanceof Date) return dateString;
+
+    let cleanDateString = String(dateString).trim();
+    
+    // Remove timezone info like GMT+7 etc.
+    cleanDateString = cleanDateString.replace(/\sGMT[+-]\d{2}:\d{2}.*$/, '');
+
+    const formats = [
+      'dd-MM-yyyy HH:mm',
+      'dd/MM/yyyy HH:mm',
+      'yyyy-MM-dd HH:mm:ss',
+      'yyyy/MM/dd HH:mm:ss',
+      'MM/dd/yyyy, hh:mm:ss a',
+    ];
+
+    for (const fmt of formats) {
+      try {
+        const parsedDate = parse(cleanDateString, fmt, new Date());
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+      } catch (e) {
+        // Continue to next format
+      }
+    }
+    
+    // Fallback for native Date parser if formats fail
+    const nativeParsed = new Date(cleanDateString);
+    if (!isNaN(nativeParsed.getTime())) {
+        return nativeParsed;
+    }
+
+    return null;
+  }
+
 
   const handleParse = () => {
     if (!file) {
@@ -181,14 +219,12 @@ export default function ImportMarketplacePage() {
                     const discount = diskon_marketplace + voucher_toko + diskon_penjual;
                     const net_total = subtotal - fee - discount;
 
-                    let tanggal_order_formatted = 'N/A';
-                    if (tanggal_order_raw) {
-                       try {
-                         tanggal_order_formatted = format(new Date(tanggal_order_raw), 'yyyy-MM-dd HH:mm:ss');
-                       } catch {
-                         tanggal_order_formatted = String(tanggal_order_raw);
-                       }
+                    const parsedDate = parseDate(tanggal_order_raw);
+                    if (!parsedDate) {
+                        console.warn(`Could not parse date for order ${nomor_order}: ${tanggal_order_raw}`);
                     }
+                    const tanggal_order_formatted = parsedDate ? format(parsedDate, 'yyyy-MM-dd HH:mm:ss') : 'Invalid Date';
+
                     
                     if (sku && initialSkuMap[sku] === undefined) {
                         initialSkuMap[sku] = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
@@ -288,33 +324,35 @@ export default function ImportMarketplacePage() {
                   </span>
                 </CardDescription>
             </CardHeader>
-            {unmappedSkus.length > 0 && (
-                <CardContent>
-                    <Alert variant="destructive" className="mb-4">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Diperlukan Pemetaan</AlertTitle>
-                        <AlertDescription>
-                            {unmappedSkus.length} SKU dari laporan tidak dapat ditemukan di database produk Anda. Harap petakan secara manual di bawah ini.
-                        </AlertDescription>
-                    </Alert>
-                    <div className="max-h-[300px] overflow-y-auto border rounded-md p-4 space-y-4">
-                        {unmappedSkus.map(sku => (
-                            <div key={sku} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                                <div>
-                                    <p className="text-sm font-semibold">SKU Laporan:</p>
-                                    <p className="text-sm text-muted-foreground">{sku}</p>
+            <CardContent>
+                {unmappedSkus.length > 0 && (
+                    <div className="mb-6">
+                        <Alert variant="destructive" className="mb-4">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Diperlukan Pemetaan</AlertTitle>
+                            <AlertDescription>
+                                {unmappedSkus.length} SKU dari laporan tidak dapat ditemukan di database produk Anda. Harap petakan secara manual di bawah ini.
+                            </AlertDescription>
+                        </Alert>
+                        <div className="max-h-[300px] overflow-y-auto border rounded-md p-4 space-y-4">
+                            {unmappedSkus.map(sku => (
+                                <div key={sku} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                    <div>
+                                        <p className="text-sm font-semibold">SKU Laporan:</p>
+                                        <p className="text-sm text-muted-foreground">{sku}</p>
+                                    </div>
+                                    <ProductMappingCell
+                                        sku={sku}
+                                        mappedProduct={skuToProductMap[sku]}
+                                        allProducts={products}
+                                        onMap={(p) => handleProductMapping(sku, p)}
+                                    />
                                 </div>
-                                <ProductMappingCell
-                                    sku={sku}
-                                    mappedProduct={skuToProductMap[sku]}
-                                    allProducts={products}
-                                    onMap={(p) => handleProductMapping(sku, p)}
-                                />
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </CardContent>
-            )}
+                )}
+            </CardContent>
             <CardContent>
                 <div className="max-h-[500px] overflow-y-auto border rounded-md">
                     <Table>
@@ -421,4 +459,5 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
 
