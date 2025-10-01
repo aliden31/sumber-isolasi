@@ -2,11 +2,12 @@
 
 'use client';
 
-import { Check, Moon, Palette, Sun } from 'lucide-react';
+import { useState, useTransition, useEffect } from 'react';
+import { Check, Moon, Palette, Sun, Save, Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { THEMES } from '@/lib/themes';
 import { cn } from '@/lib/utils';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -14,9 +15,29 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ThemeSettingsPage() {
   const { setTheme, theme: activeTheme, resolvedTheme } = useTheme();
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [selectedTheme, setSelectedTheme] = useState(activeTheme);
+
+  useEffect(() => {
+    setSelectedTheme(activeTheme);
+  }, [activeTheme]);
+
+  const handleSave = () => {
+    startTransition(() => {
+      setTheme(selectedTheme || 'theme-samudra');
+      toast({
+        title: 'Tema Disimpan',
+        description: 'Tampilan aplikasi telah berhasil diperbarui.',
+      });
+    });
+  };
+  
+  const hasChanges = activeTheme !== selectedTheme;
 
   return (
     <div className="flex flex-col gap-6">
@@ -29,7 +50,7 @@ export default function ThemeSettingsPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {THEMES.map(theme => {
-            const isActive = activeTheme === theme.name;
+            const isSelected = selectedTheme === theme.name;
             return (
               <div key={theme.name} className="flex flex-col items-center gap-2">
                 <TooltipProvider>
@@ -39,9 +60,9 @@ export default function ThemeSettingsPage() {
                                 variant="outline"
                                 className={cn(
                                     'h-24 w-full justify-start rounded-lg border-2 p-4',
-                                    isActive && 'border-primary'
+                                    isSelected && 'border-primary'
                                 )}
-                                onClick={() => setTheme(theme.name)}
+                                onClick={() => setSelectedTheme(theme.name)}
                             >
                                 <div className="flex flex-col gap-2 items-start">
                                     {theme.colors.map((color, index) => (
@@ -62,13 +83,19 @@ export default function ThemeSettingsPage() {
                     </Tooltip>
                 </TooltipProvider>
                 <div className="flex items-center gap-2">
-                    {isActive && <Check className="w-4 h-4 text-primary" />}
+                    {isSelected && <Check className="w-4 h-4 text-primary" />}
                     <span className="text-sm font-medium">{theme.label}</span>
                 </div>
               </div>
             );
           })}
         </CardContent>
+         <CardFooter className="flex justify-end">
+            <Button onClick={handleSave} disabled={isPending || !hasChanges}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Simpan Perubahan
+            </Button>
+        </CardFooter>
       </Card>
        <Card>
         <CardHeader>
