@@ -65,25 +65,34 @@ export default function ImportMarketplacePage() {
     return () => unsub();
   }, []);
 
-  const { allProductsMapped, uniqueOrderCount, totalItems } = useMemo(() => {
+  const { allProductsMapped, uniqueOrderCount, totalItems, mappedRows, unmappedRows } = useMemo(() => {
     if (parsedData.length === 0) {
-      return { allProductsMapped: false, uniqueOrderCount: 0, totalItems: 0 };
+      return { allProductsMapped: false, uniqueOrderCount: 0, totalItems: 0, mappedRows: [], unmappedRows: [] };
     }
-    const unmappedSkus = new Set(parsedData.map(row => row.sku));
+    
+    const uniqueSkus = new Set(parsedData.map(row => row.sku));
     let allMapped = true;
-    for (const sku of unmappedSkus) {
-        if (!skuToProductMap[sku]) {
-            allMapped = false;
-            break;
-        }
-    }
+    const unmapped: ImportRow[] = [];
+    const mapped: ImportRow[] = [];
+
+    parsedData.forEach(row => {
+      if (skuToProductMap[row.sku]) {
+        mapped.push(row);
+      } else {
+        unmapped.push(row);
+        allMapped = false;
+      }
+    });
+
     const uniqueOrders = new Set(parsedData.map(row => row.nomor_order));
     const totalItems = parsedData.reduce((sum, row) => sum + row.qty, 0);
 
     return { 
       allProductsMapped: allMapped, 
       uniqueOrderCount: uniqueOrders.size,
-      totalItems
+      totalItems,
+      mappedRows: mapped,
+      unmappedRows: unmapped,
     };
   }, [parsedData, skuToProductMap]);
 
@@ -280,70 +289,108 @@ export default function ImportMarketplacePage() {
       </Card>
 
       {parsedData.length > 0 && (
-        <Card>
-            <CardHeader>
-                <CardTitle>Langkah 2: Pratinjau & Konfirmasi</CardTitle>
-                <CardDescription>
-                  Periksa data yang berhasil di-parse dan petakan produk yang belum ditemukan. SKU di laporan harus cocok dengan SKU Gudang di data produk.
-                  <br />
-                  <span className="font-semibold text-foreground">
-                    Terdeteksi {uniqueOrderCount} transaksi unik dengan total {totalItems} item.
-                  </span>
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="max-h-[500px] overflow-y-auto border rounded-md">
-                    <Table>
-                        <TableHeader className="sticky top-0 bg-muted">
-                            <TableRow>
-                                <TableHead>Toko Marketplace</TableHead>
-                                <TableHead>SKU Laporan</TableHead>
-                                <TableHead>Nama Produk</TableHead>
-                                <TableHead className="min-w-[200px]">Produk Terpetakan</TableHead>
-                                <TableHead className="text-center">Kuantitas</TableHead>
-                                <TableHead className="text-right">Total Bersih</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {parsedData.map((row) => (
-                                <TableRow key={row.id}>
-                                    <TableCell>
-                                      <Badge variant="secondary">{row.channel}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-xs">{row.sku}</TableCell>
-                                    <TableCell className="text-xs">{row.nama_produk}</TableCell>
-                                    <TableCell>
-                                        <ProductMappingCell
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Langkah 2: Pratinjau & Konfirmasi</CardTitle>
+                    <CardDescription>
+                      Periksa data yang berhasil di-parse. Terdeteksi {uniqueOrderCount} transaksi unik dengan total {totalItems} item.
+                    </CardDescription>
+                </CardHeader>
+                {unmappedRows.length > 0 && (
+                  <CardContent>
+                      <Alert variant="destructive" className="mb-4">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertTitle>{unmappedRows.length} Item Belum Terpetakan</AlertTitle>
+                          <AlertDescription>
+                              SKU produk di laporan tidak cocok dengan SKU di data produk Anda. Harap petakan secara manual sebelum melanjutkan.
+                          </AlertDescription>
+                      </Alert>
+                      <div className="max-h-[500px] overflow-y-auto border rounded-md">
+                          <Table>
+                              <TableHeader className="sticky top-0 bg-muted">
+                                  <TableRow>
+                                      <TableHead>Toko</TableHead>
+                                      <TableHead>SKU Laporan</TableHead>
+                                      <TableHead>Nama Produk</TableHead>
+                                      <TableHead className="min-w-[200px]">Produk Terpetakan</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {unmappedRows.map((row) => (
+                                      <TableRow key={row.id}>
+                                          <TableCell><Badge variant="secondary">{row.channel}</Badge></TableCell>
+                                          <TableCell className="text-xs">{row.sku}</TableCell>
+                                          <TableCell className="text-xs">{row.nama_produk}</TableCell>
+                                          <TableCell>
+                                              <ProductMappingCell
+                                                  sku={row.sku}
+                                                  mappedProduct={skuToProductMap[row.sku]}
+                                                  allProducts={products}
+                                                  onMap={(p) => handleProductMapping(row.sku, p)}
+                                              />
+                                          </TableCell>
+                                      </TableRow>
+                                  ))}
+                              </TableBody>
+                          </Table>
+                      </div>
+                  </CardContent>
+                )}
+
+                {mappedRows.length > 0 && (
+                  <CardContent>
+                    <Alert className="mb-4">
+                        <CheckCircle className="h-4 w-4" />
+                        <AlertTitle>{mappedRows.length} Item Berhasil Dipetakan</AlertTitle>
+                        <AlertDescription>
+                            Produk berikut sudah siap untuk diimpor.
+                        </AlertDescription>
+                    </Alert>
+                    <div className="max-h-[500px] overflow-y-auto border rounded-md">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-muted">
+                                <TableRow>
+                                    <TableHead>Toko</TableHead>
+                                    <TableHead>SKU Laporan</TableHead>
+                                    <TableHead>Nama Produk</TableHead>
+                                    <TableHead>Produk Terpetakan</TableHead>
+                                    <TableHead className="text-center">Qty</TableHead>
+                                    <TableHead className="text-right">Total Bersih</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {mappedRows.map((row) => (
+                                    <TableRow key={row.id}>
+                                        <TableCell><Badge variant="secondary">{row.channel}</Badge></TableCell>
+                                        <TableCell className="text-xs">{row.sku}</TableCell>
+                                        <TableCell className="text-xs">{row.nama_produk}</TableCell>
+                                        <TableCell>
+                                          <ProductMappingCell
                                             sku={row.sku}
                                             mappedProduct={skuToProductMap[row.sku]}
                                             allProducts={products}
                                             onMap={(p) => handleProductMapping(row.sku, p)}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="text-center">{row.qty}</TableCell>
-                                    <TableCell className="text-right font-bold font-mono">Rp {Math.round(row.net_total).toLocaleString('id-ID')}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            </CardContent>
-            <CardFooter className="flex-col items-start gap-4">
-                 {!allProductsMapped && (
-                    <Alert variant="destructive">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Pemetaan Belum Selesai</AlertTitle>
-                        <AlertDescription>
-                            Beberapa produk tidak dapat dipetakan secara otomatis. Harap pilih produk yang benar dari dropdown sebelum melanjutkan.
-                        </AlertDescription>
-                    </Alert>
-                 )}
-                <Button onClick={handleImport} disabled={isImporting || !allProductsMapped}>
-                    {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4" />}
-                    Impor {parsedData.length} Baris
-                </Button>
-            </CardFooter>
-        </Card>
+                                          />
+                                        </TableCell>
+                                        <TableCell className="text-center">{row.qty}</TableCell>
+                                        <TableCell className="text-right font-bold font-mono">Rp {Math.round(row.net_total).toLocaleString('id-ID')}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                  </CardContent>
+                )}
+                
+                <CardFooter>
+                    <Button onClick={handleImport} disabled={isImporting || !allProductsMapped}>
+                        {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4" />}
+                        Impor {parsedData.length} Baris
+                    </Button>
+                </CardFooter>
+            </Card>
+        </>
       )}
 
     </div>
@@ -397,6 +444,4 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
-
-
 
