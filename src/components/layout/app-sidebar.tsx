@@ -61,6 +61,7 @@ import {
   Store,
   ArrowDownCircle,
   BookCheck,
+  Palette,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -195,6 +196,7 @@ const navItems = [
       { href: "/settings", label: "Profil Perusahaan", icon: Building },
       { href: "/settings/accounting", label: "Akuntansi", icon: SlidersHorizontal },
       { href: "/settings/marketplace", label: "Marketplace", icon: Store },
+      { href: "/settings/theme", label: "Tema & Tampilan", icon: Palette },
       { href: "/settings/danger", label: "Data & Reset", icon: DatabaseZap },
     ],
   },
