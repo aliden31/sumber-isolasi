@@ -1,4 +1,3 @@
-
 # Blueprint & Status Pengembangan
 
 Berikut adalah daftar lengkap fitur aplikasi, beserta status implementasinya.
@@ -22,7 +21,6 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Buat Invoice (Input Manual)**: Membuat penjualan kredit/piutang untuk pelanggan.
 - **Piutang Usaha**: Mengelola dan mencatat pelunasan piutang dari pelanggan.
 - **Retur Penjualan**: Memproses pengembalian barang dari penjualan kredit (non-POS).
-- **Impor Penjualan dari Marketplace**: Antarmuka untuk mengunggah dan mem-parsing laporan dari Tokopedia, Shopee, dll. Logika untuk menyimpan ke database dan rekonsiliasi sudah ada.
 
 ### Modul: Pembelian (Alur Penuh)
 - **Permintaan Pembelian (PR)**: Membuat permintaan pembelian internal sebelum menjadi PO.
@@ -52,8 +50,6 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 - **Jurnal Umum**: Input manual untuk transaksi jurnal.
 - **Buku Besar**: Melihat riwayat transaksi per akun.
 - **Tutup Buku**: Proses akuntansi akhir periode untuk menutup akun temporer.
-- **Jurnal Pembalik (Reversing Entries)**: Membuat jurnal pembalik secara otomatis di awal periode baru untuk membalik jurnal penyesuaian tertentu.
-- **Neraca Saldo Setelah Penutupan**: Laporan untuk verifikasi saldo akun setelah proses tutup buku.
 
 ### Modul: Laporan
 - **Laporan Penjualan**: Analisis performa penjualan, produk terlaris, dan tren.
@@ -78,5 +74,5 @@ Fitur-fitur berikut telah diimplementasikan sepenuhnya dan berfungsi dengan baik
 
 Fitur-fitur berikut masih berupa halaman *placeholder* atau dalam tahap pengembangan aktif.
 
+- **Impor Penjualan dari Marketplace**: Antarmuka untuk mengunggah laporan dari Tokopedia, Shopee, dll. Logika pemrosesan file belum ada.
 - **Rekonsiliasi Bank**: Antarmuka untuk mencocokkan transaksi bank sudah ada, termasuk unggah laporan koran. Fungsionalitas inti (pencocokan otomatis, jurnal penyesuaian) belum ada.
-- **Pengguna & Hak Akses**: Antarmuka untuk menampilkan pengguna sudah ada dengan data statis. Manajemen peran dan integrasi dengan Firebase Auth belum diimplementasikan.
