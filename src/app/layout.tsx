@@ -3,51 +3,61 @@ import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/layout/theme-provider";
-import { Alegreya, Belleza, Lora, Playfair_Display, Inter, Merriweather, Poppins, Montserrat } from "next/font/google";
+import { Playfair_Display, Lato, Cormorant_Garamond, Nunito_Sans, Abril_Fatface, Source_Sans_3, Pacifico, Quicksand, Cinzel, Raleway } from "next/font/google";
 
-const belleza = Belleza({
-  subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-belleza',
-});
-
-const alegreya = Alegreya({
-  subsets: ['latin'],
-  variable: '--font-alegreya',
-});
-
-const lora = Lora({
-  subsets: ['latin'],
-  variable: '--font-lora',
-});
-
-const playfair = Playfair_Display({
+const playfairDisplay = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair-display',
 });
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-});
-
-const merriweather = Merriweather({
+const lato = Lato({
   subsets: ['latin'],
   weight: ['400', '700'],
-  variable: '--font-merriweather',
+  variable: '--font-lato',
 });
 
-const poppins = Poppins({
+const cormorantGaramond = Cormorant_Garamond({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-poppins',
+  weight: ['400', '700'],
+  variable: '--font-cormorant-garamond',
 });
 
-const montserrat = Montserrat({
+const nunitoSans = Nunito_Sans({
   subsets: ['latin'],
-  variable: '--font-montserrat',
+  variable: '--font-nunito-sans',
 });
 
+const abrilFatface = Abril_Fatface({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-abril-fatface',
+});
+
+const sourceSansPro = Source_Sans_3({
+  subsets: ['latin'],
+  variable: '--font-source-sans-pro',
+});
+
+const pacifico = Pacifico({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-pacifico',
+});
+
+const quicksand = Quicksand({
+  subsets: ['latin'],
+  variable: '--font-quicksand',
+});
+
+const cinzel = Cinzel({
+  subsets: ['latin'],
+  variable: '--font-cinzel',
+});
+
+const raleway = Raleway({
+  subsets: ['latin'],
+  variable: '--font-raleway',
+});
 
 export const metadata: Metadata = {
   title: "Toko Kilat",
@@ -65,14 +75,16 @@ export default function RootLayout({
       <body className={cn(
           "font-body antialiased",
           "min-h-screen bg-background",
-          belleza.variable,
-          alegreya.variable,
-          lora.variable,
-          playfair.variable,
-          inter.variable,
-          merriweather.variable,
-          poppins.variable,
-          montserrat.variable
+          playfairDisplay.variable,
+          lato.variable,
+          cormorantGaramond.variable,
+          nunitoSans.variable,
+          abrilFatface.variable,
+          sourceSansPro.variable,
+          pacifico.variable,
+          quicksand.variable,
+          cinzel.variable,
+          raleway.variable
         )}>
         <ThemeProvider>
             {children}
