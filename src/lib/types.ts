@@ -373,7 +373,7 @@ export type NewCurrency = Omit<Currency, 'id'>;
 
 export type MarketplaceStore = {
   id: string;
-  marketplace: 'Tokopedia' | 'Shopee' | 'TikTok Shop' | 'Lazada' | 'BigSeller' | 'Lainnya';
+  marketplace: 'Tokopedia' | 'Shopee' | 'TikTok' | 'Lazada' | 'BigSeller' | 'Lainnya';
   storeName: string;
   nickname: string;
 };

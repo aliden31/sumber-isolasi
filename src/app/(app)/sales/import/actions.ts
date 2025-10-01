@@ -22,6 +22,7 @@ import type {
   MappedRow,
   NewCustomer,
   ProductUnit,
+  ImportRow,
 } from '@/lib/types';
 import { addJournalEntry } from '@/app/(app)/accounting/journal/actions';
 import { getAccountingSettings } from '@/app/(app)/settings/accounting/actions';
@@ -58,7 +59,7 @@ async function queryInChunks<T>(
 }
 
 export async function importMarketplaceTransactions(
-  transactions: MappedRow[]
+  transactions: ImportRow[]
 ) {
   if (!transactions || transactions.length === 0) {
     return createResponse('Tidak ada transaksi untuk diimpor.');
@@ -130,7 +131,6 @@ export async function importMarketplaceTransactions(
 
   try {
     
-    // --- Pre-fetch all products to be updated to avoid race conditions ---
     const allProductIds = [
       ...new Set(
         transactions.map(t => t.mappedProduct?.id).filter(Boolean) as string[]
@@ -143,9 +143,7 @@ export async function importMarketplaceTransactions(
     );
     const productMap: Map<string, Product> = new Map(productDocs.map(p => [p.id, p]));
 
-    // Use a transaction to ensure atomicity
     await runTransaction(db, async (transaction) => {
-      // --- 1. Handle Customer Creation ---
       const uniqueCustomers = Object.values(groupedByOrder).reduce((acc, order) => {
           if (order.customerName) {
               acc[order.customerName] = order.customerAddress || '';
@@ -172,8 +170,7 @@ export async function importMarketplaceTransactions(
         }
       }
 
-      // --- 2. Handle Product Price/Cost/Stock Updates ---
-      const productUpdates = new Map<string, { stock: number; cost?: number; units?: ProductUnit[] }>();
+      const productUpdates = new Map<string, { stock: number; cost?: number; units?: ProductUnit[]; sku?: string }>();
 
       for (const row of transactions) {
           if (!row.mappedProduct) continue;
@@ -183,21 +180,22 @@ export async function importMarketplaceTransactions(
 
           let currentUpdate = productUpdates.get(productId) || { stock: product.stock };
           
-          // Decrement stock
           currentUpdate.stock -= row.qty;
 
-          // Check and update cost (HPP)
           if (row.cost > 0 && row.cost !== product.cost) {
               currentUpdate.cost = row.cost;
           }
 
-          // Check and update selling price (on base unit)
           const baseUnit = product.units.find(u => u.name === product.baseUnit);
           if (row.unit_price > 0 && baseUnit && row.unit_price !== baseUnit.price) {
               const newUnits = product.units.map(u => 
                   u.name === product.baseUnit ? { ...u, price: row.unit_price } : u
               );
               currentUpdate.units = newUnits;
+          }
+          
+          if (row.sku && product.sku !== row.sku) {
+            currentUpdate.sku = row.sku;
           }
           
           productUpdates.set(productId, currentUpdate);
@@ -208,7 +206,6 @@ export async function importMarketplaceTransactions(
           transaction.update(productRef, updates);
       }
 
-      // --- 3. Handle Transactions and Journals ---
       for (const orderId in groupedByOrder) {
         const order = groupedByOrder[orderId];
         const newId = generateDocumentId('MKT');
