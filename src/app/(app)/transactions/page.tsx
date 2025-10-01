@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar as CalendarIcon, Wallet, User, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Calendar as CalendarIcon, Wallet, User, CheckCircle2, ArrowLeft, ArrowRight, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
@@ -10,6 +10,7 @@ import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   Card,
@@ -43,12 +44,13 @@ const TRANSACTIONS_PER_PAGE = 100;
 
 export default function TransactionsPage() {
   const [date, setDate] = useState<DateRange | undefined>();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
   const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
+  const [searchId, setSearchId] = useState('');
 
   useEffect(() => {
     fetchTransactions();
@@ -106,7 +108,7 @@ export default function TransactionsPage() {
       } as Transaction;
     });
 
-    setTransactions(transactionList);
+    setAllTransactions(transactionList);
     setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
     setFirstVisible(snapshot.docs[0]);
     setHasNextPage(nextSnapshot.docs.length > TRANSACTIONS_PER_PAGE && direction !== 'prev');
@@ -120,6 +122,13 @@ export default function TransactionsPage() {
 
     setLoading(false);
   };
+
+  const filteredTransactions = useMemo(() => {
+    if (!searchId) {
+      return allTransactions;
+    }
+    return allTransactions.filter(tx => tx.id.toLowerCase().includes(searchId.toLowerCase()));
+  }, [allTransactions, searchId]);
   
   const handleNextPage = () => {
     if (lastVisible) {
@@ -135,8 +144,8 @@ export default function TransactionsPage() {
 
 
   const totalSales = useMemo(() => {
-    return transactions.reduce((sum, tx) => sum + (tx.netTotal ?? tx.total), 0);
-  }, [transactions]);
+    return filteredTransactions.reduce((sum, tx) => sum + (tx.netTotal ?? tx.total), 0);
+  }, [filteredTransactions]);
   
   const getPaymentBadge = (tx: Transaction) => {
       if (tx.paymentMethod === 'Kredit') {
@@ -158,13 +167,25 @@ export default function TransactionsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Riwayat Transaksi</h1>
-         <DateRangePicker 
-            className="w-full sm:w-[300px]" 
-            onSelect={(newDate) => {
-                setDate(newDate);
-                setCurrentPage(1); // Reset to first page on date change
-            }}
-        />
+        <div className="flex gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-initial">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    type="search"
+                    placeholder="Cari ID transaksi..."
+                    className="pl-8 sm:w-[200px] md:w-[250px]"
+                    value={searchId}
+                    onChange={(e) => setSearchId(e.target.value)}
+                />
+            </div>
+            <DateRangePicker 
+                className="w-full sm:w-[300px]" 
+                onSelect={(newDate) => {
+                    setDate(newDate);
+                    setCurrentPage(1); // Reset to first page on date change
+                }}
+            />
+        </div>
       </div>
 
       <Card>
@@ -184,10 +205,12 @@ export default function TransactionsPage() {
           <Accordion type="single" collapsible className="w-full">
             {loading ? (
                 <div className="text-center py-10 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin mr-2"/>Memuat data transaksi...</div>
-            ) : transactions.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">Tidak ada transaksi pada periode ini.</div>
+            ) : filteredTransactions.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                    {searchId ? `Tidak ada transaksi dengan ID yang cocok dengan "${searchId}".` : "Tidak ada transaksi pada periode ini."}
+                </div>
             ) : (
-                transactions.map(tx => (
+                filteredTransactions.map(tx => (
                 <AccordionItem value={tx.id} key={tx.id}>
                     <AccordionTrigger>
                     <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
