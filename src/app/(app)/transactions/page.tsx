@@ -4,7 +4,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Calendar as CalendarIcon, Wallet, User, CheckCircle2, ArrowLeft, ArrowRight, Search, ChevronsUpDown } from 'lucide-react';
+import { Calendar as CalendarIcon, Wallet, User, CheckCircle2, ArrowLeft, ArrowRight, Search, ChevronsUpDown, Store } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
@@ -254,23 +254,36 @@ function TransactionsPageContent() {
             ) : (
                 filteredTransactions.map((tx, index) => (
                 <AccordionItem value={tx.id} key={tx.id}>
-                    <AccordionTrigger>
-                    <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
-                        <div className="mb-2 sm:mb-0">
-                            <p className="font-semibold text-sm sm:text-base font-mono">
-                              #{(currentPage - 1) * TRANSACTIONS_PER_PAGE + index + 1}. {tx.id}
-                            </p>
-                            <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyyy 'pukul' HH:mm", { locale: id })}</p>
-                            {tx.customerName && (
-                                <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1"><User size={12}/>{tx.customerName}</p>
-                            )}
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4 w-full text-left">
+                        <div className="col-span-2 sm:col-span-2 md:col-span-2">
+                          <p className="font-semibold font-mono text-sm">
+                            #{tx.id}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(tx.date, "dd MMM yyyy, HH:mm", { locale: id })}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-4 justify-between">
+                        <div className="col-span-2 sm:col-span-2 md:col-span-1 flex flex-col items-start">
+                          {tx.customerName && (
+                            <span className="text-sm flex items-center gap-1">
+                              <User size={12}/>{tx.customerName}
+                            </span>
+                          )}
+                          {tx.channel && (
+                            <Badge variant="outline" className="flex items-center gap-1 mt-1">
+                                <Store size={12} /> {tx.channel}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="col-span-1 sm:col-span-2 md:col-span-1 flex flex-col items-start sm:items-end">
                             {getPaymentBadge(tx)}
-                            <p className="font-bold text-md sm:text-lg text-primary">Rp {(tx.netTotal ?? tx.total).toLocaleString('id-ID')}</p>
+                        </div>
+                        <div className="col-span-1 sm:col-span-2 md:col-span-1 text-right">
+                          <p className="font-bold text-md text-primary">Rp {(tx.netTotal ?? tx.total).toLocaleString('id-ID')}</p>
                         </div>
                     </div>
-                    </AccordionTrigger>
+                  </AccordionTrigger>
                     <AccordionContent>
                     <div className="overflow-x-auto">
                          <Table>
