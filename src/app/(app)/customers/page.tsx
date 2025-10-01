@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Customer } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { CustomerTable } from '@/components/customers/customer-table';
 import { CustomerActions } from '@/components/customers/customer-actions';
 import { collection, onSnapshot, orderBy, query, limit, startAfter, endBefore, limitToLast, getDocs, DocumentData, Query } from 'firebase/firestore';
