@@ -4,6 +4,8 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Playfair_Display, Lato, Cormorant_Garamond, Nunito_Sans, Abril_Fatface, Source_Sans_3, Pacifico, Quicksand, Cinzel, Raleway } from "next/font/google";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const playfairDisplay = Playfair_Display({
   subsets: ['latin'],
@@ -86,8 +88,14 @@ export default function RootLayout({
           cinzel.variable,
           raleway.variable
         )}>
-        {children}
-        <Toaster />
+        <ThemeProvider>
+          <SidebarProvider>
+            <TooltipProvider>
+              {children}
+              <Toaster />
+            </TooltipProvider>
+          </SidebarProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

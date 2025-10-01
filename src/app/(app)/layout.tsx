@@ -13,12 +13,6 @@ export default async function AppLayout({
   const companySettings = await getCompanySettings();
 
   return (
-    <ThemeProvider>
-      <SidebarProvider>
-        <TooltipProvider>
-          <AppShell companyName={companySettings?.companyName || "Toko Kilat"}>{children}</AppShell>
-        </TooltipProvider>
-      </SidebarProvider>
-    </ThemeProvider>
+      <AppShell companyName={companySettings?.companyName || "Toko Kilat"}>{children}</AppShell>
   );
 }

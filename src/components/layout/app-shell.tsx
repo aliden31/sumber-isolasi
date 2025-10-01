@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { AppHeader } from './app-header';
 import { AppSidebar } from './app-sidebar';
 import { SidebarInset } from '@/components/ui/sidebar';
+import { usePathname } from 'next/navigation';
 
 export function AppShell({
   children,
@@ -14,6 +15,13 @@ export function AppShell({
   children: React.ReactNode;
   companyName: string;
 }) {
+  const pathname = usePathname();
+  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
+
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
   return (
     <>
       <AppSidebar companyName={companyName} />

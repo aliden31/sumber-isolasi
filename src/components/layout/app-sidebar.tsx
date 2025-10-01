@@ -3,7 +3,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart2,
   Book,
@@ -87,6 +87,9 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { ThemeToggle } from "./theme-toggle";
 import { TokoKilatLogo } from "../icons/logo";
+import { logout } from "@/app/auth/actions";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "../ui/button";
 
 const navItems = [
   {
@@ -203,10 +206,22 @@ const navItems = [
 
 export function AppSidebar({ companyName }: { companyName: string }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
 
   const isActive = (href: string) => pathname === href;
   const isSubActive = (subItems: any[]) =>
     subItems.some((item) => item.href && isActive(item.href));
+
+  const handleLogout = async () => {
+    const result = await logout();
+    if (result.error) {
+        toast({ title: 'Logout Gagal', description: result.error, variant: 'destructive' });
+    } else {
+        toast({ title: 'Anda telah berhasil logout.' });
+        router.push('/login');
+    }
+  }
 
   return (
     <Sidebar
@@ -285,8 +300,12 @@ export function AppSidebar({ companyName }: { companyName: string }) {
           )}
         </SidebarMenu>
       </SidebarContent>
-       <SidebarFooter>
+       <SidebarFooter className="flex flex-col gap-2">
         <ThemeToggle />
+         <Button onClick={handleLogout} variant="ghost" className="w-full justify-start gap-2 px-2">
+            <LogOut />
+            <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );
