@@ -82,6 +82,7 @@ export function CustomerTable({ data }: CustomerTableProps) {
             <TableRow>
                 <TableHead className="min-w-[200px]">Nama Pelanggan</TableHead>
                 <TableHead>No. Telepon</TableHead>
+                <TableHead className="min-w-[250px]">Alamat</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
             </TableHeader>
@@ -96,6 +97,7 @@ export function CustomerTable({ data }: CustomerTableProps) {
                     </DialogTrigger>
                 </TableCell>
                 <TableCell>{customer.phone}</TableCell>
+                <TableCell>{customer.address}</TableCell>
                 <TableCell className="text-right">
                     <CustomerRowActions customer={customer} />
                 </TableCell>
