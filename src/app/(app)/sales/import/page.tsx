@@ -35,7 +35,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import * as XLSX from 'xlsx';
 import { format, parse } from 'date-fns';
-import type { Product, MappedRow } from '@/lib/types';
+import type { Product, ImportRow } from '@/lib/types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
@@ -46,46 +46,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from '@/lib/utils';
 
 
-// Expanded mapping to handle various column names from different marketplaces
-const COLUMN_MAPPINGS: { [key: string]: keyof MappedRow | 'harga_awal_produk' } = {
-  'waktu pesanan dibuat': 'tanggal_order',
-  'tanggal order': 'tanggal_order',
-  'nomor pesanan': 'nomor_order',
-  'order id': 'nomor_order',
-  'no. pesanan': 'nomor_order',
-  'marketplace': 'channel',
-  'channel': 'channel',
-  'nama pembeli': 'nama_pembeli',
-  'alamat pengiriman': 'alamat_lengkap',
-  'alamat': 'alamat_lengkap',
-  'sku gudang': 'sku',
-  'sku induk': 'sku',
-  'informasi sku': 'sku',
-  'jumlah': 'qty',
-  'jumlah produk dibeli': 'qty',
-  'kuantitas': 'qty',
-  'harga asli produk': 'harga_awal_produk',
-  'harga awal': 'harga_awal_produk',
-  'harga satuan': 'unit_price',
-  'harga jual (rp)': 'unit_price',
-  'harga modal': 'cost', // Added to read cost directly
-  'harga pokok': 'cost',
-  'subtotal produk': 'subtotal',
-  'total penjualan (rp)': 'subtotal',
-  'ongkos kirim': 'shipping',
-  'biaya pengiriman': 'shipping',
-  'biaya pengelolaan': 'fee', 
-  'biaya transaksi': 'fee',   
-  'diskon dari penjual': 'discount',
-  'diskon marketplace': 'discount', 
-  'voucher': 'discount',
-  'voucher toko': 'discount',
-};
-
-
 export default function ImportMarketplacePage() {
   const [file, setFile] = useState<File | null>(null);
-  const [parsedData, setParsedData] = useState<MappedRow[]>([]);
+  const [parsedData, setParsedData] = useState<ImportRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [skuToProductMap, setSkuToProductMap] = useState<Record<string, Product | null>>({});
 
@@ -142,7 +105,6 @@ export default function ImportMarketplacePage() {
   const normalizeNumber = (value: any): number => {
     if (typeof value === 'number') return value;
     if (typeof value === 'string') {
-        // Remove currency symbols, thousands separators, and then parse
         return parseFloat(value.replace(/[^0-9,.-]+/g, '').replace(',', '.')) || 0;
     }
     return 0;
@@ -172,8 +134,7 @@ export default function ImportMarketplacePage() {
                 const initialSkuMap: Record<string, Product | null> = {};
                 const processedOrdersForFee = new Set<string>();
 
-
-                const mappedData: MappedRow[] = dataRows.map((row, rowIndex) => {
+                const mappedData: ImportRow[] = dataRows.map((row, rowIndex) => {
                     const rowData: {[key: string]: any} = {};
                     header.forEach((h, index) => {
                         rowData[h] = row[index];
@@ -186,7 +147,6 @@ export default function ImportMarketplacePage() {
                         return undefined;
                     }
 
-                    // --- Extraction & Normalization ---
                     const tanggal_order_raw = getVal(['waktu pesanan dibuat', 'tanggal order']);
                     const nomor_order = String(getVal(['nomor pesanan', 'order id', 'no. pesanan']) || '');
                     const channel = String(getVal(['marketplace', 'channel']) || 'N/A');
@@ -200,13 +160,12 @@ export default function ImportMarketplacePage() {
                     const unit_price = harga_awal > 0 ? harga_awal : harga_satuan;
 
                     const cost = normalizeNumber(getVal(['harga modal', 'harga pokok']));
-
                     let subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)'])) || (unit_price * qty);
                     const shipping = normalizeNumber(getVal(['ongkos kirim', 'biaya pengiriman']));
 
                     let fee = 0;
                     if (!processedOrdersForFee.has(nomor_order)) {
-                        if (channel.toLowerCase() === 'tiktok') {
+                         if (channel.toLowerCase().includes('tiktok')) {
                             const dynamicFee = subtotal * 0.08;
                             const additionalFee = Math.min(subtotal * 0.055, 40000);
                             fee = dynamicFee + additionalFee + 1250;
@@ -219,16 +178,9 @@ export default function ImportMarketplacePage() {
                     }
                     
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
-                    const voucher_toko_raw = normalizeNumber(getVal(['voucher toko']));
+                    const voucher_toko = normalizeNumber(getVal(['voucher toko']));
                     const diskon_penjual = normalizeNumber(getVal(['diskon dari penjual']));
-
-                    let voucher_toko = voucher_toko_raw;
-                    if (channel.toLowerCase() === 'tiktok') {
-                        voucher_toko = 0; // Do not use voucher toko for tiktok
-                    }
-                    
                     const discount = diskon_marketplace + voucher_toko + diskon_penjual;
-                    
                     const net_total = subtotal - fee - discount;
 
                     let tanggal_order_formatted = 'N/A';
@@ -249,6 +201,7 @@ export default function ImportMarketplacePage() {
                         tanggal_order: tanggal_order_formatted,
                         nomor_order, channel, nama_pembeli, alamat_lengkap, sku, qty, unit_price,
                         cost, subtotal, shipping, fee, discount, net_total,
+                        mappedProduct: null
                     };
                 }).filter(row => row.nomor_order && row.sku);
 

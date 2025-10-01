@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import {
@@ -19,7 +20,6 @@ import type {
   Product,
   JournalEntry,
   NewJournal,
-  MappedRow,
   NewCustomer,
   ProductUnit,
   ImportRow,
@@ -34,7 +34,6 @@ const createResponse = (
   id: string | null = null
 ) => ({ error, id });
 
-// Helper function to query in chunks
 async function queryInChunks<T>(
   ref: any,
   field: string,
