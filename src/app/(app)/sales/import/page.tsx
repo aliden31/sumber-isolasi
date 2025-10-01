@@ -65,25 +65,22 @@ export default function ImportMarketplacePage() {
     return () => unsub();
   }, []);
 
-  const { allProductsMapped, uniqueOrderCount, totalItems } = useMemo(() => {
+  const { allProductsMapped, uniqueOrderCount, totalItems, unmappedSkus } = useMemo(() => {
     if (parsedData.length === 0) {
-      return { allProductsMapped: false, uniqueOrderCount: 0, totalItems: 0 };
+      return { allProductsMapped: false, uniqueOrderCount: 0, totalItems: 0, unmappedSkus: [] };
     }
-    const unmappedSkus = new Set(parsedData.map(row => row.sku));
-    let allMapped = true;
-    for (const sku of unmappedSkus) {
-        if (!skuToProductMap[sku]) {
-            allMapped = false;
-            break;
-        }
-    }
+    
+    const uniqueSkus = [...new Set(parsedData.map(row => row.sku))];
+    const unmapped = uniqueSkus.filter(sku => !skuToProductMap[sku]);
+
     const uniqueOrders = new Set(parsedData.map(row => row.nomor_order));
     const totalItems = parsedData.reduce((sum, row) => sum + row.qty, 0);
 
     return { 
-      allProductsMapped: allMapped, 
+      allProductsMapped: unmapped.length === 0, 
       uniqueOrderCount: uniqueOrders.size,
-      totalItems
+      totalItems,
+      unmappedSkus: unmapped
     };
   }, [parsedData, skuToProductMap]);
 
@@ -282,7 +279,7 @@ export default function ImportMarketplacePage() {
       {parsedData.length > 0 && (
         <Card>
             <CardHeader>
-                <CardTitle>Langkah 2: Pratinjau & Konfirmasi</CardTitle>
+                <CardTitle>Langkah 2: Pratinjau & Pemetaan</CardTitle>
                 <CardDescription>
                   Periksa data yang berhasil di-parse dan petakan produk yang belum ditemukan. SKU di laporan harus cocok dengan SKU Gudang di data produk.
                   <br />
@@ -291,6 +288,33 @@ export default function ImportMarketplacePage() {
                   </span>
                 </CardDescription>
             </CardHeader>
+            {unmappedSkus.length > 0 && (
+                <CardContent>
+                    <Alert variant="destructive" className="mb-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Diperlukan Pemetaan</AlertTitle>
+                        <AlertDescription>
+                            {unmappedSkus.length} SKU dari laporan tidak dapat ditemukan di database produk Anda. Harap petakan secara manual di bawah ini.
+                        </AlertDescription>
+                    </Alert>
+                    <div className="max-h-[300px] overflow-y-auto border rounded-md p-4 space-y-4">
+                        {unmappedSkus.map(sku => (
+                            <div key={sku} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                <div>
+                                    <p className="text-sm font-semibold">SKU Laporan:</p>
+                                    <p className="text-sm text-muted-foreground">{sku}</p>
+                                </div>
+                                <ProductMappingCell
+                                    sku={sku}
+                                    mappedProduct={skuToProductMap[sku]}
+                                    allProducts={products}
+                                    onMap={(p) => handleProductMapping(sku, p)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            )}
             <CardContent>
                 <div className="max-h-[500px] overflow-y-auto border rounded-md">
                     <Table>
@@ -334,7 +358,7 @@ export default function ImportMarketplacePage() {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>Pemetaan Belum Selesai</AlertTitle>
                         <AlertDescription>
-                            Beberapa produk tidak dapat dipetakan secara otomatis. Harap pilih produk yang benar dari dropdown sebelum melanjutkan.
+                            Harap petakan semua produk yang tidak ditemukan sebelum mengimpor.
                         </AlertDescription>
                     </Alert>
                  )}
@@ -366,7 +390,7 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" role="combobox" aria-expanded={open} className="w-[200px] justify-between text-destructive">
+                <Button variant="outline" size="sm" role="combobox" aria-expanded={open} className="w-full justify-between text-destructive">
                     Pilih Produk...
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -397,3 +421,4 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
