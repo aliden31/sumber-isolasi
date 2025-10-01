@@ -192,7 +192,10 @@ export default function ImportMarketplacePage() {
 
                     let fee = 0;
                     if (channel.toLowerCase() === 'tiktok') {
-                        fee = (subtotal * 0.15) + 1250;
+                        const dynamicFee = subtotal * 0.08;
+                        const additionalFee = Math.min(subtotal * 0.055, 40000);
+                        const processingFee = 1250;
+                        fee = dynamicFee + additionalFee + processingFee;
                     } else {
                         const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
                         const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
@@ -412,3 +415,4 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
