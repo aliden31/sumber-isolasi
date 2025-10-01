@@ -1,29 +1,46 @@
+'use client';
 
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Customer } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CustomerTable } from '@/components/customers/customer-table';
 import { CustomerActions } from '@/components/customers/customer-actions';
-import { collection, getDocs, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-react';
 
-async function getCustomers(): Promise<Customer[]> {
-  const customersCol = collection(db, "customers");
-  const customerSnapshot = await getDocs(customersCol);
-  const customerList = customerSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-    } as Customer;
-  });
-  return customerList;
-}
+export default function CustomersPage() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
-export default async function CustomersPage() {
-  const customers = await getCustomers();
+  useEffect(() => {
+    const customersCol = collection(db, "customers");
+    const q = query(customersCol, orderBy('name'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const customerList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+        } as Customer;
+      });
+      setCustomers(customerList);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(customer =>
+      customer.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [customers, searchQuery]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -34,9 +51,23 @@ export default async function CustomersPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-headline">Daftar Pelanggan</CardTitle>
+          <div className="pt-4">
+            <Input
+              placeholder="Cari nama pelanggan..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
         </CardHeader>
         <CardContent>
-          <CustomerTable data={customers} />
+          {loading ? (
+            <div className="flex justify-center items-center h-48">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <CustomerTable data={filteredCustomers} />
+          )}
         </CardContent>
       </Card>
     </div>
