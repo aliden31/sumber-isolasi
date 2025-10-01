@@ -73,12 +73,26 @@ export default function GeneralLedgerPage() {
 
     let runningBalance = 0; // This will need to be calculated based on previous data
     const entries: LedgerEntry[] = [];
-    let transactionCount = 0;
-
-    // This is a simplified approach. A full-featured pagination would require more complex balance calculation.
-    // For now, we fetch ALL journals up to the current page to calculate the balance correctly.
-    // This is not ideal for performance but works for moderate data sizes.
     
+    // --- Phase 1: Calculate beginning balance ---
+    let beginningBalance = 0;
+    const allJournalsBeforeDateQuery = query(
+        collection(db, 'journals'),
+        where('date', '<', dateRange?.from ? Timestamp.fromDate(dateRange.from) : Timestamp.now())
+    );
+    const journalsBeforeSnap = await getDocs(allJournalsBeforeDateQuery);
+    journalsBeforeSnap.docs.forEach(journalDoc => {
+        const journal = journalDoc.data() as Journal;
+        journal.entries.forEach(entry => {
+            if (entry.accountId === selectedAccountId) {
+                beginningBalance += entry.debit - entry.credit;
+            }
+        });
+    });
+    
+    runningBalance = beginningBalance;
+    
+    // --- Phase 2: Fetch all relevant entries within the date range ---
     let allJournalsQuery = query(
         collection(db, 'journals'), 
         orderBy("date", "asc")
@@ -110,26 +124,40 @@ export default function GeneralLedgerPage() {
         });
     });
 
+    // --- Phase 3: Paginate and calculate running balance for the current page ---
+    const sortedEntriesForDisplay = allRelevantEntries.sort((a,b) => b.journalDate.getTime() - a.journalDate.getTime());
     const startIndex = (page - 1) * LEDGER_PAGE_SIZE;
     const endIndex = page * LEDGER_PAGE_SIZE;
-    
-    for (let i = 0; i < Math.min(endIndex, allRelevantEntries.length); i++) {
-        const entry = allRelevantEntries[i];
-        runningBalance += entry.debit - entry.credit;
+    const pagedEntries = sortedEntriesForDisplay.slice(startIndex, endIndex);
 
-        if (i >= startIndex) {
-            entries.push({
-                date: entry.journalDate,
-                ref: entry.journalRef,
-                desc: entry.journalDesc,
-                debit: entry.debit,
-                credit: entry.credit,
-                balance: runningBalance,
-            });
-        }
-    }
+    // To calculate the balance correctly up to the first item on the current page,
+    // we need to process all entries that came before it.
+    const lastDateOnPage = pagedEntries.length > 0 ? pagedEntries[pagedEntries.length - 1].journalDate : new Date();
     
-    setLedgerEntries(entries.sort((a, b) => b.date.getTime() - a.date.getTime()));
+    const entriesForBalanceCalc = allRelevantEntries
+        .filter(entry => entry.journalDate < lastDateOnPage)
+        .sort((a, b) => a.journalDate.getTime() - b.journalDate.getTime());
+
+    let balanceUpToPage = beginningBalance;
+    entriesForBalanceCalc.forEach(entry => {
+        balanceUpToPage += entry.debit - entry.credit;
+    });
+
+    // Now, calculate balance for the paged entries
+    const finalPageEntries: LedgerEntry[] = [];
+    pagedEntries.reverse().forEach(entry => {
+        balanceUpToPage += entry.debit - entry.credit;
+        finalPageEntries.push({
+            date: entry.journalDate,
+            ref: entry.journalRef,
+            desc: entry.journalDesc,
+            debit: entry.debit,
+            credit: entry.credit,
+            balance: balanceUpToPage
+        });
+    });
+
+    setLedgerEntries(finalPageEntries.reverse());
     setLoading(false);
 
   }, [selectedAccountId, dateRange]);
