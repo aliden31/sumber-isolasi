@@ -6,13 +6,21 @@ export function middleware(request: NextRequest) {
   const session = request.cookies.get('session');
   const { pathname } = request.nextUrl;
 
-  // If there's no session and the user is not trying to access login/register
-  if (!session && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  // Always redirect from /login to /dashboard to "turn it off"
+  if (pathname.startsWith('/login')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // If there is a session and the user tries to access login/register, redirect to dashboard
-  if (session && (pathname.startsWith('/login') || pathname.startsWith('/register'))) {
+  // If there's no session and the user is not trying to access login/register
+  if (!session && !pathname.startsWith('/register')) {
+    // Since /login is off, we can't redirect there. 
+    // For now, we will let it pass, but a real-world scenario might redirect to a "coming soon" or home page.
+    // Let's redirect to register page instead as a fallback.
+    return NextResponse.redirect(new URL('/register', request.url));
+  }
+
+  // If there is a session and the user tries to access register, redirect to dashboard
+  if (session && pathname.startsWith('/register')) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   
