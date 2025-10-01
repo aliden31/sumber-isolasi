@@ -40,6 +40,7 @@ import {
 import { collection, onSnapshot, query, where, Timestamp, orderBy, limit, startAfter, DocumentData, getDocs, Query, endBefore, limitToLast } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
 
 const TRANSACTIONS_PER_PAGE = 100;
 
@@ -258,18 +259,18 @@ function TransactionsPageContent() {
                                     <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
                                     <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
-                                {tx.discount && (
+                                {tx.discount ? (
                                 <TableRow>
                                     <TableCell colSpan={3} className="text-right">Diskon</TableCell>
                                     <TableCell className="text-right text-destructive">- Rp {tx.discount.toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
-                                )}
-                                {tx.fee && (
+                                ) : null}
+                                {tx.fee ? (
                                      <TableRow>
                                         <TableCell colSpan={3} className="text-right">Biaya Marketplace</TableCell>
                                         <TableCell className="text-right text-destructive">- Rp {tx.fee.toLocaleString('id-ID')}</TableCell>
                                     </TableRow>
-                                )}
+                                ) : null}
                                 <TableRow className="font-bold">
                                     <TableCell colSpan={3} className="text-right">Total Bersih</TableCell>
                                     <TableCell className="text-right">Rp {tx.netTotal?.toLocaleString('id-ID')}</TableCell>
