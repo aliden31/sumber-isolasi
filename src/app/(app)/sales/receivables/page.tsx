@@ -2,14 +2,14 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, limit, startAfter, DocumentData, getDocs, endBefore, limitToLast } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Transaction, Account } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Loader2, ReceiptText, CheckCircle2 } from 'lucide-react';
+import { Loader2, ReceiptText, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,33 +25,86 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+const TRANSACTIONS_PER_PAGE = 500;
+
 export default function AccountsReceivablePage() {
   const [receivables, setReceivables] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalReceivables, setTotalReceivables] = useState(0);
+
+  const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
+  const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'transactions'), where('status', '==', 'Belum Lunas'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const unpaidTxs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date.toDate(),
-      } as Transaction));
-      setReceivables(unpaidTxs);
-      setLoading(false);
+    // Listener for total receivables amount
+    const qTotal = query(collection(db, 'transactions'), where('status', '==', 'Belum Lunas'));
+    const unsubTotal = onSnapshot(qTotal, (snapshot) => {
+      let total = 0;
+      snapshot.forEach(doc => {
+        total += doc.data().total;
+      });
+      setTotalReceivables(total);
     });
-    return () => unsubscribe();
+
+    fetchReceivables('initial');
+
+    return () => unsubTotal();
   }, []);
 
-  const totalReceivables = receivables.reduce((sum, tx) => sum + tx.total, 0);
+  const fetchReceivables = async (direction: 'next' | 'prev' | 'initial' = 'initial') => {
+    setLoading(true);
+    const receivablesCol = collection(db, "transactions");
+    
+    const baseQuery = query(receivablesCol, where('status', '==', 'Belum Lunas'), orderBy('date', 'desc'));
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+    let q;
+    if (direction === 'next' && lastVisible) {
+        q = query(baseQuery, startAfter(lastVisible), limit(TRANSACTIONS_PER_PAGE));
+    } else if (direction === 'prev' && firstVisible) {
+        q = query(baseQuery, endBefore(firstVisible), limitToLast(TRANSACTIONS_PER_PAGE));
+    } else {
+        q = query(baseQuery, limit(TRANSACTIONS_PER_PAGE));
+    }
+    
+    const snapshot = await getDocs(q);
+
+    const transactionList = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        date: data.date.toDate(),
+      } as Transaction;
+    });
+
+    setReceivables(transactionList);
+    setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+    setFirstVisible(snapshot.docs[0]);
+    
+    if (snapshot.docs.length < TRANSACTIONS_PER_PAGE && direction !== 'prev') {
+        setHasNextPage(false);
+    } else {
+        const nextQuery = query(baseQuery, startAfter(snapshot.docs[snapshot.docs.length - 1]), limit(1));
+        const nextSnapshot = await getDocs(nextQuery);
+        setHasNextPage(!nextSnapshot.empty);
+    }
+    
+    setLoading(false);
+  };
+  
+  const handleNextPage = () => {
+    setCurrentPage(prev => prev + 1);
+    fetchReceivables('next');
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+      fetchReceivables('prev');
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -85,7 +138,9 @@ export default function AccountsReceivablePage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {receivables.length === 0 ? (
+                    {loading ? (
+                         <TableRow><TableCell colSpan={6} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
+                    ) : receivables.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
                                 Tidak ada piutang yang belum lunas.
@@ -102,7 +157,7 @@ export default function AccountsReceivablePage() {
                                 </TableCell>
                                 <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
                                 <TableCell className="text-right">
-                                    <SettlePaymentDialog transaction={tx} />
+                                    <SettlePaymentDialog transaction={tx} onSettled={() => fetchReceivables('initial')}/>
                                 </TableCell>
                             </TableRow>
                         ))
@@ -110,12 +165,23 @@ export default function AccountsReceivablePage() {
                 </TableBody>
             </Table>
         </CardContent>
+        <CardFooter className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Halaman {currentPage}</span>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handlePrevPage} disabled={currentPage === 1 || loading}>
+                    <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
+                </Button>
+                <Button variant="outline" onClick={handleNextPage} disabled={!hasNextPage || loading}>
+                    Berikutnya <ArrowRight className="ml-2 h-4 w-4"/>
+                </Button>
+            </div>
+        </CardFooter>
       </Card>
     </div>
   );
 }
 
-function SettlePaymentDialog({ transaction }: { transaction: Transaction }) {
+function SettlePaymentDialog({ transaction, onSettled }: { transaction: Transaction, onSettled: () => void }) {
     const [open, setOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
     const { toast } = useToast();
@@ -141,6 +207,7 @@ function SettlePaymentDialog({ transaction }: { transaction: Transaction }) {
                 toast({ title: 'Gagal melunasi piutang', description: result.error, variant: 'destructive' });
             } else {
                 toast({ title: 'Piutang berhasil dilunasi!' });
+                onSettled();
                 setOpen(false);
             }
         });
@@ -183,5 +250,3 @@ function SettlePaymentDialog({ transaction }: { transaction: Transaction }) {
         </Dialog>
     );
 }
-
-    
