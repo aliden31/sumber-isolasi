@@ -58,10 +58,6 @@ export async function deleteSingleCollection(collectionName: string) {
             // Apply all stock adjustments
             for (const productId in stockAdjustments) {
                 const productRef = doc(db, 'products', productId);
-                // We need to get the current stock within the batch logic if possible, but Firestore batch doesn't support reads.
-                // A transaction would be better here, but let's assume we can read before batching for simplicity, though this can have race conditions.
-                // For a more robust solution, one would use Cloud Functions or a more complex transaction flow.
-                // For this context, we will read before writing to the batch.
                 const productSnap = await getDoc(productRef);
                 if (productSnap.exists()) {
                     const productData = productSnap.data() as Product;
@@ -76,6 +72,41 @@ export async function deleteSingleCollection(collectionName: string) {
         return createResponse();
     } catch(e) {
         return createResponse(e instanceof Error ? e.message : `Gagal menghapus koleksi ${collectionName}.`);
+    }
+}
+
+
+export async function deleteAllDataFromGroup(collectionNames: string[]) {
+    try {
+        for (const collectionName of collectionNames) {
+            const collectionRef = collection(db, collectionName);
+            const snapshot = await getDocs(query(collectionRef));
+
+            if (snapshot.empty) continue;
+            
+            // Firestore allows batching up to 500 operations.
+            let batch = writeBatch(db);
+            let count = 0;
+            
+            for (const docSnap of snapshot.docs) {
+                batch.delete(docSnap.ref);
+                count++;
+                if (count === 499) {
+                    await batch.commit();
+                    batch = writeBatch(db);
+                    count = 0;
+                }
+            }
+            if (count > 0) {
+                 await batch.commit();
+            }
+        }
+        
+        revalidateAllPaths();
+        return createResponse();
+
+    } catch (e) {
+        return createResponse(e instanceof Error ? e.message : "Terjadi kesalahan saat menghapus grup data.");
     }
 }
 

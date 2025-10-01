@@ -15,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { deleteSingleCollection } from './actions';
+import { deleteSingleCollection, deleteAllDataFromGroup } from './actions';
 import { Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -86,7 +86,7 @@ function DeleteAction({ collection }: DeleteActionProps) {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Hapus Koleksi Data "{collection.name}"?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Tindakan ini tidak dapat diurungkan. Ini akan menghapus semua dokumen di dalam koleksi <code className="bg-muted px-1 rounded-sm">{collection.name}</code> secara permanen.
+                        Tindakan ini tidak dapat diurungkan. Ini akan menghapus semua dokumen di dalam koleksi <code className="bg-muted px-1 rounded-sm">{collection.name}</code> secara permanen. Stok produk akan dikembalikan ke kondisi sebelum transaksi terjadi (jika relevan).
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -100,6 +100,51 @@ function DeleteAction({ collection }: DeleteActionProps) {
             </AlertDialog>
         </TableCell>
     </TableRow>
+  );
+}
+
+function DeleteGroupAction({ groupName, collections }: { groupName: string, collections: { name: string }[] }) {
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleConfirm = () => {
+    startTransition(async () => {
+      const collectionNames = collections.map(c => c.name);
+      const result = await deleteAllDataFromGroup(collectionNames);
+      if (result.error) {
+        toast({ title: 'Gagal Menghapus Grup Data', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Berhasil', description: `Semua data di grup "${groupName}" telah berhasil dihapus.` });
+      }
+    });
+  };
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="destructive" className="w-full">
+          <Trash2 className="mr-2 h-4 w-4" /> Hapus Semua Data {groupName}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Hapus Semua Data Grup "{groupName}"?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Anda akan menghapus semua data untuk {collections.length} koleksi di grup ini.
+            Tindakan ini tidak dapat diurungkan dan akan menghapus data secara permanen.
+            <br/><br/>
+            <strong className="text-destructive">Peringatan:</strong> Tindakan ini TIDAK akan mengembalikan stok produk.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirm} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Ya, Hapus Semua Data Grup Ini
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -140,9 +185,7 @@ export default function DangerZonePage() {
                     </Table>
                 </CardContent>
                 <CardFooter>
-                     <Button variant="destructive" className="w-full">
-                        <Trash2 className="mr-2 h-4 w-4" /> Hapus Semua Data {groupName}
-                    </Button>
+                     <DeleteGroupAction groupName={groupName} collections={collections} />
                 </CardFooter>
             </Card>
         ))}
