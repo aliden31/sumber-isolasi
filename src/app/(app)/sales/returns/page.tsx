@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useMemo, useEffect } from 'react';
@@ -38,15 +39,15 @@ export default function SalesReturnsPage() {
   useEffect(() => {
     const q = query(
       collection(db, 'transactions'), 
-      where('paymentMethod', '==', 'Kredit'),
       orderBy('date', 'desc')
     );
     const unsub = onSnapshot(q, (snapshot) => {
-        setCreditTransactions(snapshot.docs.map(doc => ({
+        const allTransactions = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
             date: doc.data().date.toDate()
-        } as Transaction)))
+        } as Transaction));
+        setCreditTransactions(allTransactions.filter(tx => tx.paymentMethod === 'Kredit'));
     });
     return () => unsub();
   }, []);
