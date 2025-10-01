@@ -182,7 +182,7 @@ export default function ImportMarketplacePage() {
                         return undefined;
                     }
 
-                    const tanggal_order_raw = getVal(['waktu pesanan dibuat', 'tanggal order']);
+                    const tanggal_order_raw = getVal(['tanggal order']);
                     const nomor_order = String(getVal(['nomor pesanan', 'order id', 'no. pesanan']) || '');
                     const channel = String(getVal(['marketplace', 'channel']) || 'N/A');
                     const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
@@ -459,5 +459,6 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
 
 
