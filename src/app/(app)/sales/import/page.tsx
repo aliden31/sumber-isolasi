@@ -159,6 +159,8 @@ export default function ImportMarketplacePage() {
                 const dataRows = json.slice(1);
                 
                 const initialSkuMap: Record<string, Product | null> = {};
+                const processedTiktokOrders = new Set<string>();
+
 
                 const mappedData: MappedRow[] = dataRows.map((row, rowIndex) => {
                     const rowData: {[key: string]: any} = {};
@@ -195,7 +197,11 @@ export default function ImportMarketplacePage() {
                     if (channel.toLowerCase() === 'tiktok') {
                         const dynamicFee = subtotal * 0.08;
                         const additionalFee = Math.min(subtotal * 0.055, 40000);
-                        const processingFee = 1250;
+                        let processingFee = 0;
+                        if (!processedTiktokOrders.has(nomor_order)) {
+                            processingFee = 1250;
+                            processedTiktokOrders.add(nomor_order);
+                        }
                         fee = dynamicFee + additionalFee + processingFee;
                     } else {
                         const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
@@ -422,4 +428,3 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
-
