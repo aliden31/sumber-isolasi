@@ -25,6 +25,7 @@ import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestor
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import Link from 'next/link';
 
 interface CustomerTableProps {
   data: Customer[];
@@ -80,7 +81,6 @@ export function CustomerTable({ data }: CustomerTableProps) {
             <TableHeader>
             <TableRow>
                 <TableHead className="min-w-[200px]">Nama Pelanggan</TableHead>
-                <TableHead className="min-w-[250px]">Alamat</TableHead>
                 <TableHead>No. Telepon</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
@@ -95,7 +95,6 @@ export function CustomerTable({ data }: CustomerTableProps) {
                         </Button>
                     </DialogTrigger>
                 </TableCell>
-                <TableCell>{customer.address}</TableCell>
                 <TableCell>{customer.phone}</TableCell>
                 <TableCell className="text-right">
                     <CustomerRowActions customer={customer} />
@@ -126,6 +125,7 @@ export function CustomerTable({ data }: CustomerTableProps) {
                             <TableRow>
                                 <TableHead>Tanggal</TableHead>
                                 <TableHead>No. Transaksi</TableHead>
+                                <TableHead>Produk</TableHead>
                                 <TableHead className="text-right">Total</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -133,7 +133,16 @@ export function CustomerTable({ data }: CustomerTableProps) {
                             {transactions.map(tx => (
                                 <TableRow key={tx.id}>
                                     <TableCell>{format(tx.date, 'dd MMM yyyy, HH:mm')}</TableCell>
-                                    <TableCell className="font-mono text-xs">{tx.id}</TableCell>
+                                    <TableCell>
+                                      <Button variant="link" asChild className="p-0 h-auto font-mono text-xs">
+                                        <Link href={`/transactions?search=${tx.id}`}>
+                                          {tx.id}
+                                        </Link>
+                                      </Button>
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                        {tx.items.map(item => item.productName).join(', ')}
+                                    </TableCell>
                                     <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
                             ))}

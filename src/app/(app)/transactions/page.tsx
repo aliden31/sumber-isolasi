@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Calendar as CalendarIcon, Wallet, User, CheckCircle2, ArrowLeft, ArrowRight, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -42,7 +43,10 @@ import { Loader2 } from 'lucide-react';
 
 const TRANSACTIONS_PER_PAGE = 100;
 
-export default function TransactionsPage() {
+function TransactionsPageContent() {
+  const searchParams = useSearchParams();
+  const initialSearchId = searchParams.get('search') || '';
+
   const [date, setDate] = useState<DateRange | undefined>();
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +54,7 @@ export default function TransactionsPage() {
   const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
-  const [searchId, setSearchId] = useState('');
+  const [searchId, setSearchId] = useState(initialSearchId);
 
   useEffect(() => {
     fetchTransactions();
@@ -202,7 +206,7 @@ export default function TransactionsPage() {
             </div>
         </CardHeader>
         <CardContent>
-          <Accordion type="single" collapsible className="w-full">
+          <Accordion type="single" collapsible className="w-full" defaultValue={initialSearchId || undefined}>
             {loading ? (
                 <div className="text-center py-10 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin mr-2"/>Memuat data transaksi...</div>
             ) : filteredTransactions.length === 0 ? (
@@ -296,6 +300,14 @@ export default function TransactionsPage() {
   );
 }
 
+export default function TransactionsPage() {
+    return (
+        <React.Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+            <TransactionsPageContent />
+        </React.Suspense>
+    )
+}
+
 // Ensure DateRangePicker component accepts onSelect prop
 declare module '@/components/ui/date-range-picker' {
     interface DateRangePickerProps {
@@ -303,5 +315,3 @@ declare module '@/components/ui/date-range-picker' {
         className?: string;
     }
 }
-
-    
