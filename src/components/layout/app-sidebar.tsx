@@ -186,7 +186,6 @@ const navItems = [
       { href: "/suppliers", label: "Pemasok", icon: Factory },
       { href: "/taxes", label: "Pajak", icon: Percent },
       { href: "/currencies", label: "Mata Uang", icon: Coins },
-      { href: "/users", label: "Pengguna", icon: UserCheck, isDev: true },
     ],
   },
   {
