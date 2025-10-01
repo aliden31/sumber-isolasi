@@ -2,15 +2,15 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, Timestamp, orderBy, getDocs, limit, startAfter, endBefore, limitToLast, Query, DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { PurchaseOrder } from '@/lib/types';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, DollarSign, ShoppingCart, Truck, Download } from 'lucide-react';
+import { Loader2, DollarSign, ShoppingCart, Truck, Download, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Bar, BarChart, XAxis, YAxis, Tooltip } from 'recharts';
 import { ChartTooltip, ChartTooltipContent, ChartContainer } from "@/components/ui/chart";
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 (jsPDF as any).autoTableSetDefaults({
     headStyles: { fillColor: [15, 23, 42] },
@@ -46,9 +47,16 @@ export default function PurchasingReportPage() {
   });
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
 
-  useEffect(() => {
+  const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
+  const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
+  const [page, setPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [hasNextPage, setHasNextPage] = useState(false);
+
+  const fetchPOs = async (direction: 'next' | 'prev' | 'initial') => {
     setLoading(true);
-    let q = query(collection(db, 'purchaseOrders'), orderBy('date', 'desc'));
+    let q: Query<DocumentData>;
+    let baseQuery = query(collection(db, 'purchaseOrders'), orderBy('date', 'desc'));
 
     if (dateRange?.from) {
         const from = Timestamp.fromDate(dateRange.from);
@@ -56,23 +64,47 @@ export default function PurchasingReportPage() {
         const toDayEnd = new Date(dateRange.to || dateRange.from);
         toDayEnd.setHours(23, 59, 59, 999);
         to = Timestamp.fromDate(toDayEnd);
-        
-        q = query(q, where("date", ">=", from), where("date", "<=", to));
+        baseQuery = query(baseQuery, where("date", ">=", from), where("date", "<=", to));
+    }
+    
+    if (direction === 'next' && lastVisible) {
+      q = query(baseQuery, startAfter(lastVisible), limit(itemsPerPage));
+    } else if (direction === 'prev' && firstVisible) {
+      q = query(baseQuery, endBefore(firstVisible), limitToLast(itemsPerPage));
+    } else {
+      q = query(baseQuery, limit(itemsPerPage));
     }
 
-    const unsub = onSnapshot(q, (snapshot) => {
-        setPurchaseOrders(snapshot.docs.map(doc => {
-            const data = doc.data();
-            return { id: doc.id, ...data, date: data.date.toDate() } as PurchaseOrder;
-        }));
-        setLoading(false);
-    }, (error) => {
-        console.error("Error fetching purchase orders:", error);
-        setLoading(false);
-    });
+    const snapshot = await getDocs(q);
+    const pos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date.toDate() } as PurchaseOrder));
+    
+    setPurchaseOrders(pos);
+    setLastVisible(snapshot.docs[snapshot.docs.length-1]);
+    setFirstVisible(snapshot.docs[0]);
 
-    return () => unsub();
-  }, [dateRange]);
+    const nextQuery = query(baseQuery, startAfter(snapshot.docs[snapshot.docs.length - 1] || null), limit(1));
+    const nextSnapshot = await getDocs(nextQuery);
+    setHasNextPage(!nextSnapshot.empty);
+    
+    setLoading(false);
+  };
+  
+  useEffect(() => {
+    fetchPOs('initial');
+  }, [dateRange, itemsPerPage]);
+
+  const handleNextPage = () => {
+    setPage(p => p + 1);
+    fetchPOs('next');
+  };
+
+  const handlePrevPage = () => {
+    if (page > 1) {
+      setPage(p => p - 1);
+      fetchPOs('prev');
+    }
+  };
+
 
   const { metrics, supplierSummary } = useMemo(() => {
     const metrics: PurchaseMetric = {
@@ -185,76 +217,95 @@ export default function PurchasingReportPage() {
           </div>
         </div>
         
-        {loading ? (
-          <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              <MetricCard title="Total Nilai Pembelian" value={metrics.totalValue} format="currency" icon={DollarSign} />
-              <MetricCard title="Total Pesanan (PO)" value={metrics.totalOrders} icon={ShoppingCart} />
-              <MetricCard title="Jumlah Pemasok" value={metrics.supplierCount} icon={Truck} />
-            </div>
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard title="Total Nilai Pembelian" value={metrics.totalValue} format="currency" icon={DollarSign} />
+            <MetricCard title="Total Pesanan (PO)" value={metrics.totalOrders} icon={ShoppingCart} />
+            <MetricCard title="Jumlah Pemasok" value={metrics.supplierCount} icon={Truck} />
+          </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Total Pembelian per Pemasok</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <ChartContainer config={{}} className="min-h-[250px] w-full">
-                        <BarChart data={top5Suppliers} layout="vertical" margin={{ left: 20 }}>
-                             <XAxis type="number" hide />
-                             <YAxis dataKey="supplierName" type="category" tickLine={false} axisLine={false} stroke="hsl(var(--foreground))" fontSize={12} width={150} />
-                             <Tooltip content={<ChartTooltipContent indicator="dot" />} />
-                             <Bar dataKey="totalValue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Total Pembelian"/>
-                        </BarChart>
-                    </ChartContainer>
-                </CardContent>
-            </Card>
-
-            <Card>
+          <Card>
               <CardHeader>
-                <CardTitle>Riwayat Pesanan Pembelian</CardTitle>
-                <CardDescription>
-                  Daftar pesanan pembelian untuk periode yang dipilih.
-                </CardDescription>
+                  <CardTitle>Total Pembelian per Pemasok</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>No. PO</TableHead>
-                      <TableHead>Pemasok</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {purchaseOrders.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center h-24 text-muted-foreground">Tidak ada pesanan pembelian.</TableCell></TableRow>
-                    ) : (
-                      purchaseOrders.map(po => (
-                        <TableRow key={po.id}>
-                            <TableCell>{format(po.date, "dd MMM yyyy", { locale: id })}</TableCell>
-                            <TableCell>
-                              <DialogTrigger asChild>
-                                <Button variant="link" className="p-0 h-auto font-mono text-xs" onClick={() => setSelectedPO(po)}>
-                                  {po.id}
-                                </Button>
-                              </DialogTrigger>
-                            </TableCell>
-                            <TableCell>{po.supplierName}</TableCell>
-                            <TableCell><Badge variant={po.status === 'Completed' ? 'secondary' : (po.status === 'Draft' ? 'outline' : 'default')}>{po.status}</Badge></TableCell>
-                            <TableCell className="text-right font-mono">Rp {po.total.toLocaleString('id-ID')}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                  <ChartContainer config={{}} className="min-h-[250px] w-full">
+                      <BarChart data={top5Suppliers} layout="vertical" margin={{ left: 20 }}>
+                           <XAxis type="number" hide />
+                           <YAxis dataKey="supplierName" type="category" tickLine={false} axisLine={false} stroke="hsl(var(--foreground))" fontSize={12} width={150} />
+                           <Tooltip content={<ChartTooltipContent indicator="dot" />} />
+                           <Bar dataKey="totalValue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Total Pembelian"/>
+                      </BarChart>
+                  </ChartContainer>
               </CardContent>
-            </Card>
-          </div>
-        )}
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Riwayat Pesanan Pembelian</CardTitle>
+              <CardDescription>
+                Daftar pesanan pembelian untuk periode yang dipilih.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>No. PO</TableHead>
+                    <TableHead>Pemasok</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
+                  ) : purchaseOrders.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center h-24 text-muted-foreground">Tidak ada pesanan pembelian.</TableCell></TableRow>
+                  ) : (
+                    purchaseOrders.map(po => (
+                      <TableRow key={po.id}>
+                          <TableCell>{format(po.date, "dd MMM yyyy", { locale: id })}</TableCell>
+                          <TableCell>
+                            <DialogTrigger asChild>
+                              <Button variant="link" className="p-0 h-auto font-mono text-xs" onClick={() => setSelectedPO(po)}>
+                                {po.id}
+                              </Button>
+                            </DialogTrigger>
+                          </TableCell>
+                          <TableCell>{po.supplierName}</TableCell>
+                          <TableCell><Badge variant={po.status === 'Completed' ? 'secondary' : (po.status === 'Draft' ? 'outline' : 'default')}>{po.status}</Badge></TableCell>
+                          <TableCell className="text-right font-mono">Rp {po.total.toLocaleString('id-ID')}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+            <CardFooter className="flex flex-wrap justify-between items-center gap-4">
+              <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Tampilkan</span>
+                  <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
+                      <SelectTrigger className="w-[80px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                          {[50, 100, 200].map(v => <SelectItem key={v} value={String(v)}>{v}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">per halaman.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Halaman {page}</span>
+                  <Button variant="outline" onClick={handlePrevPage} disabled={page === 1 || loading}>
+                      <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
+                  </Button>
+                  <Button variant="outline" onClick={handleNextPage} disabled={!hasNextPage || loading}>
+                      Berikutnya <ArrowRight className="ml-2 h-4 w-4"/>
+                  </Button>
+              </div>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
 
       {selectedPO && (

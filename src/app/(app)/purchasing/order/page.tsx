@@ -2,19 +2,18 @@
 'use client';
 
 import React, { useState, useMemo, useTransition, useEffect } from 'react';
-import { PlusCircle, MinusCircle, X, Save, Loader2, Plus, Send, Eye } from 'lucide-react';
+import { PlusCircle, MinusCircle, X, Save, Loader2, Plus, Send, Eye, CheckCircle, XCircle, ChevronsUpDown, Check, ArrowLeft, ArrowRight } from 'lucide-react';
 import type { Product, Supplier, PurchaseOrderItem, NewPurchaseOrder, PurchaseOrder, PurchaseRequest, ProductUnit } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, getDoc, orderBy, limit, startAfter, endBefore, limitToLast, DocumentData, Query, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DatePicker } from '@/components/ui/date-picker';
 import { addPurchaseOrder, updatePurchaseOrderStatus, updatePurchaseRequestStatus } from '../actions';
@@ -32,28 +31,72 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type SortOption = "date_desc" | "total_desc" | "total_asc";
 
 export default function PurchaseOrderPage() {
   const [view, setView] = useState<'list' | 'new'>('list');
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
+  const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
+  const [page, setPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [sortOption, setSortOption] = useState<SortOption>('date_desc');
 
+  const fetchPOs = async (direction: 'next' | 'prev' | 'initial') => {
+    setLoading(true);
+    let q: Query<DocumentData>;
+    const [sortField, sortDirection] = sortOption.split('_') as ['date' | 'total', 'asc' | 'desc'];
+
+    const baseQuery = query(collection(db, "purchaseOrders"), orderBy(sortField, sortDirection));
+
+    if (direction === 'next' && lastVisible) {
+      q = query(baseQuery, startAfter(lastVisible), limit(itemsPerPage));
+    } else if (direction === 'prev' && firstVisible) {
+      q = query(baseQuery, endBefore(firstVisible), limitToLast(itemsPerPage));
+    } else {
+      q = query(baseQuery, limit(itemsPerPage));
+    }
+
+    const snapshot = await getDocs(q);
+    const pos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date.toDate() } as PurchaseOrder));
+    
+    setPurchaseOrders(pos);
+    setLastVisible(snapshot.docs[snapshot.docs.length-1]);
+    setFirstVisible(snapshot.docs[0]);
+
+    if (snapshot.docs.length < itemsPerPage) {
+      setHasNextPage(false);
+    } else {
+      const nextQuery = query(baseQuery, startAfter(snapshot.docs[snapshot.docs.length - 1]), limit(1));
+      const nextSnapshot = await getDocs(nextQuery);
+      setHasNextPage(!nextSnapshot.empty);
+    }
+    setLoading(false);
+  };
+  
   useEffect(() => {
-    const poUnsub = onSnapshot(collection(db, "purchaseOrders"), (snapshot) => {
-      const pos = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date.toDate()
-      } as PurchaseOrder)).sort((a,b) => b.date.getTime() - a.date.getTime());
-      setPurchaseOrders(pos);
-      setLoading(false);
-    });
+    fetchPOs('initial');
+  }, [sortOption, itemsPerPage]);
 
-    return () => poUnsub();
-  }, []);
+  const handleNextPage = () => {
+    setPage(p => p + 1);
+    fetchPOs('next');
+  };
+
+  const handlePrevPage = () => {
+    if (page > 1) {
+      setPage(p => p - 1);
+      fetchPOs('prev');
+    }
+  };
 
   if (view === 'new') {
-    return <NewPurchaseOrderForm onBack={() => setView('list')} />;
+    return <NewPurchaseOrderForm onBack={() => { setView('list'); fetchPOs('initial'); }} />;
   }
 
   return (
@@ -66,8 +109,22 @@ export default function PurchaseOrderPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Riwayat Purchase Order</CardTitle>
-          <CardDescription>Daftar semua pesanan pembelian yang pernah dibuat.</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Riwayat Purchase Order</CardTitle>
+              <CardDescription>Daftar semua pesanan pembelian yang pernah dibuat.</CardDescription>
+            </div>
+             <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Urutkan berdasarkan..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="date_desc">Tanggal (Terbaru)</SelectItem>
+                    <SelectItem value="total_desc">Total (Tertinggi)</SelectItem>
+                    <SelectItem value="total_asc">Total (Terendah)</SelectItem>
+                </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -103,6 +160,27 @@ export default function PurchaseOrderPage() {
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter className="flex flex-wrap justify-between items-center gap-4">
+             <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Tampilkan</span>
+                 <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
+                    <SelectTrigger className="w-[80px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {[50, 100, 200].map(v => <SelectItem key={v} value={String(v)}>{v}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                 <span className="text-sm text-muted-foreground">per halaman.</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Halaman {page}</span>
+                <Button variant="outline" onClick={handlePrevPage} disabled={page === 1 || loading}>
+                    <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
+                </Button>
+                <Button variant="outline" onClick={handleNextPage} disabled={!hasNextPage || loading}>
+                    Berikutnya <ArrowRight className="ml-2 h-4 w-4"/>
+                </Button>
+            </div>
+        </CardFooter>
       </Card>
     </div>
   );
@@ -423,3 +501,4 @@ function SendPOButton({ po }: { po: PurchaseOrder }) {
         </AlertDialog>
     );
 }
+

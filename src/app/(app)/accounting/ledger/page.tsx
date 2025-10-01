@@ -28,7 +28,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Download, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { collection, onSnapshot, query, orderBy, where, Timestamp, getDocs, limit, startAfter, DocumentData } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where, Timestamp, getDocs, limit, startAfter, DocumentData, endBefore, limitToLast, Query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal, JournalEntry } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
@@ -43,8 +43,6 @@ type LedgerEntry = {
   balance: number;
 };
 
-const LEDGER_PAGE_SIZE = 100;
-
 export default function GeneralLedgerPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -53,140 +51,129 @@ export default function GeneralLedgerPage() {
   
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
-  const [pageHistory, setPageHistory] = useState<(DocumentData | null)[] >([null]);
-  const [currentPage, setCurrentPage] = useState(1);
-
-
+  const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
+  const [page, setPage] = useState(1);
+  const [entriesPerPage, setEntriesPerPage] = useState(100);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  
   useEffect(() => {
     const unsubAccounts = onSnapshot(collection(db, 'coa'), (snapshot) => {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)).sort((a,b) => a.code.localeCompare(b.code)));
-      setLoading(false);
+      if (!selectedAccountId) setLoading(false);
     });
 
     return () => unsubAccounts();
-  }, []);
+  }, [selectedAccountId]);
   
-  const fetchLedgerEntries = useCallback(async (page: number, startAfterDoc: DocumentData | null) => {
-    if (!selectedAccountId) return;
+  const fetchLedgerEntries = useCallback(async (direction: 'next' | 'prev' | 'initial') => {
+    if (!selectedAccountId) {
+        setLedgerEntries([]);
+        setLoading(false);
+        return;
+    };
     
     setLoading(true);
 
-    let runningBalance = 0; // This will need to be calculated based on previous data
-    const entries: LedgerEntry[] = [];
+    const fromDate = dateRange?.from || new Date('1970-01-01');
+    const toDate = dateRange?.to || new Date();
+    toDate.setHours(23, 59, 59, 999);
+
+    const journalsRef = collection(db, 'journals');
+    let q = query(journalsRef, orderBy("date", "asc"));
     
-    // --- Phase 1: Calculate beginning balance ---
-    let beginningBalance = 0;
+    if (fromDate) q = query(q, where("date", ">=", Timestamp.fromDate(fromDate)));
+    if (toDate) q = query(q, where("date", "<=", Timestamp.fromDate(toDate)));
+
+    const allRelevantJournalsSnap = await getDocs(q);
+    const journalsContainingAccount = allRelevantJournalsSnap.docs.filter(doc => (doc.data() as Journal).entries.some(e => e.accountId === selectedAccountId));
+    const journalIds = journalsContainingAccount.map(doc => doc.id);
+
+    if (journalIds.length === 0) {
+      setLedgerEntries([]);
+      setLoading(false);
+      return;
+    }
+
+    let finalQuery: Query<DocumentData> = query(
+        collection(db, 'journals'),
+        where('__name__', 'in', journalIds),
+        orderBy('date', 'desc')
+    );
+
+    if (direction === 'next' && lastVisible) {
+        finalQuery = query(finalQuery, startAfter(lastVisible), limit(entriesPerPage));
+    } else if (direction === 'prev' && firstVisible) {
+        finalQuery = query(finalQuery, endBefore(firstVisible), limitToLast(entriesPerPage));
+    } else {
+        finalQuery = query(finalQuery, limit(entriesPerPage));
+    }
+
+    const snapshot = await getDocs(finalQuery);
+    const pageJournals = snapshot.docs.map(d => ({...d.data(), id: d.id, date: d.data().date.toDate()} as Journal));
+
+    // --- Balance Calculation ---
     const allJournalsBeforeDateQuery = query(
         collection(db, 'journals'),
-        where('date', '<', dateRange?.from ? Timestamp.fromDate(dateRange.from) : Timestamp.now())
+        where('date', '<', fromDate)
     );
     const journalsBeforeSnap = await getDocs(allJournalsBeforeDateQuery);
+    let beginningBalance = 0;
     journalsBeforeSnap.docs.forEach(journalDoc => {
-        const journal = journalDoc.data() as Journal;
-        journal.entries.forEach(entry => {
+        (journalDoc.data() as Journal).entries.forEach(entry => {
             if (entry.accountId === selectedAccountId) {
                 beginningBalance += entry.debit - entry.credit;
             }
         });
     });
-    
-    runningBalance = beginningBalance;
-    
-    // --- Phase 2: Fetch all relevant entries within the date range ---
-    let allJournalsQuery = query(
-        collection(db, 'journals'), 
-        orderBy("date", "asc")
-    );
 
-    if (dateRange?.from) {
-        allJournalsQuery = query(allJournalsQuery, where("date", ">=", Timestamp.fromDate(dateRange.from)));
-    }
-    if (dateRange?.to) {
-        const toDayEnd = new Date(dateRange.to);
-        toDayEnd.setHours(23, 59, 59, 999);
-        allJournalsQuery = query(allJournalsQuery, where("date", "<=", Timestamp.fromDate(toDayEnd)));
-    }
+    const entries: LedgerEntry[] = [];
+    let runningBalance = beginningBalance;
 
-    const allJournalsSnapshot = await getDocs(allJournalsQuery);
-    const allRelevantEntries: any[] = [];
+    const allJournalsForPeriod = journalsContainingAccount.map(doc => ({...doc.data(), date: doc.data().date.toDate()} as Journal)).sort((a,b) => a.date.getTime() - b.date.getTime());
     
-    allJournalsSnapshot.docs.forEach(journalDoc => {
-        const journal = journalDoc.data() as Journal;
+    allJournalsForPeriod.forEach(journal => {
         journal.entries.forEach(entry => {
             if (entry.accountId === selectedAccountId) {
-                allRelevantEntries.push({
-                    journalDate: journal.date.toDate(),
-                    journalRef: journal.refNumber || journal.id,
-                    journalDesc: journal.description,
-                    ...entry
-                });
+                 runningBalance += entry.debit - entry.credit;
+                 entries.push({
+                    date: journal.date,
+                    ref: journal.refNumber || journal.id,
+                    desc: journal.description,
+                    debit: entry.debit,
+                    credit: entry.credit,
+                    balance: runningBalance,
+                 })
             }
-        });
-    });
+        })
+    })
 
-    // --- Phase 3: Paginate and calculate running balance for the current page ---
-    const sortedEntriesForDisplay = allRelevantEntries.sort((a,b) => b.journalDate.getTime() - a.journalDate.getTime());
-    const startIndex = (page - 1) * LEDGER_PAGE_SIZE;
-    const endIndex = page * LEDGER_PAGE_SIZE;
-    const pagedEntries = sortedEntriesForDisplay.slice(startIndex, endIndex);
+    const finalEntries = entries.reverse().slice((page-1) * entriesPerPage, page * entriesPerPage);
 
-    // To calculate the balance correctly up to the first item on the current page,
-    // we need to process all entries that came before it.
-    const lastDateOnPage = pagedEntries.length > 0 ? pagedEntries[pagedEntries.length - 1].journalDate : new Date();
-    
-    const entriesForBalanceCalc = allRelevantEntries
-        .filter(entry => entry.journalDate < lastDateOnPage)
-        .sort((a, b) => a.journalDate.getTime() - b.journalDate.getTime());
+    setLedgerEntries(finalEntries);
 
-    let balanceUpToPage = beginningBalance;
-    entriesForBalanceCalc.forEach(entry => {
-        balanceUpToPage += entry.debit - entry.credit;
-    });
+    setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+    setFirstVisible(snapshot.docs[0]);
+    setHasNextPage(finalEntries.length === entriesPerPage);
 
-    // Now, calculate balance for the paged entries
-    const finalPageEntries: LedgerEntry[] = [];
-    pagedEntries.reverse().forEach(entry => {
-        balanceUpToPage += entry.debit - entry.credit;
-        finalPageEntries.push({
-            date: entry.journalDate,
-            ref: entry.journalRef,
-            desc: entry.journalDesc,
-            debit: entry.debit,
-            credit: entry.credit,
-            balance: balanceUpToPage
-        });
-    });
-
-    setLedgerEntries(finalPageEntries.reverse());
     setLoading(false);
 
-  }, [selectedAccountId, dateRange]);
+  }, [selectedAccountId, dateRange, page, entriesPerPage, lastVisible, firstVisible]);
 
 
   useEffect(() => {
-    setCurrentPage(1);
-    setPageHistory([null]);
-    if (selectedAccountId) {
-        fetchLedgerEntries(1, null);
-    } else {
-        setLedgerEntries([]);
-    }
-  }, [selectedAccountId, dateRange, fetchLedgerEntries]);
+    setPage(1);
+    setLastVisible(null);
+    setFirstVisible(null);
+    fetchLedgerEntries('initial');
+  }, [selectedAccountId, dateRange, entriesPerPage]);
 
   const handleNextPage = () => {
-    const newPage = currentPage + 1;
-    setCurrentPage(newPage);
-    fetchLedgerEntries(newPage, lastVisible);
+    setPage(p => p + 1);
   };
 
   const handlePrevPage = () => {
-    const newPage = currentPage - 1;
-    if (newPage > 0) {
-      setCurrentPage(newPage);
-      fetchLedgerEntries(newPage, null); // Simplified, not using pageHistory for now
-    }
+    setPage(p => p - 1);
   };
-
 
   return (
     <div className="flex flex-col gap-6">
@@ -269,14 +256,26 @@ export default function GeneralLedgerPage() {
             </Table>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Menampilkan hingga {LEDGER_PAGE_SIZE} transaksi per halaman.</span>
-            <div className="flex gap-2">
-                <Button variant="outline" onClick={handlePrevPage} disabled={currentPage === 1 || loading}>
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Sebelumnya
+        <CardFooter className="flex flex-wrap justify-between items-center gap-4">
+             <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Tampilkan</span>
+                 <Select value={String(entriesPerPage)} onValueChange={(v) => setEntriesPerPage(Number(v))}>
+                    <SelectTrigger className="w-[80px]">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {[50, 100, 200, 300, 500].map(v => <SelectItem key={v} value={String(v)}>{v}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                 <span className="text-sm text-muted-foreground">transaksi per halaman.</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Halaman {page}</span>
+                <Button variant="outline" onClick={handlePrevPage} disabled={page === 1 || loading}>
+                    <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
                 </Button>
-                <Button variant="outline" onClick={handleNextPage} disabled={loading || ledgerEntries.length < LEDGER_PAGE_SIZE}>
-                    Berikutnya <ArrowRight className="h-4 w-4 ml-2" />
+                <Button variant="outline" onClick={handleNextPage} disabled={!hasNextPage || loading}>
+                    Berikutnya <ArrowRight className="ml-2 h-4 w-4"/>
                 </Button>
             </div>
         </CardFooter>
@@ -285,7 +284,6 @@ export default function GeneralLedgerPage() {
   );
 }
 
-// Add this to date-range-picker component to accept onSelect props
 declare module '@/components/ui/date-range-picker' {
     interface DateRangePickerProps {
         onSelect?: (date?: DateRange) => void;
