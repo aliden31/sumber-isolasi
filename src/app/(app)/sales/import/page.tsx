@@ -319,7 +319,7 @@ export default function ImportMarketplacePage() {
                                         />
                                     </TableCell>
                                     <TableCell className="text-center">{row.qty}</TableCell>
-                                    <TableCell className="text-xs max-w-[200px] truncate">{row.alamat_lengkap}</TableCell>
+                                    <TableCell className="text-xs">{row.alamat_lengkap}</TableCell>
                                     <TableCell className="text-right font-bold font-mono">Rp {Math.round(row.net_total).toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
                             ))}
