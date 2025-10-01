@@ -2,72 +2,29 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, writeBatch, getDocs, query, doc, getDoc } from "firebase/firestore";
+import { collection, writeBatch, getDocs, query, doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Transaction, SalesReturn, GoodsReceipt, PurchaseReturn, StockOpname, Product } from "@/lib/types";
 
-const createResponse = (error: string | null = null) => ({ error });
+const createResponse = (error: string | null = null, data: any = null) => ({ error, data });
+
+const ALL_COLLECTION_NAMES = [
+    "transactions", "journals", "salesReturns", "parkedTransactions",
+    "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
+    "purchasePayments", "purchaseReturns", "stockTransfers", "periodClosings",
+    "stockOpnames", "products", "customers", "suppliers",
+    "productCategories", "warehouses", "taxes", "currencies",
+    "marketplaceStores", "coa"
+];
 
 export async function deleteSingleCollection(collectionName: string) {
     try {
         const batch = writeBatch(db);
         const docsToDelete = await getDocs(query(collection(db, collectionName)));
-        const stockAdjustments: { [productId: string]: number } = {};
-
+        
         if (!docsToDelete.empty) {
-            for (const docSnap of docsToDelete.docs) {
-                const data = docSnap.data();
-
-                // Logic for stock reversion based on collection type
-                switch (collectionName) {
-                    case 'transactions':
-                        const tx = data as Transaction;
-                        tx.items.forEach(item => {
-                            stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) + item.quantity;
-                        });
-                        break;
-                    case 'salesReturns':
-                        const sr = data as SalesReturn;
-                        sr.items.forEach(item => {
-                            stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) - item.quantity;
-                        });
-                        break;
-                    case 'goodsReceipts':
-                        const gr = data as GoodsReceipt;
-                        gr.items.forEach(item => {
-                            stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) - item.receivedQuantity;
-                        });
-                        break;
-                    case 'purchaseReturns':
-                        const pr = data as PurchaseReturn;
-                        pr.items.forEach(item => {
-                            stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) + item.returnQuantity;
-                        });
-                        break;
-                    case 'stockOpnames':
-                        const so = data as StockOpname;
-                        so.items.forEach(item => {
-                            // Revert the stock opname adjustment
-                            stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) - item.difference;
-                        });
-                        break;
-                }
+             for (const docSnap of docsToDelete.docs) {
                 batch.delete(docSnap.ref);
-            }
-
-            // Apply all stock adjustments
-            for (const productId in stockAdjustments) {
-                const productRef = doc(db, 'products', productId);
-                // We need to get the current stock within the batch logic if possible, but Firestore batch doesn't support reads.
-                // A transaction would be better here, but let's assume we can read before batching for simplicity, though this can have race conditions.
-                // For a more robust solution, one would use Cloud Functions or a more complex transaction flow.
-                // For this context, we will read before writing to the batch.
-                const productSnap = await getDoc(productRef);
-                if (productSnap.exists()) {
-                    const productData = productSnap.data() as Product;
-                    const currentStock = productData.stock || 0;
-                    batch.update(productRef, { stock: currentStock + stockAdjustments[productId] });
-                }
             }
         }
         
@@ -76,6 +33,65 @@ export async function deleteSingleCollection(collectionName: string) {
         return createResponse();
     } catch(e) {
         return createResponse(e instanceof Error ? e.message : `Gagal menghapus koleksi ${collectionName}.`);
+    }
+}
+
+
+export async function backupAllData() {
+    try {
+        const backupData: { [key: string]: any[] } = {};
+
+        for (const collectionName of ALL_COLLECTION_NAMES) {
+            const snapshot = await getDocs(collection(db, collectionName));
+            backupData[collectionName] = snapshot.docs.map(doc => {
+                 const data = doc.data();
+                // Convert Firestore Timestamps to ISO strings
+                Object.keys(data).forEach(key => {
+                    if (data[key] instanceof Timestamp) {
+                        data[key] = { _seconds: data[key].seconds, _nanoseconds: data[key].nanoseconds };
+                    }
+                });
+                return { id: doc.id, ...data };
+            });
+        }
+        
+        return createResponse(null, backupData);
+
+    } catch(e) {
+        return createResponse(e instanceof Error ? e.message : "Terjadi kesalahan saat membuat backup.");
+    }
+}
+
+export async function restoreAllData(data: { [key: string]: any[] }) {
+    try {
+        for (const collectionName of ALL_COLLECTION_NAMES) {
+             // First, delete all existing documents in the collection
+            const existingDocs = await getDocs(collection(db, collectionName));
+            let deleteBatch = writeBatch(db);
+            existingDocs.forEach(doc => deleteBatch.delete(doc.ref));
+            await deleteBatch.commit();
+            
+            // Then, write new documents from the backup
+            if (data[collectionName] && data[collectionName].length > 0) {
+                 let writeBatch = writeBatch(db);
+                 data[collectionName].forEach(item => {
+                    const { id, ...itemData } = item;
+                     // Convert objects back to Firestore Timestamps
+                    Object.keys(itemData).forEach(key => {
+                        if (itemData[key] && typeof itemData[key] === 'object' && itemData[key]._seconds !== undefined) {
+                            itemData[key] = new Timestamp(itemData[key]._seconds, itemData[key]._nanoseconds);
+                        }
+                    });
+                    const docRef = doc(db, collectionName, id);
+                    writeBatch.set(docRef, itemData);
+                 });
+                 await writeBatch.commit();
+            }
+        }
+        revalidateAllPaths();
+        return createResponse();
+    } catch(e) {
+        return createResponse(e instanceof Error ? e.message : "Terjadi kesalahan saat memulihkan data.");
     }
 }
 

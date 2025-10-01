@@ -1,8 +1,8 @@
 
 'use client';
 
-import React, { useState, useTransition } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useTransition, useRef } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -16,10 +16,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { deleteSingleCollection } from './actions';
-import { Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { deleteSingleCollection, backupAllData, restoreAllData } from './actions';
+import { Loader2, Trash2, AlertTriangle, Download, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 
 const ALL_COLLECTIONS = [
     { name: "transactions", group: 'Transaksional', description: 'Semua riwayat penjualan.' },
@@ -100,6 +101,59 @@ function DeleteAction({ collection }: DeleteActionProps) {
 
 
 export default function DangerZonePage() {
+  const [isBackupPending, startBackupTransition] = useTransition();
+  const [isRestorePending, startRestoreTransition] = useTransition();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBackup = () => {
+    startBackupTransition(async () => {
+      const result = await backupAllData();
+      if (result.error) {
+        toast({ title: 'Backup Gagal', description: result.error, variant: 'destructive'});
+      } else {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(result.data, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `tokokilat_backup_${new Date().toISOString()}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        toast({ title: 'Backup Berhasil', description: 'Data Anda telah diunduh sebagai file JSON.' });
+      }
+    });
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content);
+        
+        startRestoreTransition(async () => {
+          const result = await restoreAllData(data);
+          if (result.error) {
+            toast({ title: 'Restore Gagal', description: result.error, variant: 'destructive'});
+          } else {
+            toast({ title: 'Restore Berhasil', description: 'Semua data telah berhasil dipulihkan.' });
+          }
+        });
+        
+      } catch (err) {
+        const e = err as Error;
+        toast({ title: 'File Tidak Valid', description: `File backup tidak valid: ${e.message}`, variant: 'destructive'});
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input
+    if(fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+
   return (
     <div className="flex flex-col gap-6">
       <Card className="border-destructive">
@@ -109,24 +163,57 @@ export default function DangerZonePage() {
             Zona Berbahaya
           </CardTitle>
           <CardDescription>
-            Hapus koleksi data secara individual dan permanen. Tindakan ini tidak dapat diurungkan. Lakukan dengan sangat hati-hati.
+            Tindakan di area ini dapat menyebabkan kehilangan data permanen. Lakukan dengan sangat hati-hati.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Nama Koleksi</TableHead>
-                        <TableHead>Deskripsi</TableHead>
-                        <TableHead>Aksi</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {ALL_COLLECTIONS.map(collection => (
-                        <DeleteAction key={collection.name} collection={collection} />
-                    ))}
-                </TableBody>
-            </Table>
+        <CardContent className="space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Backup & Restore</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Buat cadangan lengkap dari seluruh data aplikasi Anda, atau pulihkan dari file backup sebelumnya.
+                <strong className="text-destructive"> Peringatan: Restore akan menimpa semua data yang ada saat ini.</strong>
+              </p>
+              <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleBackup} disabled={isBackupPending}>
+                      {isBackupPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
+                      Backup Semua Data
+                  </Button>
+                  <Button variant="destructive" onClick={() => fileInputRef.current?.click()} disabled={isRestorePending}>
+                      {isRestorePending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4" />}
+                      Restore dari File...
+                  </Button>
+                  <Input 
+                    type="file" 
+                    className="hidden" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange}
+                    accept="application/json"
+                  />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Hapus Koleksi Data Individual</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Hapus seluruh data dari satu koleksi tertentu. Tindakan ini tidak dapat diurungkan.
+              </p>
+               <div className="border rounded-md">
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nama Koleksi</TableHead>
+                            <TableHead>Deskripsi</TableHead>
+                            <TableHead>Aksi</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {ALL_COLLECTIONS.map(collection => (
+                            <DeleteAction key={collection.name} collection={collection} />
+                        ))}
+                    </TableBody>
+                </Table>
+              </div>
+            </div>
+
         </CardContent>
       </Card>
     </div>
