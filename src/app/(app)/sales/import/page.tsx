@@ -187,12 +187,17 @@ export default function ImportMarketplacePage() {
 
                     const cost = normalizeNumber(getVal(['harga modal', 'harga pokok']));
 
-                    const subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)'])) || (unit_price * qty);
+                    let subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)'])) || (unit_price * qty);
                     const shipping = normalizeNumber(getVal(['ongkos kirim', 'biaya pengiriman']));
 
-                    const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
-                    const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
-                    const fee = fee_pengelolaan + fee_transaksi;
+                    let fee = 0;
+                    if (channel.toLowerCase() === 'tiktok') {
+                        fee = (subtotal * 0.15) + 1250;
+                    } else {
+                        const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
+                        const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
+                        fee = fee_pengelolaan + fee_transaksi;
+                    }
                     
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
                     const voucher_toko = normalizeNumber(getVal(['voucher toko']));
@@ -407,5 +412,3 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
-
-
