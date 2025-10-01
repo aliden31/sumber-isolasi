@@ -34,6 +34,7 @@ const createResponse = (
   id: string | null = null
 ) => ({ error, id });
 
+
 async function queryInChunks<T>(
   ref: any,
   field: string,
@@ -57,6 +58,7 @@ async function queryInChunks<T>(
   return results;
 }
 
+
 export async function importMarketplaceTransactions(
   transactions: ImportRow[]
 ) {
@@ -71,7 +73,7 @@ export async function importMarketplaceTransactions(
     marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
-    bankAccountId,
+    accountsReceivableAccountId,
   } = settings;
 
   const requiredAccountIds = [
@@ -80,7 +82,7 @@ export async function importMarketplaceTransactions(
     marketplaceFeeAccountId,
     cogsAccountId,
     inventoryAccountId,
-    bankAccountId,
+    accountsReceivableAccountId,
   ];
 
   if (requiredAccountIds.some((id) => !id)) {
@@ -217,9 +219,9 @@ export async function importMarketplaceTransactions(
           discount: order.discount,
           fee: order.fee,
           netTotal: order.netTotal,
-          paymentMethod: 'Transfer',
+          paymentMethod: 'Kredit',
           customerName: order.customerName,
-          status: 'Lunas',
+          status: 'Belum Lunas',
           channel: order.channel,
         };
         transaction.set(newTxRef, newTransaction);
@@ -227,11 +229,22 @@ export async function importMarketplaceTransactions(
         const journalDescription = `Penjualan Marketplace #${orderId}`;
         const journalEntries: JournalEntry[] = [];
         
-        if (order.netTotal > 0) journalEntries.push({ accountId: bankAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
-        if (order.discount > 0) journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
-        if (order.fee > 0) journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
-
+        // Use accountsReceivableAccountId for the main debit
+        if (order.netTotal > 0) journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: order.total, credit: 0 });
+        
+        // Credit the revenue
         journalEntries.push({ accountId: salesRevenueAccountId!, accountName: '', debit: 0, credit: order.total });
+        
+        // Handle discounts and fees if they exist by crediting AR
+        if (order.discount > 0) {
+            journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
+            journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: 0, credit: order.discount });
+        }
+        if (order.fee > 0) {
+            journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
+            journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: 0, credit: order.fee });
+        }
+
 
         const newJournal: NewJournal = {
           date: order.date,
@@ -271,6 +284,8 @@ export async function importMarketplaceTransactions(
     revalidatePath('/(app)/dashboard');
     revalidatePath('/(app)/accounting/ledger');
     revalidatePath('/(app)/customers');
+    revalidatePath('/(app)/sales/receivables');
+
 
     return createResponse(null, `${Object.keys(groupedByOrder).length}`);
   } catch (e) {
