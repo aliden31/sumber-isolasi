@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import {
   Card,
@@ -34,7 +35,6 @@ export default async function AccountingSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl md:text-3xl font-headline font-bold">Pengaturan Akuntansi</h1>
       <Card>
         <CardHeader>
           <CardTitle className="font-headline">Pemetaan Akun Otomatis</CardTitle>

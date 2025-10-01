@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -45,7 +46,7 @@ export default function CustomersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl md:text-3xl font-headline font-bold">Manajemen Pelanggan</h1>
+        <div /> 
         <CustomerActions hasCustomers={customers.length > 0} />
       </div>
       <Card>

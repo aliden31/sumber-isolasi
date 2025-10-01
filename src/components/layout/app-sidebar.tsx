@@ -62,6 +62,7 @@ import {
   ArrowDownCircle,
   BookCheck,
   Palette,
+  Users2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -88,7 +89,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { ThemeToggle } from "./theme-toggle";
 import { TokoKilatLogo } from "../icons/logo";
 
-const navItems = [
+export const navItems = [
   {
     href: "/dashboard",
     icon: LayoutDashboard,
@@ -195,6 +196,7 @@ const navItems = [
       { href: "/settings", label: "Profil Perusahaan", icon: Building },
       { href: "/settings/accounting", label: "Akuntansi", icon: SlidersHorizontal },
       { href: "/settings/marketplace", label: "Marketplace", icon: Store },
+      { href: "/users", label: "Pengguna & Hak Akses", icon: Users2, isDev: false },
       { href: "/settings/theme", label: "Tema & Tampilan", icon: Palette },
       { href: "/settings/danger", label: "Data & Reset", icon: DatabaseZap },
     ],

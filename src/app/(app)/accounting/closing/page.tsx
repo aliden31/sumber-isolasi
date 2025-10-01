@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useTransition, useEffect } from 'react';
@@ -99,7 +100,6 @@ export default function PeriodClosingPage() {
     
     return (
         <div className="flex flex-col gap-6">
-            <h1 className="text-2xl md:text-3xl font-headline font-bold">Tutup Buku Periode</h1>
             <Card className="w-full">
                 <CardHeader>
                     <CardTitle>Proses Tutup Buku & Jurnal Balik</CardTitle>
@@ -219,7 +219,7 @@ function ClosingHistoryRow({ item }: { item: PeriodClosing }) {
                         <AlertDialogHeader>
                             <AlertDialogTitle>Batalkan Tutup Buku?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Anda akan membatalkan tutup buku periode <strong>{getMonthName(item.month)} {item.year}</strong>.
+                                Anda akan membatalkan tutup buku periode <strong>{getMonthName(item.month)} ${item.year}</strong>.
                                 Semua jurnal penutup dan pembalik yang terkait akan dihapus secara permanen. Lanjutkan?
                             </AlertDialogDescription>
                         </AlertDialogHeader>

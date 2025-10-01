@@ -1,4 +1,5 @@
 
+
 import { db } from '@/lib/firebase';
 import type { Supplier } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +29,7 @@ export default async function SuppliersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl md:text-3xl font-headline font-bold">Manajemen Supplier</h1>
+        <div />
         <SupplierActions hasSuppliers={suppliers.length > 0} />
       </div>
       <Card>

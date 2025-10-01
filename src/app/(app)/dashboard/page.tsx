@@ -111,7 +111,6 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl md:text-3xl font-headline font-bold">Dashboard</h1>
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/transactions">
           <Card className="hover:bg-muted/50 transition-colors">

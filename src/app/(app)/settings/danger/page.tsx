@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -101,7 +102,6 @@ function DeleteAction({ collection }: DeleteActionProps) {
 export default function DangerZonePage() {
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl md:text-3xl font-headline font-bold">Data &amp; Reset</h1>
       <Card className="border-destructive">
         <CardHeader>
           <CardTitle className="font-headline text-destructive flex items-center gap-2">
