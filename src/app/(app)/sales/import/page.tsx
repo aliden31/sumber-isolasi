@@ -204,8 +204,14 @@ export default function ImportMarketplacePage() {
                     }
                     
                     const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
-                    const voucher_toko = normalizeNumber(getVal(['voucher toko']));
+                    const voucher_toko_raw = normalizeNumber(getVal(['voucher toko']));
                     const diskon_penjual = normalizeNumber(getVal(['diskon dari penjual']));
+
+                    let voucher_toko = voucher_toko_raw;
+                    if (channel.toLowerCase() === 'tiktok') {
+                        voucher_toko = 0; // Do not use voucher toko for tiktok
+                    }
+                    
                     const discount = diskon_marketplace + voucher_toko + diskon_penjual;
                     
                     const net_total = subtotal - fee - discount;
@@ -416,3 +422,4 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
