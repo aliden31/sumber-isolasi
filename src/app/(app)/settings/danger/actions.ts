@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, writeBatch, getDocs, query } from "firebase/firestore";
+import { collection, writeBatch, getDocs, query, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import type { Transaction, SalesReturn, GoodsReceipt, PurchaseReturn, StockOpname } from "@/lib/types";
 
 const createResponse = (error: string | null = null) => ({ error });
 
@@ -12,67 +13,65 @@ async function deleteCollection(collectionName: string, batch: FirebaseFirestore
     snapshot.docs.forEach(doc => {
         batch.delete(doc.ref);
     });
-}
-
-// Re-export individual delete functions if they are needed elsewhere,
-// but for this page, we'll use a single handler.
-
-export async function deleteTransactionalData() {
-    const COLLECTIONS = [
-        "transactions", "journals", "salesReturns", "parkedTransactions",
-        "purchaseRequests", "purchaseOrders", "goodsReceipts", "supplierInvoices",
-        "purchasePayments", "purchaseReturns", "stockTransfers", "periodClosings",
-        "stockOpnames"
-    ];
-    try {
-        const batch = writeBatch(db);
-        for (const colName of COLLECTIONS) {
-            await deleteCollection(colName, batch);
-        }
-        await batch.commit();
-        revalidateAllPaths();
-        return createResponse();
-    } catch(e) {
-        return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
-    }
-}
-export async function deleteMasterData() {
-    const COLLECTIONS = [
-        "products", "customers", "suppliers", "productCategories", 
-        "warehouses", "taxes", "currencies", "marketplaceStores"
-    ];
-    try {
-        const batch = writeBatch(db);
-        for (const colName of COLLECTIONS) {
-            await deleteCollection(colName, batch);
-        }
-        await batch.commit();
-        revalidateAllPaths();
-        return createResponse();
-    } catch(e) {
-        return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
-    }
-}
-
-export async function deleteCoaData() {
-    const COLLECTIONS = ["coa"];
-    try {
-        const batch = writeBatch(db);
-        for (const colName of COLLECTIONS) {
-            await deleteCollection(colName, batch);
-        }
-        await batch.commit();
-        revalidateAllPaths();
-        return createResponse();
-    } catch(e) {
-        return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
-    }
+    return snapshot.docs;
 }
 
 export async function deleteSingleCollection(collectionName: string) {
     try {
         const batch = writeBatch(db);
-        await deleteCollection(collectionName, batch);
+        const docsToDelete = await getDocs(collection(db, collectionName));
+        const stockAdjustments: { [productId: string]: number } = {};
+
+        for (const docSnap of docsToDelete.docs) {
+             const data = docSnap.data();
+
+             // Logic for stock reversion based on collection type
+            switch (collectionName) {
+                case 'transactions':
+                    const tx = data as Transaction;
+                    tx.items.forEach(item => {
+                        stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) + item.quantity;
+                    });
+                    break;
+                case 'salesReturns':
+                    const sr = data as SalesReturn;
+                    sr.items.forEach(item => {
+                        stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) - item.quantity;
+                    });
+                    break;
+                case 'goodsReceipts':
+                    const gr = data as GoodsReceipt;
+                    gr.items.forEach(item => {
+                        stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) - item.receivedQuantity;
+                    });
+                    break;
+                case 'purchaseReturns':
+                    const pr = data as PurchaseReturn;
+                    pr.items.forEach(item => {
+                        stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) + item.returnQuantity;
+                    });
+                    break;
+                case 'stockOpnames':
+                    const so = data as StockOpname;
+                    so.items.forEach(item => {
+                        // Revert the stock opname adjustment
+                        stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) - item.difference;
+                    });
+                    break;
+            }
+             batch.delete(docSnap.ref);
+        }
+
+        // Apply all stock adjustments
+        for (const productId in stockAdjustments) {
+            const productRef = doc(db, 'products', productId);
+            const productSnap = await getDoc(productRef);
+            if (productSnap.exists()) {
+                const currentStock = productSnap.data().stock || 0;
+                batch.update(productRef, { stock: currentStock + stockAdjustments[productId] });
+            }
+        }
+        
         await batch.commit();
         revalidateAllPaths();
         return createResponse();
