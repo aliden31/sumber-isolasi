@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Handshake, DollarSign, Package, ShoppingCart, AlertCircle } from "lucide-react";
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -112,62 +113,70 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl md:text-3xl font-headline font-bold">Dashboard</h1>
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium font-body">
-              Penjualan Hari Ini
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              Rp {dailySales.toLocaleString("id-ID")}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Total pendapatan hari ini
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium font-body">Total Piutang Usaha</CardTitle>
-            <Handshake className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              Rp {totalReceivables.toLocaleString("id-ID")}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Total tagihan belum lunas dari pelanggan
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium font-body">Total Utang Usaha</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              Rp {totalPayables.toLocaleString("id-ID")}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Total tagihan belum dibayar ke pemasok
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium font-body">Stok Menipis</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{lowStockProducts.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Produk dengan stok di bawah batas minimum
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/transactions">
+          <Card className="hover:bg-muted/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium font-body">
+                Penjualan Hari Ini
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                Rp {dailySales.toLocaleString("id-ID")}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total pendapatan hari ini
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/sales/receivables">
+          <Card className="hover:bg-muted/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium font-body">Total Piutang Usaha</CardTitle>
+              <Handshake className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                Rp {totalReceivables.toLocaleString("id-ID")}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total tagihan belum lunas dari pelanggan
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/purchasing/payables">
+          <Card className="hover:bg-muted/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium font-body">Total Utang Usaha</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                Rp {totalPayables.toLocaleString("id-ID")}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total tagihan belum dibayar ke pemasok
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/stock/notifications">
+          <Card className="hover:bg-muted/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium font-body">Stok Menipis</CardTitle>
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{lowStockProducts.length}</div>
+              <p className="text-xs text-muted-foreground">
+                Produk dengan stok di bawah batas minimum
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-7">
         <Card className="lg:col-span-4">
