@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -45,6 +45,12 @@ const ALL_COLLECTIONS = [
     { name: "coa", group: 'Akuntansi', description: 'Seluruh Bagan Akun (Chart of Accounts).' },
 ];
 
+const collectionGroups = {
+    'Transaksional': ALL_COLLECTIONS.filter(c => c.group === 'Transaksional'),
+    'Master': ALL_COLLECTIONS.filter(c => c.group === 'Master'),
+    'Akuntansi': ALL_COLLECTIONS.filter(c => c.group === 'Akuntansi'),
+}
+
 interface DeleteActionProps {
   collection: { name: string; group: string; description: string };
 }
@@ -71,7 +77,7 @@ function DeleteAction({ collection }: DeleteActionProps) {
         <TableCell>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
+                <Button variant="destructive" size="sm" className="w-full">
                     <Trash2 className="mr-2 h-4 w-4" />
                     Hapus
                 </Button>
@@ -99,36 +105,48 @@ function DeleteAction({ collection }: DeleteActionProps) {
 
 
 export default function DangerZonePage() {
+    
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl md:text-3xl font-headline font-bold">Data &amp; Reset</h1>
-      <Card className="border-destructive">
+       <Card className="border-destructive">
         <CardHeader>
           <CardTitle className="font-headline text-destructive flex items-center gap-2">
             <AlertTriangle />
             Zona Berbahaya
           </CardTitle>
           <CardDescription>
-            Hapus koleksi data secara individual dan permanen. Tindakan ini tidak dapat diurungkan. Lakukan dengan sangat hati-hati.
+            Tindakan di halaman ini akan menghapus data secara permanen dan tidak dapat diurungkan. Lakukan dengan sangat hati-hati.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Nama Koleksi</TableHead>
-                        <TableHead>Deskripsi</TableHead>
-                        <TableHead>Aksi</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {ALL_COLLECTIONS.map(collection => (
-                        <DeleteAction key={collection.name} collection={collection} />
-                    ))}
-                </TableBody>
-            </Table>
-        </CardContent>
       </Card>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+        {Object.entries(collectionGroups).map(([groupName, collections]) => (
+            <Card key={groupName}>
+                <CardHeader>
+                    <CardTitle>{groupName}</CardTitle>
+                    <CardDescription>
+                        Kumpulan data {groupName.toLowerCase()}.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableBody>
+                            {collections.map(collection => (
+                                <DeleteAction key={collection.name} collection={collection} />
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+                <CardFooter>
+                     <Button variant="destructive" className="w-full">
+                        <Trash2 className="mr-2 h-4 w-4" /> Hapus Semua Data {groupName}
+                    </Button>
+                </CardFooter>
+            </Card>
+        ))}
+      </div>
     </div>
   );
 }
