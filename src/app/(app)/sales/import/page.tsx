@@ -153,6 +153,7 @@ export default function ImportMarketplacePage() {
                     const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
                     const alamat_lengkap = String(getVal(['alamat pengiriman', 'alamat']) || '');
                     const sku = String(getVal(['sku gudang', 'sku induk', 'informasi sku']) || '');
+                    const nama_produk = String(getVal(['nama produk', 'product name']) || '');
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
                     const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
@@ -199,7 +200,7 @@ export default function ImportMarketplacePage() {
                     return {
                         id: `${nomor_order}-${rowIndex}`,
                         tanggal_order: tanggal_order_formatted,
-                        nomor_order, channel, nama_pembeli, alamat_lengkap, sku, qty, unit_price,
+                        nomor_order, channel, nama_pembeli, alamat_lengkap, sku, nama_produk, qty, unit_price,
                         cost, subtotal, shipping, fee, discount, net_total,
                         mappedProduct: null
                     };
@@ -295,11 +296,11 @@ export default function ImportMarketplacePage() {
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted">
                             <TableRow>
-                                <TableHead>Toko Marketplace</TableHead>
+                                <TableHead>Marketplace</TableHead>
                                 <TableHead>SKU Laporan</TableHead>
+                                <TableHead>Nama Produk (Laporan)</TableHead>
                                 <TableHead className="min-w-[200px]">Produk Terpetakan</TableHead>
                                 <TableHead className="text-center">Kuantitas</TableHead>
-                                <TableHead>Alamat</TableHead>
                                 <TableHead className="text-right">Total Bersih</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -310,6 +311,7 @@ export default function ImportMarketplacePage() {
                                       <Badge variant="secondary">{row.channel}</Badge>
                                     </TableCell>
                                     <TableCell className="text-xs">{row.sku}</TableCell>
+                                    <TableCell className="text-xs">{row.nama_produk}</TableCell>
                                     <TableCell>
                                         <ProductMappingCell
                                             sku={row.sku}
@@ -319,7 +321,6 @@ export default function ImportMarketplacePage() {
                                         />
                                     </TableCell>
                                     <TableCell className="text-center">{row.qty}</TableCell>
-                                    <TableCell className="text-xs max-w-[200px] truncate">{row.alamat_lengkap}</TableCell>
                                     <TableCell className="text-right font-bold font-mono">Rp {Math.round(row.net_total).toLocaleString('id-ID')}</TableCell>
                                 </TableRow>
                             ))}
@@ -396,4 +397,3 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
-
