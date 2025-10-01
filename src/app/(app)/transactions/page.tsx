@@ -44,7 +44,6 @@ import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const TRANSACTIONS_PER_PAGE = 300;
 type SortOption = "date_desc" | "total_desc" | "total_asc";
 
 
@@ -60,11 +59,12 @@ function TransactionsPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState(initialSearchId);
   const [sortOption, setSortOption] = useState<SortOption>('date_desc');
+  const [transactionsPerPage, setTransactionsPerPage] = useState(100);
 
 
   useEffect(() => {
     fetchTransactions('initial');
-  }, [date, sortOption]);
+  }, [date, sortOption, transactionsPerPage]);
 
   const fetchTransactions = async (direction: 'next' | 'prev' | 'initial' = 'initial') => {
     setLoading(true);
@@ -108,11 +108,11 @@ function TransactionsPageContent() {
 
     let q: Query<DocumentData>;
     if (direction === 'next' && lastVisible) {
-        q = query(baseQuery, startAfter(lastVisible), limit(TRANSACTIONS_PER_PAGE));
+        q = query(baseQuery, startAfter(lastVisible), limit(transactionsPerPage));
     } else if (direction === 'prev' && firstVisible) {
-        q = query(baseQuery, endBefore(firstVisible), limitToLast(TRANSACTIONS_PER_PAGE));
+        q = query(baseQuery, endBefore(firstVisible), limitToLast(transactionsPerPage));
     } else {
-        q = query(baseQuery, limit(TRANSACTIONS_PER_PAGE));
+        q = query(baseQuery, limit(transactionsPerPage));
     }
     
     const snapshot = await getDocs(q);
@@ -131,7 +131,7 @@ function TransactionsPageContent() {
     setFirstVisible(snapshot.docs[0]);
     
     // Check for next page
-    if (snapshot.docs.length < TRANSACTIONS_PER_PAGE) {
+    if (snapshot.docs.length < transactionsPerPage) {
         setHasNextPage(false);
     } else {
         const nextQuery = query(baseQuery, startAfter(snapshot.docs[snapshot.docs.length - 1]), limit(1));
@@ -190,6 +190,13 @@ function TransactionsPageContent() {
   
   const handleSortChange = (value: SortOption) => {
     setSortOption(value);
+    setCurrentPage(1);
+    setLastVisible(null);
+    setFirstVisible(null);
+  }
+
+  const handlePerPageChange = (value: string) => {
+    setTransactionsPerPage(Number(value));
     setCurrentPage(1);
     setLastVisible(null);
     setFirstVisible(null);
@@ -337,9 +344,25 @@ function TransactionsPageContent() {
             )}
           </Accordion>
         </CardContent>
-        <CardFooter className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Halaman {currentPage}</span>
-            <div className="flex gap-2">
+        <CardFooter className="flex flex-wrap justify-between items-center gap-4">
+            <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Tampilkan</span>
+                 <Select value={String(transactionsPerPage)} onValueChange={handlePerPageChange}>
+                    <SelectTrigger className="w-[80px]">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                        <SelectItem value="200">200</SelectItem>
+                        <SelectItem value="300">300</SelectItem>
+                        <SelectItem value="500">500</SelectItem>
+                    </SelectContent>
+                </Select>
+                 <span className="text-sm text-muted-foreground">transaksi per halaman.</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Halaman {currentPage}</span>
                 <Button variant="outline" onClick={handlePrevPage} disabled={currentPage === 1 || loading}>
                     <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
                 </Button>
