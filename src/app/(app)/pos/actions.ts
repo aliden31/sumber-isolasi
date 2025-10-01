@@ -10,7 +10,10 @@ import {
   runTransaction,
   getDoc,
   writeBatch,
-  setDoc
+  setDoc,
+  getDocs,
+  query,
+  where
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { NewTransaction, Product, JournalEntry, NewJournal, NewParkedTransaction, NewSalesReturn, Transaction } from "@/lib/types";
@@ -279,39 +282,56 @@ export async function processSalesReturn(returnData: NewSalesReturn) {
 }
 
 
-export async function settleReceivable(transaction: Transaction, paymentAccountId: string) {
+export async function settleReceivable(transactionId: string, paymentAccountId: string, batch?: FirebaseFirestore.WriteBatch) {
+    const settings = await getAccountingSettings();
+    if (!settings.accountsReceivableAccountId) {
+        throw new Error("Akun Piutang Usaha belum diatur di Pengaturan Akuntansi.");
+    }
+    
+    const txRef = doc(db, 'transactions', transactionId);
+    const txSnap = await getDoc(txRef);
+    if (!txSnap.exists()) {
+        throw new Error(`Transaksi dengan ID ${transactionId} tidak ditemukan.`);
+    }
+    const transaction = txSnap.data() as Transaction;
+    
+    const localBatch = batch || writeBatch(db);
+
+    localBatch.update(txRef, { status: 'Lunas' });
+
+    const description = `Pelunasan piutang untuk transaksi #${transactionId}`;
+    const journalEntries: JournalEntry[] = [
+        { accountId: paymentAccountId, accountName: '', debit: transaction.total, credit: 0 },
+        { accountId: settings.accountsReceivableAccountId, accountName: '', debit: 0, credit: transaction.total },
+    ];
+    
+    const newJournal: NewJournal = {
+        date: new Date(),
+        description,
+        refNumber: `PEL-${transactionId}`,
+        entries: journalEntries,
+        total: transaction.total,
+    };
+
+    const journalsCol = collection(db, "journals");
+    const newJournalRef = doc(journalsCol);
+    
+    localBatch.set(newJournalRef, { ...newJournal, date: Timestamp.fromDate(newJournal.date as Date) });
+
+    if (!batch) {
+        await localBatch.commit();
+        revalidatePath('/(app)/sales/receivables');
+        revalidatePath('/(app)/accounting/ledger');
+    }
+}
+
+
+export async function settleMultipleReceivables(transactionIds: string[], paymentAccountId: string) {
     try {
-        const settings = await getAccountingSettings();
-        if (!settings.accountsReceivableAccountId) {
-            throw new Error("Akun Piutang Usaha belum diatur di Pengaturan Akuntansi.");
-        }
-
         const batch = writeBatch(db);
-
-        // Update transaction status
-        const txRef = doc(db, 'transactions', transaction.id);
-        batch.update(txRef, { status: 'Lunas' });
-
-        // Create journal entry for settlement
-        const description = `Pelunasan piutang untuk transaksi #${transaction.id}`;
-        const journalEntries: JournalEntry[] = [
-            { accountId: paymentAccountId, accountName: '', debit: transaction.total, credit: 0 },
-            { accountId: settings.accountsReceivableAccountId, accountName: '', debit: 0, credit: transaction.total },
-        ];
-        
-        const newJournal: NewJournal = {
-            date: new Date(),
-            description,
-            refNumber: `PEL-${transaction.id}`,
-            entries: journalEntries,
-            total: transaction.total,
-        };
-
-        const journalsCol = collection(db, "journals");
-        const newJournalRef = doc(journalsCol);
-        
-        batch.set(newJournalRef, { ...newJournal, date: Timestamp.fromDate(newJournal.date as Date) });
-
+        for (const txId of transactionIds) {
+            await settleReceivable(txId, paymentAccountId, batch);
+        }
         await batch.commit();
 
         revalidatePath('/(app)/sales/receivables');
@@ -322,5 +342,5 @@ export async function settleReceivable(transaction: Transaction, paymentAccountI
         return createResponse(e instanceof Error ? e.message : "An unknown error occurred.");
     }
 }
-
     
+

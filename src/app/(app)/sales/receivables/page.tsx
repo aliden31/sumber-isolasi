@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
@@ -20,10 +21,13 @@ import {
   DialogFooter,
   DialogTrigger
 } from '@/components/ui/dialog';
-import { settleReceivable } from '@/app/(app)/pos/actions';
+import { settleReceivable, settleMultipleReceivables } from '@/app/(app)/pos/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
+
 
 const TRANSACTIONS_PER_PAGE = 500;
 
@@ -36,6 +40,9 @@ export default function AccountsReceivablePage() {
   const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
+  
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+
 
   useEffect(() => {
     // Listener for total receivables amount
@@ -55,6 +62,7 @@ export default function AccountsReceivablePage() {
 
   const fetchReceivables = async (direction: 'next' | 'prev' | 'initial' = 'initial') => {
     setLoading(true);
+    setSelectedRows([]);
     const receivablesCol = collection(db, "transactions");
     
     const baseQuery = query(receivablesCol, where('status', '==', 'Belum Lunas'), orderBy('date', 'desc'));
@@ -105,6 +113,25 @@ export default function AccountsReceivablePage() {
       fetchReceivables('prev');
     }
   };
+  
+  const handleSelectRow = (id: string) => {
+    setSelectedRows(prev => 
+      prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]
+    );
+  }
+
+  const handleSelectAll = () => {
+    if (selectedRows.length === receivables.length) {
+      setSelectedRows([]);
+    } else {
+      setSelectedRows(receivables.map(tx => tx.id));
+    }
+  }
+  
+  const totalSelectedAmount = receivables
+    .filter(tx => selectedRows.includes(tx.id))
+    .reduce((sum, tx) => sum + tx.total, 0);
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -126,15 +153,35 @@ export default function AccountsReceivablePage() {
               </div>
           </CardHeader>
           <CardContent>
+             {selectedRows.length > 0 && (
+                <div className="mb-4 p-3 bg-muted rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <p className="font-semibold">{selectedRows.length} transaksi terpilih</p>
+                        <p className="text-sm text-muted-foreground">Total: Rp {totalSelectedAmount.toLocaleString('id-ID')}</p>
+                    </div>
+                    <MultiSettleDialog 
+                        transactionIds={selectedRows} 
+                        onSettled={() => {
+                            fetchReceivables('initial');
+                            setSelectedRows([]);
+                        }}
+                    />
+                </div>
+            )}
             <Table>
                 <TableHeader>
                     <TableRow>
+                        <TableHead className="w-10">
+                            <Checkbox 
+                                checked={receivables.length > 0 && selectedRows.length === receivables.length}
+                                onCheckedChange={handleSelectAll}
+                            />
+                        </TableHead>
                         <TableHead>Tanggal</TableHead>
                         <TableHead>No. Invoice</TableHead>
                         <TableHead>Pelanggan</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Jumlah</TableHead>
-                        <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -148,7 +195,13 @@ export default function AccountsReceivablePage() {
                         </TableRow>
                     ) : (
                         receivables.map(tx => (
-                            <TableRow key={tx.id}>
+                            <TableRow key={tx.id} className={cn(selectedRows.includes(tx.id) && 'bg-muted/50')}>
+                                <TableCell>
+                                    <Checkbox 
+                                        checked={selectedRows.includes(tx.id)}
+                                        onCheckedChange={() => handleSelectRow(tx.id)}
+                                    />
+                                </TableCell>
                                 <TableCell>{format(tx.date, 'dd MMM yyyy')}</TableCell>
                                 <TableCell className="font-mono text-xs">{tx.id}</TableCell>
                                 <TableCell>{tx.customerName}</TableCell>
@@ -156,9 +209,6 @@ export default function AccountsReceivablePage() {
                                     <Badge variant="destructive">{tx.status}</Badge>
                                 </TableCell>
                                 <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
-                                <TableCell className="text-right">
-                                    <SettlePaymentDialog transaction={tx} onSettled={() => fetchReceivables('initial')}/>
-                                </TableCell>
                             </TableRow>
                         ))
                     )}
@@ -181,7 +231,8 @@ export default function AccountsReceivablePage() {
   );
 }
 
-function SettlePaymentDialog({ transaction, onSettled }: { transaction: Transaction, onSettled: () => void }) {
+
+function MultiSettleDialog({ transactionIds, onSettled }: { transactionIds: string[], onSettled: () => void }) {
     const [open, setOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
     const { toast } = useToast();
@@ -189,12 +240,13 @@ function SettlePaymentDialog({ transaction, onSettled }: { transaction: Transact
     const [cashBankAccounts, setCashBankAccounts] = useState<Account[]>([]);
 
     useEffect(() => {
+        if (!open) return;
         const q = query(collection(db, 'coa'), where('type', '==', 'Kas & Bank'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setCashBankAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
         });
         return () => unsubscribe();
-    }, []);
+    }, [open]);
 
     const handleSettle = () => {
         if (!paymentAccountId) {
@@ -202,11 +254,11 @@ function SettlePaymentDialog({ transaction, onSettled }: { transaction: Transact
             return;
         }
         startTransition(async () => {
-            const result = await settleReceivable(transaction, paymentAccountId);
+            const result = await settleMultipleReceivables(transactionIds, paymentAccountId);
             if (result.error) {
                 toast({ title: 'Gagal melunasi piutang', description: result.error, variant: 'destructive' });
             } else {
-                toast({ title: 'Piutang berhasil dilunasi!' });
+                toast({ title: 'Piutang berhasil dilunasi!', description: `${transactionIds.length} transaksi telah diperbarui.` });
                 onSettled();
                 setOpen(false);
             }
@@ -216,15 +268,15 @@ function SettlePaymentDialog({ transaction, onSettled }: { transaction: Transact
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm">
-                    <CheckCircle2 className="mr-2 h-4 w-4" /> Catat Pelunasan
+                 <Button>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Lakukan Pelunasan
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Pelunasan Piutang</DialogTitle>
+                    <DialogTitle>Pelunasan Piutang Massal</DialogTitle>
                     <DialogDescription>
-                        Konfirmasi pelunasan untuk invoice #{transaction.id} sebesar Rp {transaction.total.toLocaleString('id-ID')}.
+                        Anda akan melunasi {transactionIds.length} transaksi terpilih. Pilih akun bank/kas tujuan penerimaan dana.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2 py-4">
