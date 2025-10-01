@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const MARKETPLACE_OPTIONS = ['Tokopedia', 'Shopee', 'TikTok Shop', 'Lazada', 'BigSeller', 'Lainnya'];
+const MARKETPLACE_OPTIONS = ['Tokopedia', 'Shopee', 'TikTok', 'Lazada', 'BigSeller', 'Lainnya'];
 
 export function MarketplaceActions() {
   return (
