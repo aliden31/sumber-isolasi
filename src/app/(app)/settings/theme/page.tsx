@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 
 export default function ThemeSettingsPage() {
-  const { setTheme, theme: activeTheme } = useTheme();
+  const { setTheme, theme: activeTheme, resolvedTheme } = useTheme();
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,10 +80,10 @@ export default function ThemeSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex gap-2">
-           <Button variant="outline" onClick={() => setTheme('light')}>
+           <Button variant={resolvedTheme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')}>
                 <Sun className="mr-2 h-4 w-4" /> Terang
             </Button>
-            <Button variant="outline" onClick={() => setTheme('dark')}>
+            <Button variant={resolvedTheme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')}>
                 <Moon className="mr-2 h-4 w-4" /> Gelap
             </Button>
         </CardContent>

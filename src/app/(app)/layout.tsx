@@ -1,8 +1,8 @@
-
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/app-shell";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { getCompanySettings } from "./settings/actions";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 
 export default async function AppLayout({
   children,
@@ -13,10 +13,12 @@ export default async function AppLayout({
   const companySettings = await getCompanySettings();
 
   return (
-    <SidebarProvider>
-      <TooltipProvider>
-        <AppShell companyName={companySettings?.companyName || "Toko Kilat"}>{children}</AppShell>
-      </TooltipProvider>
-    </SidebarProvider>
+    <ThemeProvider>
+      <SidebarProvider>
+        <TooltipProvider>
+          <AppShell companyName={companySettings?.companyName || "Toko Kilat"}>{children}</AppShell>
+        </TooltipProvider>
+      </SidebarProvider>
+    </ThemeProvider>
   );
 }
