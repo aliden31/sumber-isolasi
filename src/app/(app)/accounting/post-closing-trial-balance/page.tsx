@@ -20,6 +20,8 @@ type ReportRow = {
   credit: number;
 };
 
+const isPermanentAccount = (type: string) => type.startsWith('Aset') || type.startsWith('Kas') || type.startsWith('Kewajiban') || type.startsWith('Ekuitas');
+
 export default function PostClosingTrialBalancePage() {
   const [journals, setJournals] = useState<Journal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -56,28 +58,44 @@ export default function PostClosingTrialBalancePage() {
 
   const reportData: ReportRow[] = useMemo(() => {
     const balances: { [key: string]: number } = {};
-    accounts.forEach(acc => { balances[acc.id] = 0; });
+    const permanentAccounts = accounts.filter(acc => isPermanentAccount(acc.type));
+    
+    permanentAccounts.forEach(acc => { balances[acc.id] = 0; });
 
     journals.forEach(journal => {
       journal.entries.forEach(entry => {
-        const account = accounts.find(a => a.id === entry.accountId);
-        if (!account) return;
+        if (balances[entry.accountId] !== undefined) {
+          const account = permanentAccounts.find(a => a.id === entry.accountId);
+          if (!account) return;
 
-        const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Beban');
-        const balanceEffect = isDebitNormal ? entry.debit - entry.credit : entry.credit - entry.debit;
-        
-        balances[entry.accountId] += balanceEffect;
+          const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Kas & Bank');
+          const balanceEffect = isDebitNormal ? entry.debit - entry.credit : entry.credit - entry.debit;
+          
+          balances[entry.accountId] += balanceEffect;
+        }
       });
     });
 
-    return accounts.map(account => {
+    return permanentAccounts.map(account => {
       const balance = balances[account.id] || 0;
-      const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Beban');
+      const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Kas & Bank');
+      
+      let debit = 0;
+      let credit = 0;
+
+      if (isDebitNormal) {
+        if (balance > 0) debit = balance;
+        else credit = -balance; // Show abnormal balance on credit side
+      } else { // Credit normal
+        if (balance > 0) credit = balance;
+        else debit = -balance; // Show abnormal balance on debit side
+      }
+
       return {
         accountCode: account.code,
         accountName: account.name,
-        debit: isDebitNormal && balance > 0 ? balance : 0,
-        credit: !isDebitNormal && balance > 0 ? balance : (balance < 0 ? -balance : 0),
+        debit,
+        credit,
       };
     }).filter(row => row.debit !== 0 || row.credit !== 0);
   }, [journals, accounts]);
