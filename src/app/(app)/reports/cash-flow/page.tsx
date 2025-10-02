@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -361,6 +362,14 @@ function ReportRowComponent({ row, isSubRow = false, isSubSubRow = false }: { ro
     }
   };
 
+  const getTransactionSearchLink = () => {
+    const match = row.description.match(/#([A-Z]{2,4}-\d{8}-\w{5,})/);
+    if (match && match[1]) {
+      return `/transactions?search=${match[1]}`;
+    }
+    return null;
+  };
+
   const getLink = () => {
     if (row.sourceType === 'account' && typeof row.sourceId === 'string') {
         return `/accounting/ledger?accountId=${row.sourceId}`;
@@ -368,27 +377,40 @@ function ReportRowComponent({ row, isSubRow = false, isSubSubRow = false }: { ro
     if (row.sourceType === 'report') {
         return '/reports/financial';
     }
+    const txLink = getTransactionSearchLink();
+    if (txLink) return txLink;
+
     return '#';
   };
 
   const isClickable = row.sourceType === 'journal';
-  const isLink = row.sourceType === 'account' || row.sourceType === 'report';
+  const isLink = (row.sourceType === 'account' || row.sourceType === 'report' || !!getTransactionSearchLink());
+  const linkHref = getLink();
+
+  const renderDescription = () => {
+    const content = (
+      <>
+        {row.description}
+        {(isClickable || isLink) && <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground group-hover:text-primary"/>}
+      </>
+    );
+
+    if(isLink && linkHref !== '#') {
+      return (
+        <Link href={linkHref} className="flex items-center hover:underline">
+          {content}
+        </Link>
+      );
+    }
+    
+    return <span className={cn(isClickable && "group")}>{content}</span>;
+  }
 
   return (
     <>
-      <TableRow onClick={isClickable ? handleClick : undefined} className={cn(isClickable && "cursor-pointer")}>
-        <TableCell className={cn(isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "", isClickable && "group")}>
-          {isLink ? (
-            <Link href={getLink()} className="flex items-center hover:underline">
-              {row.description}
-              <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground"/>
-            </Link>
-          ) : (
-            <>
-              {row.description}
-              {isClickable && <ExternalLink className="inline-block ml-2 h-3 w-3 text-muted-foreground group-hover:text-primary"/>}
-            </>
-          )}
+      <TableRow onClick={isClickable && !isLink ? handleClick : undefined} className={cn(isClickable && !isLink && "cursor-pointer")}>
+        <TableCell className={cn(isSubSubRow ? "pl-12" : isSubRow ? "pl-8" : "")}>
+          {renderDescription()}
         </TableCell>
         <TableCell className="text-right font-mono">{row.amount.toLocaleString('id-ID')}</TableCell>
       </TableRow>
