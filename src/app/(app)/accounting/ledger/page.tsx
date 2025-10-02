@@ -275,7 +275,7 @@ export default function GeneralLedgerPage() {
                       <TableCell>{format(tx.date, 'dd MMM yyyy')}</TableCell>
                       <TableCell className="font-mono text-xs">
                         <Button variant="link" className="p-0 h-auto" onClick={() => handleRefClick(tx.ref)}>
-                            {tx.ref}
+                            ...{tx.ref.slice(-8)}
                         </Button>
                       </TableCell>
                       <TableCell>{tx.desc}</TableCell>
