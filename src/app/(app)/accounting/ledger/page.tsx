@@ -25,10 +25,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { collection, onSnapshot, query, orderBy, where, Timestamp, getDocs, limit, startAfter, DocumentData } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where, Timestamp, getDocs, limit, startAfter, DocumentData, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal, JournalEntry } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
@@ -55,6 +62,9 @@ export default function GeneralLedgerPage() {
   const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
   const [pageHistory, setPageHistory] = useState<(DocumentData | null)[] >([null]);
   const [currentPage, setCurrentPage] = useState(1);
+  
+  const [selectedJournal, setSelectedJournal] = useState<Journal | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
 
   useEffect(() => {
@@ -111,12 +121,12 @@ export default function GeneralLedgerPage() {
     const allRelevantEntries: any[] = [];
     
     allJournalsSnapshot.docs.forEach(journalDoc => {
-        const journal = journalDoc.data() as Journal;
+        const journal = { ...journalDoc.data(), id: journalDoc.id } as Journal;
         journal.entries.forEach(entry => {
             if (entry.accountId === selectedAccountId) {
                 allRelevantEntries.push({
                     journalDate: journal.date.toDate(),
-                    journalRef: journal.refNumber || journal.id,
+                    journalRef: journal.id,
                     journalDesc: journal.description,
                     ...entry
                 });
@@ -186,6 +196,24 @@ export default function GeneralLedgerPage() {
       fetchLedgerEntries(newPage, null); // Simplified, not using pageHistory for now
     }
   };
+  
+  const handleRefClick = async (journalId: string) => {
+    try {
+        const journalRef = doc(db, 'journals', journalId);
+        const journalSnap = await getDoc(journalRef);
+        if (journalSnap.exists()) {
+            const journalData = journalSnap.data();
+            setSelectedJournal({
+                id: journalSnap.id,
+                ...journalData,
+                date: journalData.date.toDate()
+            } as Journal);
+            setIsDetailOpen(true);
+        }
+    } catch (e) {
+        console.error("Failed to fetch journal details:", e);
+    }
+  }
 
 
   return (
@@ -245,7 +273,11 @@ export default function GeneralLedgerPage() {
                   ledgerEntries.map((tx, index) => (
                     <TableRow key={index}>
                       <TableCell>{format(tx.date, 'dd MMM yyyy')}</TableCell>
-                      <TableCell className="font-mono text-xs">{tx.ref}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <Button variant="link" className="p-0 h-auto" onClick={() => handleRefClick(tx.ref)}>
+                            {tx.ref}
+                        </Button>
+                      </TableCell>
                       <TableCell>{tx.desc}</TableCell>
                       <TableCell className="text-right font-mono">
                         {tx.debit > 0 ? tx.debit.toLocaleString('id-ID') : '-'}
@@ -281,6 +313,38 @@ export default function GeneralLedgerPage() {
             </div>
         </CardFooter>
       </Card>
+      
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+          <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                  <DialogTitle>Detail Jurnal: {selectedJournal?.id}</DialogTitle>
+                  <DialogDescription>
+                      {selectedJournal?.description}
+                  </DialogDescription>
+              </DialogHeader>
+               <div className="py-4 max-h-[60vh] overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Akun</TableHead>
+                                <TableHead className="text-right">Debit</TableHead>
+                                <TableHead className="text-right">Kredit</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {selectedJournal?.entries.map((entry, idx) => (
+                                <TableRow key={idx}>
+                                    <TableCell>{entry.accountName}</TableCell>
+                                    <TableCell className="text-right font-mono">{entry.debit > 0 ? entry.debit.toLocaleString('id-ID') : '-'}</TableCell>
+                                    <TableCell className="text-right font-mono">{entry.credit > 0 ? entry.credit.toLocaleString('id-ID') : '-'}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+          </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
