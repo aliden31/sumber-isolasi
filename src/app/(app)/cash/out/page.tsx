@@ -72,10 +72,9 @@ export default function CashOutPage() {
 
     const qHistory = query(
       collection(db, 'journals'), 
+      orderBy('date', 'desc'),
       where('description', '>=', 'Kas Keluar:'), 
-      where('description', '<', 'Kas Keluar:' + '\uf8ff'),
-      orderBy('description'),
-      orderBy('date', 'desc')
+      where('description', '<', 'Kas Keluar:' + '\uf8ff')
     );
     const unsubHistory = onSnapshot(qHistory, (snapshot) => {
         setHistory(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: doc.data().date.toDate() } as Journal)));
@@ -316,4 +315,3 @@ function HistoryRow({ item, onSelectJournal }: { item: Journal, onSelectJournal:
         </TableRow>
     );
 }
-
