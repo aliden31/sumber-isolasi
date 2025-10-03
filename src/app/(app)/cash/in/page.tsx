@@ -14,14 +14,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, Loader2, History } from 'lucide-react';
+import { Save, Loader2, History, Trash2 } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/hooks/use-toast';
 import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, NewJournal, JournalEntry, Journal } from '@/lib/types';
-import { addJournalEntry } from '@/app/(app)/accounting/journal/actions';
+import { addJournalEntry, deleteJournalEntry } from '@/app/(app)/accounting/journal/actions';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -64,9 +75,10 @@ export default function CashInPage() {
 
     const qHistory = query(
       collection(db, 'journals'), 
-      orderBy('date', 'desc'),
       where('description', '>=', 'Kas Masuk:'), 
-      where('description', '<', 'Kas Masuk:' + '\uf8ff')
+      where('description', '<', 'Kas Masuk:' + '\uf8ff'),
+      orderBy('description'),
+      orderBy('date', 'desc')
     );
     const unsubHistory = onSnapshot(qHistory, (snapshot) => {
         setHistory(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: doc.data().date.toDate() } as Journal)));
@@ -200,27 +212,18 @@ export default function CashInPage() {
                             <TableHead>Deskripsi</TableHead>
                             <TableHead>Akun Sumber</TableHead>
                             <TableHead className="text-right">Jumlah</TableHead>
+                            <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loadingHistory ? (
-                            <TableRow><TableCell colSpan={4} className="text-center h-24"><Loader2 className="animate-spin"/></TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="animate-spin"/></TableCell></TableRow>
                         ) : history.length === 0 ? (
-                            <TableRow><TableCell colSpan={4} className="text-center h-24 text-muted-foreground">Belum ada riwayat pemasukan.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="text-center h-24 text-muted-foreground">Belum ada riwayat pemasukan.</TableCell></TableRow>
                         ) : (
-                            history.map(item => {
-                                const creditEntry = item.entries.find(e => e.credit > 0);
-                                return (
-                                    <DialogTrigger key={item.id} asChild>
-                                        <TableRow className="cursor-pointer" onClick={() => setSelectedJournal(item)}>
-                                            <TableCell>{format(item.date, "dd MMM yyyy", { locale: id })}</TableCell>
-                                            <TableCell>{item.description.replace('Kas Masuk: ', '')}</TableCell>
-                                            <TableCell>{creditEntry?.accountName}</TableCell>
-                                            <TableCell className="text-right font-mono">Rp {item.total.toLocaleString('id-ID')}</TableCell>
-                                        </TableRow>
-                                    </DialogTrigger>
-                                );
-                            })
+                            history.map(item => (
+                                <HistoryRow key={item.id} item={item} onSelectJournal={setSelectedJournal} />
+                            ))
                         )}
                     </TableBody>
                 </Table>
@@ -259,3 +262,62 @@ export default function CashInPage() {
     </Dialog>
   );
 }
+
+
+function HistoryRow({ item, onSelectJournal }: { item: Journal, onSelectJournal: (journal: Journal | null) => void }) {
+    const [isDeleting, startDeleteTransition] = useTransition();
+    const { toast } = useToast();
+
+    const creditEntry = item.entries.find(e => e.credit > 0);
+
+    const handleDelete = () => {
+        startDeleteTransition(async () => {
+            const result = await deleteJournalEntry(item.id);
+            if (result.error) {
+                toast({ title: 'Gagal menghapus', description: result.error, variant: 'destructive' });
+            } else {
+                toast({ title: 'Berhasil', description: 'Transaksi kas masuk telah dihapus.' });
+            }
+        });
+    };
+
+    return (
+        <TableRow>
+            <TableCell>
+                <DialogTrigger asChild>
+                    <Button variant="link" className="p-0 h-auto" onClick={() => onSelectJournal(item)}>
+                        {format(item.date, "dd MMM yyyy", { locale: id })}
+                    </Button>
+                </DialogTrigger>
+            </TableCell>
+            <TableCell>{item.description.replace('Kas Masuk: ', '')}</TableCell>
+            <TableCell>{creditEntry?.accountName}</TableCell>
+            <TableCell className="text-right font-mono">Rp {item.total.toLocaleString('id-ID')}</TableCell>
+            <TableCell className="text-right">
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={isDeleting}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Tindakan ini akan menghapus transaksi kas masuk ini secara permanen. Jurnal yang terkait juga akan dihapus.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Batal</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Ya, Hapus
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </TableCell>
+        </TableRow>
+    );
+}
+
