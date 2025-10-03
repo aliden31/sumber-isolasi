@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useTransition, useEffect } from 'react';
-import { PlusCircle, MinusCircle, X, Save, Loader2, Plus, Send, Eye } from 'lucide-react';
+import { Plus, Save, Loader2, PlusCircle, MinusCircle, X, ChevronsUpDown, Check, ArrowLeft, Send, Eye, CheckCircle, XCircle } from 'lucide-react';
 import type { Product, Supplier, PurchaseOrderItem, NewPurchaseOrder, PurchaseOrder, PurchaseRequest, ProductUnit } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,6 @@ import { db } from '@/lib/firebase';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DatePicker } from '@/components/ui/date-picker';
 import { addPurchaseOrder, updatePurchaseOrderStatus, updatePurchaseRequestStatus } from '../actions';
@@ -116,12 +115,13 @@ function NewPurchaseOrderForm({ onBack }: { onBack: () => void }) {
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [selectedPR, setSelectedPR] = useState<PurchaseRequest | null>(null);
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date | undefined>();
 
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
   useEffect(() => {
+    setDate(new Date());
     const productsUnsub = onSnapshot(collection(db, "products"), (snapshot) => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     });

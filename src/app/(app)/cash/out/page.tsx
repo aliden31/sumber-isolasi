@@ -48,7 +48,7 @@ export default function CashOutPage() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date | undefined>();
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState(0);
   const [fromAccountId, setFromAccountId] = useState('');
@@ -63,6 +63,7 @@ export default function CashOutPage() {
   const [selectedJournal, setSelectedJournal] = useState<Journal | null>(null);
 
   useEffect(() => {
+    setDate(new Date());
     const unsub = onSnapshot(collection(db, 'coa'), (snapshot) => {
       const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)).sort((a,b) => a.code.localeCompare(b.code));
       setAllAccounts(accounts);

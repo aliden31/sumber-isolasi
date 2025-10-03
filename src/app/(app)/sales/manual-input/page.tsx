@@ -25,12 +25,13 @@ export default function ManualSalesInputPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date | undefined>();
 
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
   useEffect(() => {
+    setDate(new Date());
     const productsUnsub = onSnapshot(collection(db, "products"), (snapshot) => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     });

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useTransition, useEffect } from 'react';
@@ -122,7 +123,7 @@ export default function PurchaseRequestPage() {
 function NewPurchaseRequestForm({ onBack }: { onBack: () => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [items, setItems] = useState<PurchaseRequestItem[]>([]);
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date | undefined>();
   const [requestedBy, setRequestedBy] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -130,6 +131,7 @@ function NewPurchaseRequestForm({ onBack }: { onBack: () => void }) {
   const { toast } = useToast();
 
   useEffect(() => {
+    setDate(new Date());
     const productsUnsub = onSnapshot(collection(db, "products"), (snapshot) => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     });

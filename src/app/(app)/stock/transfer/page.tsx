@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useTransition, useMemo } from 'react';
@@ -22,7 +23,7 @@ export default function StockTransferPage() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date | undefined>();
   const [notes, setNotes] = useState('');
   const [fromWarehouseId, setFromWarehouseId] = useState('');
   const [toWarehouseId, setToWarehouseId] = useState('');
@@ -32,6 +33,7 @@ export default function StockTransferPage() {
   const [products, setProducts] = useState<Product[]>([]);
   
   useEffect(() => {
+    setDate(new Date());
     const unsubWarehouses = onSnapshot(query(collection(db, 'warehouses'), orderBy('name')), (snapshot) => {
       setWarehouses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse)));
     });

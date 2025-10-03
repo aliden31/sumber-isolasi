@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
@@ -42,7 +41,7 @@ export default function StockOpnamePage() {
   const [opnameItems, setOpnameItems] = useState<OpnameItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
-  const [opnameDate, setOpnameDate] = useState<Date|undefined>(new Date());
+  const [opnameDate, setOpnameDate] = useState<Date|undefined>();
   const [notes, setNotes] = useState('');
   
   const [opnameHistory, setOpnameHistory] = useState<StockOpname[]>([]);
@@ -51,6 +50,7 @@ export default function StockOpnamePage() {
   const { toast } = useToast();
 
   useEffect(() => {
+    setOpnameDate(new Date());
     const unsubProducts = onSnapshot(query(collection(db, 'products'), orderBy('name')), (snapshot) => {
       const productList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
       setProducts(productList);
