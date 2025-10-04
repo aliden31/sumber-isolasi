@@ -62,6 +62,7 @@ const raleway = Raleway({
 export const metadata: Metadata = {
   title: "Toko Kilat",
   description: "Aplikasi kasir penjualan dan akuntansi.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -71,7 +72,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <head />
+      <head>
+        <meta name="theme-color" content="#000000" />
+      </head>
       <body className={cn(
           "font-body antialiased",
           "min-h-screen bg-background",
