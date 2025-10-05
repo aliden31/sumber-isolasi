@@ -5,9 +5,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { PurchaseOrder } from '@/lib/types';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, DollarSign, ShoppingCart, Truck, Download } from 'lucide-react';
@@ -20,6 +19,8 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 (jsPDF as any).autoTableSetDefaults({
     headStyles: { fillColor: [15, 23, 42] },
@@ -40,25 +41,30 @@ interface SupplierPurchaseSummary {
 export default function PurchasingReportPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(),
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
   });
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    let q = query(collection(db, 'purchaseOrders'), orderBy('date', 'desc'));
+    const newFrom = new Date(year, month - 1, 1);
+    const newTo = endOfMonth(newFrom);
+    setDateRange({ from: newFrom, to: newTo });
+  }, [year, month]);
 
-    if (dateRange?.from) {
-        const from = Timestamp.fromDate(dateRange.from);
-        let to = dateRange.to ? Timestamp.fromDate(dateRange.to) : from;
-        const toDayEnd = new Date(dateRange.to || dateRange.from);
-        toDayEnd.setHours(23, 59, 59, 999);
-        to = Timestamp.fromDate(toDayEnd);
-        
-        q = query(q, where("date", ">=", from), where("date", "<=", to));
-    }
+  useEffect(() => {
+    if (!dateRange?.from) return;
+    setLoading(true);
+    
+    const from = Timestamp.fromDate(dateRange.from);
+    const toDayEnd = new Date(dateRange.to || dateRange.from);
+    toDayEnd.setHours(23, 59, 59, 999);
+    const to = Timestamp.fromDate(toDayEnd);
+    
+    let q = query(collection(db, 'purchaseOrders'), where("date", ">=", from), where("date", "<=", to), orderBy('date', 'desc'));
 
     const unsub = onSnapshot(q, (snapshot) => {
         setPurchaseOrders(snapshot.docs.map(doc => {
@@ -109,7 +115,7 @@ export default function PurchasingReportPage() {
     const doc = new jsPDF();
     const settings = await getCompanySettings();
     const companyName = settings.companyName || 'Toko Kilat';
-    const period = `Periode: ${dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - ${dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}`;
+    const period = `Periode: ${dateRange?.from ? format(dateRange.from, 'd MMMM yyyy', { locale: id }) : '...'} - ${dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : '...'}`;
     
     let y = 15;
     doc.setFontSize(16);
@@ -171,13 +177,30 @@ export default function PurchasingReportPage() {
     doc.save(`laporan-pembelian-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
+  const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('id-ID', { month: 'long' });
+
   return (
     <Dialog onOpenChange={(open) => !open && setSelectedPO(null)}>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Pembelian</h1>
            <div className="flex gap-2">
-              <DateRangePicker onSelect={setDateRange} />
+              <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
+                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Pilih bulan" /></SelectTrigger>
+                  <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                          <SelectItem key={m} value={String(m)}>{getMonthName(m)}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+              <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
+                  <SelectTrigger className="w-[120px]"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                  <SelectContent>
+                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
               <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
                   <Download className="mr-2 h-4 w-4"/>
                   Ekspor PDF
@@ -318,8 +341,4 @@ function MetricCard({ title, value, format = 'number', icon: Icon }: MetricCardP
     );
 }
 
-declare module '@/components/ui/date-range-picker' {
-    interface DateRangePickerProps {
-        onSelect?: (date?: DateRange) => void;
-    }
-}
+    

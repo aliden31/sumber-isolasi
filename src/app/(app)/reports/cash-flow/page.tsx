@@ -1,16 +1,14 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { collection, onSnapshot, query, where, Timestamp, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
@@ -19,6 +17,7 @@ import jsPDF from 'jspdf';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import Link from 'next/link';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type ReportRow = {
   description: string;
@@ -55,11 +54,19 @@ export default function CashFlowPage() {
   const [journals, setJournals] = useState<Journal[]>([]);
   const [allTimeJournals, setAllTimeJournals] = useState<Journal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   });
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const newFrom = new Date(year, month - 1, 1);
+    const newTo = endOfMonth(newFrom);
+    setDateRange({ from: newFrom, to: newTo });
+  }, [year, month]);
 
   useEffect(() => {
     const unsubAccounts = onSnapshot(query(collection(db, 'coa'), orderBy('code')), (snapshot) => {
@@ -297,12 +304,29 @@ export default function CashFlowPage() {
     </>
   );
 
+  const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('id-ID', { month: 'long' });
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Arus Kas</h1>
         <div className="flex gap-2">
-            <DateRangePicker onSelect={setDateRange} />
+            <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Pilih bulan" /></SelectTrigger>
+                <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                        <SelectItem key={m} value={String(m)}>{getMonthName(m)}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
+                <SelectTrigger className="w-[120px]"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                <SelectContent>
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
             <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
                 <Download className="mr-2 h-4 w-4"/>
                 Ekspor PDF
@@ -313,7 +337,7 @@ export default function CashFlowPage() {
         <CardHeader>
           <CardTitle>Laporan Arus Kas (Metode Tidak Langsung)</CardTitle>
            <CardDescription>
-            Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}
+            Periode: {dateRange?.from ? format(dateRange.from, 'd MMMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : '...'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -455,8 +479,4 @@ function JournalDetailDialog({ open, onOpenChange, journal }: { open: boolean, o
     );
 }
 
-declare module '@/components/ui/date-range-picker' {
-    interface DateRangePickerProps {
-        onSelect?: (date?: DateRange) => void;
-    }
-}
+    

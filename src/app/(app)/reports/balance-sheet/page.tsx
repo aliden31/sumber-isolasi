@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -9,7 +8,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, endOfMonth } from 'date-fns';
 import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
@@ -17,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import Link from 'next/link';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 type ReportRow = {
@@ -48,9 +48,16 @@ const isExpense = (type: string) => type.startsWith('Beban');
 export default function BalanceSheetPage() {
   const [journals, setJournals] = useState<Journal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [reportDate, setReportDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const newFrom = new Date(year, month - 1, 1);
+    setReportDate(endOfMonth(newFrom));
+  }, [year, month]);
 
   useEffect(() => {
     const unsubAccounts = onSnapshot(collection(db, 'coa'), (snapshot) => {
@@ -324,12 +331,29 @@ export default function BalanceSheetPage() {
     </>
   );
 
+  const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('id-ID', { month: 'long' });
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Posisi Keuangan (Neraca)</h1>
         <div className="flex gap-2">
-            <DatePicker date={reportDate} setDate={setReportDate} />
+            <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Pilih bulan" /></SelectTrigger>
+                <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                        <SelectItem key={m} value={String(m)}>{getMonthName(m)}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
+                <SelectTrigger className="w-[120px]"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                <SelectContent>
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
              <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
                 <Download className="mr-2 h-4 w-4"/>
                 Ekspor PDF
@@ -404,3 +428,5 @@ export default function BalanceSheetPage() {
     </div>
   );
 }
+
+    

@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -10,7 +9,7 @@ import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'fireba
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
@@ -18,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import Link from 'next/link';
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type ReportRow = {
   accountId: string;
@@ -40,13 +39,20 @@ type FinancialReport = {
 export default function FinancialReportsPage() {
   const [journals, setJournals] = useState<Journal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(),
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
   });
   const [loading, setLoading] = useState(true);
   const reportRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const newFrom = new Date(year, month - 1, 1);
+    const newTo = endOfMonth(newFrom);
+    setDateRange({ from: newFrom, to: newTo });
+  }, [year, month]);
 
   useEffect(() => {
     const unsubAccounts = onSnapshot(collection(db, 'coa'), (snapshot) => {
@@ -57,22 +63,17 @@ export default function FinancialReportsPage() {
   }, []);
   
   useEffect(() => {
-    if (accounts.length === 0) return; // Wait for accounts to be loaded
+    if (accounts.length === 0 || !dateRange?.from) return;
 
     setLoading(true);
     const journalsCol = collection(db, 'journals');
-    let q = query(journalsCol, orderBy('date', 'asc'));
-
-    if (dateRange?.from) {
-        const from = Timestamp.fromDate(dateRange.from);
-        let to = dateRange.to ? Timestamp.fromDate(dateRange.to) : from;
-
-        const toDayEnd = new Date(dateRange.to || dateRange.from);
-        toDayEnd.setHours(23, 59, 59, 999);
-        to = Timestamp.fromDate(toDayEnd);
-        
-        q = query(q, where("date", ">=", from), where("date", "<=", to));
-    }
+    
+    const from = Timestamp.fromDate(dateRange.from);
+    const toDayEnd = new Date(dateRange.to || dateRange.from);
+    toDayEnd.setHours(23, 59, 59, 999);
+    const to = Timestamp.fromDate(toDayEnd);
+    
+    let q = query(journalsCol, where("date", ">=", from), where("date", "<=", to), orderBy('date', 'asc'));
 
     const unsubJournals = onSnapshot(q, (snapshot) => {
         setJournals(snapshot.docs.map(doc => {
@@ -273,13 +274,30 @@ export default function FinancialReportsPage() {
       )}
     </>
   );
+  
+  const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('id-ID', { month: 'long' });
 
   return (
     <div className="flex flex-col gap-6">
        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-headline font-bold">Laporan Laba Rugi</h1>
         <div className="flex gap-2">
-            <DateRangePicker onSelect={setDateRange} />
+            <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Pilih bulan" /></SelectTrigger>
+                <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                        <SelectItem key={m} value={String(m)}>{getMonthName(m)}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
+                <SelectTrigger className="w-[120px]"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                <SelectContent>
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
              <Button onClick={handleExportPDF} variant="outline" disabled={loading}>
                 <Download className="mr-2 h-4 w-4"/>
                 Ekspor PDF
@@ -290,7 +308,7 @@ export default function FinancialReportsPage() {
         <CardHeader>
           <CardTitle>Laporan Laba Rugi</CardTitle>
           <CardDescription>
-            Periode: {dateRange?.from ? format(dateRange.from, 'd MMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMM yyyy', { locale: id }) : '...'}
+            Periode: {dateRange?.from ? format(dateRange.from, 'd MMMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : '...'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -332,9 +350,4 @@ export default function FinancialReportsPage() {
   );
 }
 
-// Add this to date-range-picker component to accept onSelect props
-declare module '@/components/ui/date-range-picker' {
-    interface DateRangePickerProps {
-        onSelect?: (date?: DateRange) => void;
-    }
-}
+    
