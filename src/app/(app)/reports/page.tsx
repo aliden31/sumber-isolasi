@@ -294,7 +294,7 @@ export default function SalesReportPage() {
               <CardHeader>
                 <CardTitle>Rangkuman Penjualan per Produk</CardTitle>
                 <CardDescription>
-                  Periode: {dateRange?.from ? format(dateRange.from, 'd MMMM yyyy', { locale: id }) : '...'} - {dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : '...'}
+                  Pendapatan Kotor adalah total penjualan sebelum diskon, sedangkan Laba Kotor adalah pendapatan setelah dikurangi HPP.
                 </CardDescription>
               </CardHeader>
               <CardContent>
