@@ -16,16 +16,11 @@ import { Badge } from '@/components/ui/badge';
 import { id } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-
-(jsPDF as any).autoTableSetDefaults({
-    headStyles: { fillColor: [15, 23, 42] },
-    styles: { font: 'helvetica' },
-});
 
 interface PurchaseMetric {
     totalValue: number;
@@ -113,6 +108,10 @@ export default function PurchasingReportPage() {
 
   const handleExportPDF = async () => {
     const doc = new jsPDF();
+    autoTable(doc, {
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { font: 'helvetica' },
+    });
     const settings = await getCompanySettings();
     const companyName = settings.companyName || 'Toko Kilat';
     const period = `Periode: ${dateRange?.from ? format(dateRange.from, 'd MMMM yyyy', { locale: id }) : '...'} - ${dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : '...'}`;
@@ -134,7 +133,7 @@ export default function PurchasingReportPage() {
     doc.setFont('helvetica', 'bold');
     doc.text("Ringkasan Metrik Pembelian", 14, y);
     y+= 6;
-    (doc as any).autoTable({
+    autoTable(doc, {
         startY: y,
         body: [
             ['Total Nilai Pembelian', `Rp ${metrics.totalValue.toLocaleString('id-ID')}`],
@@ -159,7 +158,7 @@ export default function PurchasingReportPage() {
       `Rp ${po.total.toLocaleString('id-ID')}`,
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
         startY: y,
         head: [['Tanggal', 'No. PO', 'Pemasok', 'Status', 'Total']],
         body: tableData,

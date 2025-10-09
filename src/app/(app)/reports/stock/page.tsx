@@ -13,16 +13,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import { id } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 
-(jsPDF as any).autoTableSetDefaults({
-    headStyles: { fillColor: [15, 23, 42] },
-    styles: { font: 'helvetica' },
-});
 
 export default function StockReportsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -76,6 +72,10 @@ export default function StockReportsPage() {
 
   const handleExportPDF = async () => {
     const doc = new jsPDF();
+    autoTable(doc, {
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { font: 'helvetica' },
+    });
     const settings = await getCompanySettings();
     const companyName = settings.companyName || 'Toko Kilat';
     const period = `Per tanggal: ${format(new Date(), 'd MMMM yyyy', { locale: id })}`;
@@ -97,7 +97,7 @@ export default function StockReportsPage() {
     doc.setFont('helvetica', 'bold');
     doc.text("Ringkasan Persediaan", 14, y);
     y+= 6;
-    (doc as any).autoTable({
+    autoTable(doc, {
         startY: y,
         body: [
             ['Total Nilai Persediaan', `Rp ${totalInventoryValue.toLocaleString('id-ID')}`],
@@ -121,7 +121,7 @@ export default function StockReportsPage() {
       `Rp ${((p.cost || 0) * p.stock).toLocaleString('id-ID')}`,
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
         startY: y,
         head: [['Produk', 'Kategori', 'Stok', 'Harga Pokok', 'Total Nilai']],
         body: tableData,

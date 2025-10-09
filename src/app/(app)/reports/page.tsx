@@ -15,16 +15,11 @@ import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tool
 import { ChartTooltip, ChartTooltipContent, ChartContainer } from "@/components/ui/chart";
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-
-(jsPDF as any).autoTableSetDefaults({
-    headStyles: { fillColor: [15, 23, 42] },
-    styles: { font: 'helvetica' },
-});
 
 export default function SalesReportPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -142,6 +137,10 @@ export default function SalesReportPage() {
 
   const handleExportPDF = async () => {
     const doc = new jsPDF();
+    autoTable(doc, {
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { font: 'helvetica' },
+    });
     const settings = await getCompanySettings();
     const companyName = settings.companyName || 'Toko Kilat';
     const period = `Periode: ${dateRange?.from ? format(dateRange.from, 'd MMMM yyyy', { locale: id }) : '...'} - ${dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : '...'}`;
@@ -163,7 +162,7 @@ export default function SalesReportPage() {
     doc.setFont('helvetica', 'bold');
     doc.text("Ringkasan Metrik Penjualan", 14, y);
     y+= 6;
-    (doc as any).autoTable({
+    autoTable(doc, {
         startY: y,
         body: [
             ['Penjualan Kotor', `Rp ${metrics.grossSales.toLocaleString('id-ID')}`],
@@ -188,7 +187,7 @@ export default function SalesReportPage() {
       `Rp ${p.grossProfit.toLocaleString('id-ID')}`,
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
         startY: y,
         head: [['Produk', 'Kuantitas Terjual', 'Pendapatan Kotor', 'Laba Kotor']],
         body: tableData,
