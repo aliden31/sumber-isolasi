@@ -196,19 +196,33 @@ export default function ImportMarketplacePage() {
                     let subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)'])) || (unit_price * qty);
 
                     let fee = 0;
-                    if (!ordersFeeCalculated.has(nomor_order)) {
-                        const commissionFee = normalizeNumber(getVal(['biaya komisi']));
-                        const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
-                        const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
-                        fee = commissionFee + transactionFee + affiliateFee;
-                        ordersFeeCalculated.set(nomor_order, fee);
-                    } else {
-                        fee = ordersFeeCalculated.get(nomor_order) || 0;
-                    }
+                    let discount = 0;
+                    let net_total = 0;
 
-                    const voucher_toko = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller']));
-                    const discount = voucher_toko;
-                    const net_total = subtotal - fee - discount;
+                    if (channel.toLowerCase() === 'tiktok') {
+                        if (!ordersFeeCalculated.has(nomor_order)) {
+                             // TikTok custom fee: 15% of subtotal + 1250
+                            fee = (subtotal * 0.15) + 1250;
+                            ordersFeeCalculated.set(nomor_order, fee);
+                        } else {
+                            fee = ordersFeeCalculated.get(nomor_order) || 0;
+                        }
+                        // For TikTok, ignore voucher, calculate net_total from subtotal and custom fee
+                        net_total = subtotal - fee;
+                    } else {
+                        // Original logic for other marketplaces
+                        if (!ordersFeeCalculated.has(nomor_order)) {
+                            const commissionFee = normalizeNumber(getVal(['biaya komisi']));
+                            const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
+                            const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
+                            fee = commissionFee + transactionFee + affiliateFee;
+                            ordersFeeCalculated.set(nomor_order, fee);
+                        } else {
+                            fee = ordersFeeCalculated.get(nomor_order) || 0;
+                        }
+                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller']));
+                        net_total = subtotal - fee - discount;
+                    }
 
                     const parsedDate = parseDate(tanggal_order_raw);
                     if (!parsedDate) {
