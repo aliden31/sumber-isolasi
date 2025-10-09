@@ -200,15 +200,10 @@ export default function ImportMarketplacePage() {
                     let net_total = 0;
 
                     if (channel.toLowerCase() === 'tiktok') {
-                        if (!ordersFeeCalculated.has(nomor_order)) {
-                             // TikTok custom fee: 15% of subtotal + 1250
-                            fee = (subtotal * 0.15) + 1250;
-                            ordersFeeCalculated.set(nomor_order, fee);
-                        } else {
-                            fee = ordersFeeCalculated.get(nomor_order) || 0;
-                        }
-                        // For TikTok, ignore voucher, calculate net_total from subtotal and custom fee
-                        net_total = subtotal - fee;
+                        // For TikTok, fee is 15% + 1250, and voucher is ignored for net calculation
+                        fee = (subtotal * 0.15) + 1250;
+                        net_total = subtotal - fee; // Discount is not subtracted from net_total as per user request
+                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller'])); // still capture discount if present, but don't use it for net_total
                     } else {
                         // Original logic for other marketplaces
                         if (!ordersFeeCalculated.has(nomor_order)) {
@@ -361,13 +356,15 @@ export default function ImportMarketplacePage() {
                 <div className="max-h-[500px] overflow-y-auto border rounded-md">
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted">
-                            <TableRow>
+                           <TableRow>
                                 <TableHead>Marketplace</TableHead>
-                                <TableHead>SKU Laporan</TableHead>
-                                <TableHead>Nama Produk (Laporan)</TableHead>
-                                <TableHead className="min-w-[200px]">Produk Terpetakan</TableHead>
-                                <TableHead className="text-center">Kuantitas</TableHead>
-                                <TableHead className="text-right">Total Bersih</TableHead>
+                                <TableHead>SKU</TableHead>
+                                <TableHead>Produk Terpetakan</TableHead>
+                                <TableHead className="text-center">Qty</TableHead>
+                                <TableHead className="text-right">Subtotal</TableHead>
+                                <TableHead className="text-right">Diskon</TableHead>
+                                <TableHead className="text-right">Fee</TableHead>
+                                <TableHead className="text-right">Total Net</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -377,7 +374,6 @@ export default function ImportMarketplacePage() {
                                       <Badge variant="secondary">{row.channel}</Badge>
                                     </TableCell>
                                     <TableCell className="text-xs">{row.sku}</TableCell>
-                                    <TableCell className="text-xs">{row.nama_produk}</TableCell>
                                     <TableCell>
                                         <ProductMappingCell
                                             sku={row.sku}
@@ -387,7 +383,18 @@ export default function ImportMarketplacePage() {
                                         />
                                     </TableCell>
                                     <TableCell className="text-center">{row.qty}</TableCell>
-                                    <TableCell className="text-right font-bold font-mono">Rp {Math.round(row.net_total).toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="text-right font-mono">
+                                        {Math.round(row.subtotal).toLocaleString('id-ID')}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-destructive">
+                                        - {Math.round(row.discount).toLocaleString('id-ID')}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-destructive">
+                                        - {Math.round(row.fee).toLocaleString('id-ID')}
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold font-mono">
+                                        Rp {Math.round(row.net_total).toLocaleString('id-ID')}
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
