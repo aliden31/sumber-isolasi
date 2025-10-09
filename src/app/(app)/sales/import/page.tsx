@@ -164,6 +164,7 @@ export default function ImportMarketplacePage() {
                 const dataRows = json.slice(1);
                 
                 const initialSkuMap: Record<string, Product | null> = {};
+                const processedOrders = new Set<string>();
 
                 const mappedData: ImportRow[] = dataRows.map((row, rowIndex) => {
                     const rowData: {[key: string]: any} = {};
@@ -204,22 +205,25 @@ export default function ImportMarketplacePage() {
                         fee = (subtotal * 0.15) + 1250;
                         net_total = subtotal - fee;
                         discount = 0; 
-                    } else if (channelLower.includes('shopee')) {
+                    } else { // Shopee and others
                         const commissionFee = normalizeNumber(getVal(['biaya komisi']));
                         const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
                         const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
-                        const processingFee = normalizeNumber(getVal(['biaya pengolahan', 'biaya pengelolaan']));
+                        let processingFee = 0;
+                        
+                        if (!processedOrders.has(nomor_order)) {
+                           processingFee = normalizeNumber(getVal(['biaya pengolahan', 'biaya pengelolaan']));
+                           processedOrders.add(nomor_order);
+                        }
+
                         fee = commissionFee + transactionFee + affiliateFee + processingFee;
-                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
-                        net_total = subtotal - fee - discount;
-                    }
-                    else {
-                        const commissionFee = normalizeNumber(getVal(['biaya komisi']));
-                        const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
-                        const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
-                        const processingFee = normalizeNumber(getVal(['biaya pengolahan', 'biaya pengelolaan']));
-                        fee = commissionFee + transactionFee + affiliateFee + processingFee;
-                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
+                        
+                        if (channelLower.includes('shopee')) {
+                            discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
+                        } else {
+                            discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
+                        }
+                        
                         net_total = subtotal - fee - discount;
                     }
 
@@ -361,7 +365,7 @@ export default function ImportMarketplacePage() {
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted">
                            <TableRow>
-                                <TableHead>Marketplace</TableHead>
+                                <TableHead>Channel</TableHead>
                                 <TableHead>SKU</TableHead>
                                 <TableHead>Produk Terpetakan</TableHead>
                                 <TableHead className="text-center">Qty</TableHead>
@@ -474,5 +478,6 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
 
 
