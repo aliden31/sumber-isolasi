@@ -199,13 +199,26 @@ export default function ImportMarketplacePage() {
                     let discount = 0;
                     let net_total = 0;
 
-                    if (channel.toLowerCase() === 'tiktok') {
-                        // For TikTok, fee is 15% + 1250, and voucher is ignored for net calculation
+                    const channelLower = channel.toLowerCase();
+                    
+                    if (channelLower === 'tiktok') {
                         fee = (subtotal * 0.15) + 1250;
-                        net_total = subtotal - fee; // Discount is not subtracted from net_total as per user request
-                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller'])); // still capture discount if present, but don't use it for net_total
-                    } else {
-                        // Original logic for other marketplaces
+                        net_total = subtotal - fee;
+                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
+                    } else if (channelLower === 'shopee') {
+                         if (!ordersFeeCalculated.has(nomor_order)) {
+                            const commissionFee = normalizeNumber(getVal(['biaya komisi']));
+                            const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
+                            const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
+                            fee = commissionFee + transactionFee + affiliateFee;
+                            ordersFeeCalculated.set(nomor_order, fee);
+                        } else {
+                            fee = ordersFeeCalculated.get(nomor_order) || 0;
+                        }
+                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
+                        net_total = subtotal - fee - discount;
+                    }
+                    else {
                         if (!ordersFeeCalculated.has(nomor_order)) {
                             const commissionFee = normalizeNumber(getVal(['biaya komisi']));
                             const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
@@ -215,7 +228,7 @@ export default function ImportMarketplacePage() {
                         } else {
                             fee = ordersFeeCalculated.get(nomor_order) || 0;
                         }
-                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller']));
+                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
                         net_total = subtotal - fee - discount;
                     }
 
