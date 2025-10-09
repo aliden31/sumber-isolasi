@@ -113,7 +113,6 @@ export default function ImportMarketplacePage() {
 
     let cleanDateString = String(dateString).trim();
     
-    // Remove timezone info like GMT+7 etc.
     cleanDateString = cleanDateString.replace(/\sGMT[+-]\d{2}:\d{2}.*$/, '');
 
     const formats = [
@@ -131,11 +130,9 @@ export default function ImportMarketplacePage() {
           return parsedDate;
         }
       } catch (e) {
-        // Continue to next format
       }
     }
     
-    // Fallback for native Date parser if formats fail
     const nativeParsed = new Date(cleanDateString);
     if (!isNaN(nativeParsed.getTime())) {
         return nativeParsed;
@@ -167,7 +164,7 @@ export default function ImportMarketplacePage() {
                 const dataRows = json.slice(1);
                 
                 const initialSkuMap: Record<string, Product | null> = {};
-                const processedOrdersForFee = new Set<string>();
+                const ordersFeeCalculated = new Map<string, number>();
 
                 const mappedData: ImportRow[] = dataRows.map((row, rowIndex) => {
                     const rowData: {[key: string]: any} = {};
@@ -182,41 +179,35 @@ export default function ImportMarketplacePage() {
                         return undefined;
                     }
 
-                    const tanggal_order_raw = new Date();
+                    const tanggal_order_raw = getVal(['waktu pembuatan pesanan', 'tanggal order']);
                     const nomor_order = String(getVal(['nomor pesanan', 'order id', 'no. pesanan']) || '');
                     const channel = String(getVal(['marketplace', 'channel']) || 'N/A');
-                    const nama_pembeli = String(getVal(['nama pembeli']) || 'N/A');
+                    const nama_pembeli = String(getVal(['nama penerima', 'nama pembeli']) || 'N/A');
                     const alamat_lengkap = String(getVal(['alamat pengiriman', 'alamat']) || '');
-                    const sku = String(getVal(['sku gudang', 'sku induk', 'informasi sku']) || '');
+                    const sku = String(getVal(['sku penjual', 'sku induk', 'sku gudang']) || '');
                     const nama_produk = String(getVal(['nama produk', 'product name']) || '');
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
                     const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
-                    const harga_satuan = normalizeNumber(getVal(['harga satuan', 'harga jual (rp)']));
-                    const unit_price = harga_awal > 0 ? harga_awal : harga_satuan;
+                    const harga_satuan = normalizeNumber(getVal(['harga setelah diskon penjual', 'harga jual (rp)']));
+                    const unit_price = harga_satuan > 0 ? harga_satuan : harga_awal;
 
                     const cost = normalizeNumber(getVal(['harga modal', 'harga pokok']));
                     let subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)'])) || (unit_price * qty);
-                    const shipping = normalizeNumber(getVal(['ongkos kirim', 'biaya pengiriman']));
 
                     let fee = 0;
-                    if (!processedOrdersForFee.has(nomor_order)) {
-                         if (channel.toLowerCase().includes('tiktok')) {
-                            const dynamicFee = subtotal * 0.08;
-                            const additionalFee = Math.min(subtotal * 0.055, 40000);
-                            fee = dynamicFee + additionalFee + 1250;
-                        } else {
-                            const fee_pengelolaan = normalizeNumber(getVal(['biaya pengelolaan']));
-                            const fee_transaksi = normalizeNumber(getVal(['biaya transaksi']));
-                            fee = fee_pengelolaan + fee_transaksi;
-                        }
-                        processedOrdersForFee.add(nomor_order);
+                    if (!ordersFeeCalculated.has(nomor_order)) {
+                        const commissionFee = normalizeNumber(getVal(['biaya komisi']));
+                        const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
+                        const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
+                        fee = commissionFee + transactionFee + affiliateFee;
+                        ordersFeeCalculated.set(nomor_order, fee);
+                    } else {
+                        fee = ordersFeeCalculated.get(nomor_order) || 0;
                     }
-                    
-                    const diskon_marketplace = normalizeNumber(getVal(['diskon marketplace', 'voucher']));
-                    const voucher_toko = normalizeNumber(getVal(['voucher toko']));
-                    const diskon_penjual = normalizeNumber(getVal(['diskon dari penjual']));
-                    const discount = diskon_marketplace + voucher_toko + diskon_penjual;
+
+                    const voucher_toko = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller']));
+                    const discount = voucher_toko;
                     const net_total = subtotal - fee - discount;
 
                     const parsedDate = parseDate(tanggal_order_raw);
@@ -224,7 +215,6 @@ export default function ImportMarketplacePage() {
                         console.warn(`Could not parse date for order ${nomor_order}: ${tanggal_order_raw}`);
                     }
                     const tanggal_order_formatted = parsedDate ? format(parsedDate, 'yyyy-MM-dd HH:mm:ss') : 'Invalid Date';
-
                     
                     if (sku && initialSkuMap[sku] === undefined) {
                         initialSkuMap[sku] = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
@@ -234,7 +224,7 @@ export default function ImportMarketplacePage() {
                         id: `${nomor_order}-${rowIndex}`,
                         tanggal_order: tanggal_order_formatted,
                         nomor_order, channel, nama_pembeli, alamat_lengkap, sku, nama_produk, qty, unit_price,
-                        cost, subtotal, shipping, fee, discount, net_total,
+                        cost, subtotal, shipping: 0, fee, discount, net_total,
                         mappedProduct: null
                     };
                 }).filter(row => row.nomor_order && row.sku);
@@ -459,3 +449,4 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+

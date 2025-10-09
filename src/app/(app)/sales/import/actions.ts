@@ -229,22 +229,11 @@ export async function importMarketplaceTransactions(
         const journalDescription = `Penjualan Marketplace #${orderId}`;
         const journalEntries: JournalEntry[] = [];
         
-        // Use accountsReceivableAccountId for the main debit
-        if (order.netTotal > 0) journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: order.total, credit: 0 });
+        if (order.netTotal > 0) journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: order.netTotal, credit: 0 });
+        if (order.fee > 0) journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
+        if (order.discount > 0) journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
         
-        // Credit the revenue
         journalEntries.push({ accountId: salesRevenueAccountId!, accountName: '', debit: 0, credit: order.total });
-        
-        // Handle discounts and fees if they exist by crediting AR
-        if (order.discount > 0) {
-            journalEntries.push({ accountId: salesDiscountAccountId!, accountName: '', debit: order.discount, credit: 0 });
-            journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: 0, credit: order.discount });
-        }
-        if (order.fee > 0) {
-            journalEntries.push({ accountId: marketplaceFeeAccountId!, accountName: '', debit: order.fee, credit: 0 });
-            journalEntries.push({ accountId: accountsReceivableAccountId!, accountName: '', debit: 0, credit: order.fee });
-        }
-
 
         const newJournal: NewJournal = {
           date: order.date,
