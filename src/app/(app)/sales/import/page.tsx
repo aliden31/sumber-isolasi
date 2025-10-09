@@ -164,7 +164,6 @@ export default function ImportMarketplacePage() {
                 const dataRows = json.slice(1);
                 
                 const initialSkuMap: Record<string, Product | null> = {};
-                const ordersFeeCalculated = new Map<string, number>();
 
                 const mappedData: ImportRow[] = dataRows.map((row, rowIndex) => {
                     const rowData: {[key: string]: any} = {};
@@ -201,33 +200,25 @@ export default function ImportMarketplacePage() {
 
                     const channelLower = channel.toLowerCase();
                     
-                    if (channelLower === 'tiktok') {
+                    if (channelLower.includes('tiktok')) {
                         fee = (subtotal * 0.15) + 1250;
                         net_total = subtotal - fee;
-                        discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
-                    } else if (channelLower === 'shopee') {
-                         if (!ordersFeeCalculated.has(nomor_order)) {
-                            const commissionFee = normalizeNumber(getVal(['biaya komisi']));
-                            const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
-                            const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
-                            fee = commissionFee + transactionFee + affiliateFee;
-                            ordersFeeCalculated.set(nomor_order, fee);
-                        } else {
-                            fee = ordersFeeCalculated.get(nomor_order) || 0;
-                        }
+                        discount = 0; // Ignore discount for tiktok as requested
+                    } else if (channelLower.includes('shopee')) {
+                        const commissionFee = normalizeNumber(getVal(['biaya komisi']));
+                        const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
+                        const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
+                        const processingFee = normalizeNumber(getVal(['biaya pengolahan']));
+                        fee = commissionFee + transactionFee + affiliateFee + processingFee;
                         discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
                         net_total = subtotal - fee - discount;
                     }
                     else {
-                        if (!ordersFeeCalculated.has(nomor_order)) {
-                            const commissionFee = normalizeNumber(getVal(['biaya komisi']));
-                            const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
-                            const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
-                            fee = commissionFee + transactionFee + affiliateFee;
-                            ordersFeeCalculated.set(nomor_order, fee);
-                        } else {
-                            fee = ordersFeeCalculated.get(nomor_order) || 0;
-                        }
+                        const commissionFee = normalizeNumber(getVal(['biaya komisi']));
+                        const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
+                        const affiliateFee = normalizeNumber(getVal(['biaya afiliasi']));
+                        const processingFee = normalizeNumber(getVal(['biaya pengolahan']));
+                        fee = commissionFee + transactionFee + affiliateFee + processingFee;
                         discount = normalizeNumber(getVal(['diskon dari penjual', 'voucher dari seller', 'voucher toko']));
                         net_total = subtotal - fee - discount;
                     }
