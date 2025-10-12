@@ -274,6 +274,7 @@ export async function importMarketplaceTransactions(
     revalidatePath('/(app)/accounting/ledger');
     revalidatePath('/(app)/customers');
     revalidatePath('/(app)/sales/receivables');
+    revalidatePath('/(app)/reports');
 
 
     return createResponse(null, `${Object.keys(groupedByOrder).length}`);
