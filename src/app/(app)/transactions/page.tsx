@@ -244,18 +244,23 @@ function TransactionsPageContent() {
                     {searchQuery ? `Tidak ada transaksi yang cocok dengan "${searchQuery}".` : "Tidak ada transaksi pada periode ini."}
                 </div>
             ) : (
-                filteredTransactions.map((tx) => (
+                filteredTransactions.map((tx, index) => (
                     <AccordionItem value={tx.id} key={tx.id}>
                         <AccordionTrigger>
                         <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
-                            <div className="mb-2 sm:mb-0">
-                                <p className="font-semibold text-sm sm:text-base font-mono">
-                                  #{tx.id}
-                                </p>
-                                <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyyy 'pukul' HH:mm", { locale: id })}</p>
-                                {tx.customerName && (
-                                    <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1"><User size={12}/>{tx.customerName}</p>
-                                )}
+                            <div className="flex items-center gap-4 mb-2 sm:mb-0">
+                                <span className="font-mono text-xs text-muted-foreground">
+                                    { (currentPage - 1) * TRANSACTIONS_PER_PAGE + index + 1 }
+                                </span>
+                                <div>
+                                    <p className="font-semibold text-sm sm:text-base font-mono">
+                                    #{tx.id}
+                                    </p>
+                                    <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyyy 'pukul' HH:mm", { locale: id })}</p>
+                                    {tx.customerName && (
+                                        <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1"><User size={12}/>{tx.customerName}</p>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex items-center gap-2 sm:gap-4 justify-between">
                                 {getPaymentBadge(tx)}
