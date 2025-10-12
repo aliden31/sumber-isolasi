@@ -118,6 +118,8 @@ export default function ImportMarketplacePage() {
     const formats = [
       'dd-MM-yyyy HH:mm',
       'dd/MM/yyyy HH:mm',
+      'dd-MM-yy HH:mm',
+      'dd/MM/yy HH:mm',
       'yyyy-MM-dd HH:mm:ss',
       'yyyy/MM/dd HH:mm:ss',
       'MM/dd/yyyy, hh:mm:ss a',
@@ -478,6 +480,4 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
-
-
 
