@@ -38,7 +38,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { collection, onSnapshot, query, where, Timestamp, orderBy, limit, startAfter, DocumentData, getDocs, Query, endBefore, limitToLast,getCountFromServer } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, Timestamp, orderBy, limit, startAfter, DocumentData, getDocs, Query, endBefore, limitToLast } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -60,7 +60,6 @@ function TransactionsPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState(initialSearchId);
   const [sortOption, setSortOption] = useState<SortOption>('date_desc');
-  const [totalTransactionsCount, setTotalTransactionsCount] = useState(0);
 
 
   useEffect(() => {
@@ -98,12 +97,6 @@ function TransactionsPageContent() {
     setLoading(true);
     
     const baseQuery = getBaseQuery();
-
-    // Get total count for numbering
-    if (direction === 'initial') {
-        const countSnapshot = await getCountFromServer(baseQuery);
-        setTotalTransactionsCount(countSnapshot.data().count);
-    }
     
     let q: Query<DocumentData>;
     if (direction === 'next' && lastVisible) {
@@ -251,15 +244,13 @@ function TransactionsPageContent() {
                     {searchQuery ? `Tidak ada transaksi yang cocok dengan "${searchQuery}".` : "Tidak ada transaksi pada periode ini."}
                 </div>
             ) : (
-                filteredTransactions.map((tx, index) => {
-                  const rowNumber = totalTransactionsCount - ((currentPage - 1) * TRANSACTIONS_PER_PAGE) - index;
-                  return (
+                filteredTransactions.map((tx) => (
                     <AccordionItem value={tx.id} key={tx.id}>
                         <AccordionTrigger>
                         <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
                             <div className="mb-2 sm:mb-0">
                                 <p className="font-semibold text-sm sm:text-base font-mono">
-                                  #{rowNumber}. {tx.id}
+                                  #{tx.id}
                                 </p>
                                 <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyyy 'pukul' HH:mm", { locale: id })}</p>
                                 {tx.customerName && (
@@ -321,12 +312,12 @@ function TransactionsPageContent() {
                         </div>
                         </AccordionContent>
                     </AccordionItem>
-                )})
+                ))
             )}
           </Accordion>
         </CardContent>
         <CardFooter className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Halaman {currentPage} dari {Math.ceil(totalTransactionsCount / TRANSACTIONS_PER_PAGE)}</span>
+            <span className="text-sm text-muted-foreground">Halaman {currentPage}</span>
             <div className="flex gap-2">
                 <Button variant="outline" onClick={handlePrevPage} disabled={currentPage === 1 || loading}>
                     <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
