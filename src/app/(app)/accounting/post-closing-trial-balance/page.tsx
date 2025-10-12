@@ -20,7 +20,7 @@ type ReportRow = {
   credit: number;
 };
 
-const isPermanentAccount = (type: string) => type.startsWith('Aset') || type.startsWith('Kas') || type.startsWith('Kewajiban') || type.startsWith('Ekuitas');
+const isPermanentAccount = (type: string) => !['Pendapatan', 'Pendapatan Lainnya', 'Beban Pokok Penjualan', 'Beban Operasional', 'Beban Lainnya'].includes(type);
 
 export default function PostClosingTrialBalancePage() {
   const [journals, setJournals] = useState<Journal[]>([]);
@@ -68,7 +68,7 @@ export default function PostClosingTrialBalancePage() {
           const account = permanentAccounts.find(a => a.id === entry.accountId);
           if (!account) return;
 
-          const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Kas');
+          const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Beban');
           const balanceEffect = isDebitNormal ? entry.debit - entry.credit : entry.credit - entry.debit;
           
           balances[entry.accountId] += balanceEffect;
@@ -164,3 +164,5 @@ export default function PostClosingTrialBalancePage() {
     </div>
   );
 }
+
+    

@@ -50,7 +50,6 @@ type LedgerEntry = {
   balance: number;
 };
 
-const LEDGER_PAGE_SIZE = 100;
 const isDebitNormal = (type: string = '') => type.startsWith('Aset') || type.startsWith('Beban');
 
 
@@ -61,9 +60,6 @@ export default function GeneralLedgerPage() {
   const [loading, setLoading] = useState(true);
   
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
-  const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
-  const [pageHistory, setPageHistory] = useState<(DocumentData | null)[] >([null]);
-  const [currentPage, setCurrentPage] = useState(1);
   
   const [selectedJournal, setSelectedJournal] = useState<Journal | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -78,7 +74,7 @@ export default function GeneralLedgerPage() {
     return () => unsubAccounts();
   }, []);
   
-  const fetchLedgerEntries = useCallback(async (page: number, startAfterDoc: DocumentData | null) => {
+  const fetchLedgerEntries = useCallback(async () => {
     if (!selectedAccountId) return;
     
     setLoading(true);
@@ -128,8 +124,6 @@ export default function GeneralLedgerPage() {
         journalsInPeriodQuery = query(journalsInPeriodQuery, where("date", "<=", Timestamp.fromDate(toDayEnd)));
     }
     
-    // We can't paginate Firestore queries and filter by array-contains simultaneously in a scalable way.
-    // So, we fetch all journals in the period and then filter client-side.
     const journalsSnapshot = await getDocs(journalsInPeriodQuery);
     
     const relevantEntries: LedgerEntry[] = [];
@@ -167,22 +161,13 @@ export default function GeneralLedgerPage() {
 
 
   useEffect(() => {
-    setCurrentPage(1);
-    setPageHistory([null]);
     if (selectedAccountId) {
-        fetchLedgerEntries(1, null);
+        fetchLedgerEntries();
     } else {
         setLedgerEntries([]);
     }
   }, [selectedAccountId, dateRange, fetchLedgerEntries]);
 
-  const handleNextPage = () => {
-    // Pagination logic removed due to complexity with running balances
-  };
-
-  const handlePrevPage = () => {
-    // Pagination logic removed
-  };
   
   const handleRefClick = async (journalId: string) => {
     try {
@@ -333,3 +318,5 @@ declare module '@/components/ui/date-range-picker' {
         onSelect?: (date?: DateRange) => void;
     }
 }
+
+    

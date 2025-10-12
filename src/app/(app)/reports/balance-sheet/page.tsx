@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
-import { format, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
@@ -17,6 +17,7 @@ import { getCompanySettings } from '@/app/(app)/settings/actions';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRange } from 'react-day-picker';
+import autoTable from 'jspdf-autotable';
 
 
 type ReportRow = {
@@ -47,39 +48,47 @@ const isContraAsset = (type: string) => type.startsWith('Akumulasi');
 
 
 export default function BalanceSheetPage() {
-  const [allTimeJournals, setAllTimeJournals] = useState<Journal[]>([]);
+  const [journals, setJournals] = useState<Journal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [reportDate, setReportDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const newFrom = new Date(year, month - 1, 1);
-    const newTo = endOfMonth(newFrom);
-    setDateRange({ from: newFrom, to: newTo });
+    const newTo = endOfMonth(new Date(year, month - 1, 1));
+    setReportDate(newTo);
   }, [year, month]);
 
   useEffect(() => {
     const unsubAccounts = onSnapshot(query(collection(db, 'coa'), orderBy('code')), (snapshot) => {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
     });
+    return () => unsubAccounts();
+  }, []);
+
+  useEffect(() => {
+    if (accounts.length === 0 || !reportDate) return;
+
+    setLoading(true);
+    const endDate = new Date(reportDate);
+    endDate.setHours(23, 59, 59, 999);
+    const to = Timestamp.fromDate(endDate);
     
-    const allJournalsQuery = query(collection(db, 'journals'), orderBy('date', 'asc'));
-    const unsubAllJournals = onSnapshot(allJournalsQuery, (snapshot) => {
-        setAllTimeJournals(snapshot.docs.map(doc => ({...doc.data(), id: doc.id, date: doc.data().date.toDate()} as Journal)));
+    const journalsUptoEndDateQuery = query(collection(db, 'journals'), where("date", "<=", to), orderBy('date', 'asc'));
+
+    const unsubJournals = onSnapshot(journalsUptoEndDateQuery, (snapshot) => {
+        setJournals(snapshot.docs.map(doc => ({...doc.data(), id: doc.id, date: doc.data().date.toDate()} as Journal)));
         setLoading(false);
     }, (error) => {
-        console.error("Error fetching all journals:", error);
+        console.error("Error fetching journals:", error);
         setLoading(false);
     });
 
-    return () => {
-        unsubAccounts();
-        unsubAllJournals();
-    };
-  }, []);
+    return () => unsubJournals();
+  }, [reportDate, accounts]);
+
 
   const reportData: BalanceSheetReport = useMemo(() => {
     const report: BalanceSheetReport = {
@@ -90,52 +99,30 @@ export default function BalanceSheetPage() {
         retainedEarnings: 0
     };
 
-    if (!dateRange?.to || accounts.length === 0) return report;
-    
-    const reportEndDate = dateRange.to;
-    reportEndDate.setHours(23, 59, 59, 999);
+    if (!reportDate || accounts.length === 0) return report;
     
     // --- 1. Calculate ending balances for all accounts up to the report date ---
     const endingBalances: { [key: string]: number } = {};
     accounts.forEach(acc => { endingBalances[acc.id] = 0; });
     
-    const journalsUptoEndDate = allTimeJournals.filter(j => j.date <= reportEndDate);
-    journalsUptoEndDate.forEach(journal => {
+    journals.forEach(journal => {
         journal.entries.forEach(entry => {
             const account = accounts.find(a => a.id === entry.accountId);
             if (account && endingBalances[entry.accountId] !== undefined) {
                const isDebitNormalAcc = isAsset(account.type) || isExpense(account.type);
-               const balanceEffect = isDebitNormalAcc
-                    ? entry.debit - entry.credit
-                    : entry.credit - entry.debit;
+               let balanceEffect = isDebitNormalAcc ? entry.debit - entry.credit : entry.credit - entry.debit;
                if(isContraAsset(account.type)) {
-                   endingBalances[entry.accountId] -= balanceEffect; // Contra asset increases with credit
-               } else {
-                   endingBalances[entry.accountId] += balanceEffect;
+                   balanceEffect = -balanceEffect; // Contra asset increases with credit but is shown as negative asset
                }
+               endingBalances[entry.accountId] += balanceEffect;
             }
         });
     });
     
-    // --- 2. Calculate Net Income for the current period ---
-    const periodStartDate = startOfYear(reportEndDate); // Net income is for the current fiscal year
-    const journalsForPeriod = allTimeJournals.filter(j => j.date >= periodStartDate && j.date <= reportEndDate);
-    
-    let netIncomeForPeriod = 0;
-    journalsForPeriod.forEach(journal => {
-        journal.entries.forEach(entry => {
-            const account = accounts.find(a => a.id === entry.accountId);
-            if (account) {
-                if(isRevenue(account.type)) netIncomeForPeriod += (entry.credit - entry.debit);
-                if(isExpense(account.type)) netIncomeForPeriod -= (entry.debit - entry.credit);
-            }
-        });
-    });
-
-    // --- 3. Separate accounts and calculate totals ---
+    // --- 2. Separate accounts and calculate totals ---
     accounts.forEach(account => {
-        let balance = endingBalances[account.id] || 0;
-        if (balance === 0 && !account.name.toLowerCase().includes('laba ditahan')) return;
+        const balance = endingBalances[account.id] || 0;
+        if (balance === 0) return;
         
         const row = { accountId: account.id, accountName: account.name, amount: balance };
 
@@ -148,14 +135,7 @@ export default function BalanceSheetPage() {
             if (account.type === 'Kewajiban Jangka Pendek') report.shortTermLiabilities.push(row);
             else report.longTermLiabilities.push(row);
         } else if (isEquity(account.type)) {
-             if (account.name.toLowerCase().includes('ikhtisar laba rugi')) return;
-             if (account.name.toLowerCase().includes('laba ditahan')) {
-                // Balance from endingBalances is RE from previous periods.
-                // We add current period's net income to it.
-                report.retainedEarnings = balance + netIncomeForPeriod;
-             } else {
-                 report.equity.push(row);
-             }
+             report.equity.push(row);
         }
     });
     
@@ -168,19 +148,65 @@ export default function BalanceSheetPage() {
     const totalLongTermLiabilities = report.longTermLiabilities.reduce((sum, r) => sum + r.amount, 0);
     report.totalLiabilities = totalShortTermLiabilities + totalLongTermLiabilities;
 
-    const baseEquity = report.equity.reduce((sum, r) => sum + r.amount, 0);
-    report.totalEquity = baseEquity + report.retainedEarnings;
+    report.totalEquity = report.equity.reduce((sum, r) => sum + r.amount, 0);
 
     return report;
-  }, [allTimeJournals, accounts, dateRange]);
+  }, [journals, accounts, reportDate]);
   
   const handleExportPDF = async () => {
-    // PDF Export logic remains the same
+    const doc = new jsPDF();
+    const settings = await getCompanySettings();
+    const companyName = settings.companyName || 'Toko Kilat';
+    const period = `Per tanggal: ${reportDate ? format(reportDate, 'd MMMM yyyy', { locale: id }) : '...'}`;
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName, 105, 15, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Laporan Posisi Keuangan', 105, 22, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(period, 105, 27, { align: 'center' });
+    
+    const assetBody = [
+        [{ content: 'Aset Lancar', colSpan: 2, styles: { fontStyle: 'bold' } }],
+        ...reportData.currentAssets.map(r => [({ content: `  ${r.accountName}`}), ({ content: r.amount.toLocaleString('id-ID'), styles: { halign: 'right' } })]),
+        [{ content: 'Total Aset Lancar', styles: { fontStyle: 'bold' } }, { content: reportData.currentAssets.reduce((s, r) => s + r.amount, 0).toLocaleString('id-ID'), styles: { halign: 'right' } }],
+        [{ content: 'Aset Tetap', colSpan: 2, styles: { fontStyle: 'bold' } }],
+        ...reportData.fixedAssets.map(r => [({ content: `  ${r.accountName}`}), ({ content: r.amount.toLocaleString('id-ID'), styles: { halign: 'right' } })]),
+        [{ content: 'Total Aset Tetap', styles: { fontStyle: 'bold' } }, { content: reportData.fixedAssets.reduce((s, r) => s + r.amount, 0).toLocaleString('id-ID'), styles: { halign: 'right' } }]
+    ];
+     autoTable(doc, {
+        startY: 35,
+        head: [['Aset', '']],
+        body: assetBody,
+        theme: 'plain',
+        tableWidth: 90,
+        columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 30 } },
+        didDrawPage: (data) => { data.cursor!.x = 115; data.cursor!.y = 35; }
+    });
+
+    const liabEquityBody = [
+        [{ content: 'Kewajiban Jangka Pendek', colSpan: 2, styles: { fontStyle: 'bold' } }],
+        ...reportData.shortTermLiabilities.map(r => [({ content: `  ${r.accountName}`}), ({ content: r.amount.toLocaleString('id-ID'), styles: { halign: 'right' } })]),
+        [{ content: 'Total Kewajiban Jangka Pendek', styles: { fontStyle: 'bold' } }, { content: reportData.shortTermLiabilities.reduce((s, r) => s + r.amount, 0).toLocaleString('id-ID'), styles: { halign: 'right' } }],
+        [{ content: 'Ekuitas', colSpan: 2, styles: { fontStyle: 'bold' } }],
+        ...reportData.equity.map(r => [({ content: `  ${r.accountName}`}), ({ content: r.amount.toLocaleString('id-ID'), styles: { halign: 'right' } })]),
+    ];
+    autoTable(doc, {
+        head: [['Kewajiban dan Ekuitas', '']],
+        body: liabEquityBody,
+        theme: 'plain',
+        tableWidth: 90,
+        columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 30 } }
+    });
+    
+    doc.save(`laporan-neraca-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
-  const ReportRowLink = ({ row, dateRange }: { row: ReportRow, dateRange?: DateRange }) => {
-    const from = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
-    const to = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : from;
+  const ReportRowLink = ({ row }: { row: ReportRow }) => {
+    const from = reportDate ? format(new Date(reportDate.getFullYear(), 0, 1), 'yyyy-MM-dd') : '';
+    const to = reportDate ? format(reportDate, 'yyyy-MM-dd') : from;
     const link = `/accounting/ledger?accountId=${row.accountId}&from=${from}&to=${to}`;
 
     return (
@@ -203,7 +229,7 @@ export default function BalanceSheetPage() {
         <TableCell></TableCell>
       </TableRow>
       {rows.map((row) => (
-        <ReportRowLink key={row.accountId} row={row} dateRange={dateRange} />
+        <ReportRowLink key={row.accountId} row={row} />
       ))}
       <TableRow className="font-semibold border-t">
         <TableCell className="pl-8">Total {title}</TableCell>
@@ -245,7 +271,7 @@ export default function BalanceSheetPage() {
         <CardHeader>
           <CardTitle>Neraca</CardTitle>
           <CardDescription>
-            Posisi Keuangan per tanggal: {dateRange?.to ? format(dateRange.to, 'd MMMM yyyy', { locale: id }) : '...'}
+            Posisi Keuangan per tanggal: {reportDate ? format(reportDate, 'd MMMM yyyy', { locale: id }) : '...'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -283,16 +309,8 @@ export default function BalanceSheetPage() {
                                 <TableCell colSpan={2}>Ekuitas</TableCell>
                             </TableRow>
                             {reportData.equity.map((row) => (
-                                <ReportRowLink key={row.accountId} row={row} dateRange={dateRange}/>
+                                <ReportRowLink key={row.accountId} row={row}/>
                             ))}
-                             <TableRow>
-                                <TableCell className="pl-8">Laba Ditahan (Termasuk Laba Periode Berjalan)</TableCell>
-                                <TableCell className="text-right font-mono">{reportData.retainedEarnings.toLocaleString('id-ID')}</TableCell>
-                             </TableRow>
-                             <TableRow className="font-semibold border-t">
-                                <TableCell className="pl-8">Total Ekuitas</TableCell>
-                                <TableCell className="text-right font-mono">{reportData.totalEquity.toLocaleString('id-ID')}</TableCell>
-                            </TableRow>
                         </TableBody>
                         <TableFooter>
                             <TableRow className="text-lg font-bold bg-secondary/50 hover:bg-secondary">
@@ -309,3 +327,5 @@ export default function BalanceSheetPage() {
     </div>
   );
 }
+
+    

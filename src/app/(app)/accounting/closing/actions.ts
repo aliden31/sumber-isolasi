@@ -73,6 +73,13 @@ export async function performPeriodClosing({ year, month }: { year: number, mont
         return createResponse("Akun Ikhtisar Laba Rugi atau Laba Ditahan belum diatur di Pengaturan Akuntansi.");
     }
     
+    // Check if period is in the future
+    const today = new Date();
+    const closingPeriodDate = new Date(year, month - 1, 1);
+    if (closingPeriodDate > today) {
+        return createResponse("Tidak dapat melakukan tutup buku untuk periode di masa depan.");
+    }
+
     // Check if period is already closed
     const closingHistoryQuery = query(collection(db, 'periodClosings'), where('year', '==', year), where('month', '==', month));
     const historySnapshot = await getDocs(closingHistoryQuery);
@@ -241,5 +248,7 @@ const getMonthName = (month: number) => {
 const accountIsDebitNormal = (type: string = '') => {
     return type.includes('Aset') || type.includes('Beban');
 }
+
+    
 
     
