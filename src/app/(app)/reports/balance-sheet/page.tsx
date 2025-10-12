@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
-import { format, startOfMonth, endOfMonth, startOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
 import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
@@ -38,7 +38,7 @@ type BalanceSheetReport = {
   retainedEarnings: number;
 };
 
-const isAsset = (type: string) => type.startsWith('Aset') || type.startsWith('Kas');
+const isAsset = (type: string) => type.startsWith('Aset') || type.startsWith('Kas') || type.startsWith('Akumulasi');
 const isLiability = (type: string) => type.startsWith('Kewajiban');
 const isEquity = (type: string) => type.startsWith('Ekuitas');
 const isRevenue = (type: string) => type.startsWith('Pendapatan');
@@ -90,19 +90,16 @@ export default function BalanceSheetPage() {
         retainedEarnings: 0
     };
 
-    if (!dateRange?.from || accounts.length === 0) return report;
+    if (!dateRange?.to || accounts.length === 0) return report;
     
-    const reportEndDate = dateRange.to || dateRange.from;
+    const reportEndDate = dateRange.to;
     reportEndDate.setHours(23, 59, 59, 999);
     
-    const periodStartDate = startOfDay(dateRange.from);
-
-    const journalsUptoEndDate = allTimeJournals.filter(j => j.date <= reportEndDate);
-    const journalsForPeriod = journalsUptoEndDate.filter(j => j.date >= periodStartDate);
-    
+    // --- 1. Calculate ending balances for all accounts up to the report date ---
     const endingBalances: { [key: string]: number } = {};
     accounts.forEach(acc => { endingBalances[acc.id] = 0; });
-
+    
+    const journalsUptoEndDate = allTimeJournals.filter(j => j.date <= reportEndDate);
     journalsUptoEndDate.forEach(journal => {
         journal.entries.forEach(entry => {
             const account = accounts.find(a => a.id === entry.accountId);
@@ -111,10 +108,18 @@ export default function BalanceSheetPage() {
                const balanceEffect = isDebitNormalAcc
                     ? entry.debit - entry.credit
                     : entry.credit - entry.debit;
-               endingBalances[entry.accountId] += balanceEffect;
+               if(isContraAsset(account.type)) {
+                   endingBalances[entry.accountId] -= balanceEffect; // Contra asset increases with credit
+               } else {
+                   endingBalances[entry.accountId] += balanceEffect;
+               }
             }
         });
     });
+    
+    // --- 2. Calculate Net Income for the current period ---
+    const periodStartDate = startOfYear(reportEndDate); // Net income is for the current fiscal year
+    const journalsForPeriod = allTimeJournals.filter(j => j.date >= periodStartDate && j.date <= reportEndDate);
     
     let netIncomeForPeriod = 0;
     journalsForPeriod.forEach(journal => {
@@ -127,9 +132,10 @@ export default function BalanceSheetPage() {
         });
     });
 
+    // --- 3. Separate accounts and calculate totals ---
     accounts.forEach(account => {
         let balance = endingBalances[account.id] || 0;
-        if (balance === 0) return;
+        if (balance === 0 && !account.name.toLowerCase().includes('laba ditahan')) return;
         
         const row = { accountId: account.id, accountName: account.name, amount: balance };
 
@@ -142,19 +148,11 @@ export default function BalanceSheetPage() {
             if (account.type === 'Kewajiban Jangka Pendek') report.shortTermLiabilities.push(row);
             else report.longTermLiabilities.push(row);
         } else if (isEquity(account.type)) {
-             if (account.name.toLowerCase().includes('ikhtisar')) return;
+             if (account.name.toLowerCase().includes('ikhtisar laba rugi')) return;
              if (account.name.toLowerCase().includes('laba ditahan')) {
-                // The balance from endingBalances already includes previous RE. We just need to add this period's net income.
-                const beginningJournals = allTimeJournals.filter(j => j.date < periodStartDate);
-                let beginningRE = 0;
-                beginningJournals.forEach(j => {
-                  j.entries.forEach(e => {
-                    if (e.accountId === account.id) {
-                      beginningRE += e.credit - e.debit;
-                    }
-                  });
-                });
-                report.retainedEarnings = beginningRE + netIncomeForPeriod;
+                // Balance from endingBalances is RE from previous periods.
+                // We add current period's net income to it.
+                report.retainedEarnings = balance + netIncomeForPeriod;
              } else {
                  report.equity.push(row);
              }
@@ -288,7 +286,7 @@ export default function BalanceSheetPage() {
                                 <ReportRowLink key={row.accountId} row={row} dateRange={dateRange}/>
                             ))}
                              <TableRow>
-                                <TableCell className="pl-8">Laba Ditahan</TableCell>
+                                <TableCell className="pl-8">Laba Ditahan (Termasuk Laba Periode Berjalan)</TableCell>
                                 <TableCell className="text-right font-mono">{reportData.retainedEarnings.toLocaleString('id-ID')}</TableCell>
                              </TableRow>
                              <TableRow className="font-semibold border-t">
