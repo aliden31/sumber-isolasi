@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import * as XLSX from 'xlsx';
-import { format, parse } from 'date-fns';
+import { format } from 'date-fns';
 import type { Product, ImportRow } from '@/lib/types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -107,43 +107,6 @@ export default function ImportMarketplacePage() {
     return 0;
   }
   
-  const parseDate = (dateString: any): Date | null => {
-    if (!dateString) return null;
-    if (dateString instanceof Date) return dateString;
-
-    let cleanDateString = String(dateString).trim();
-    
-    cleanDateString = cleanDateString.replace(/\sGMT[+-]\d{2}:\d{2}.*$/, '');
-
-    const formats = [
-      'dd-MM-yyyy HH:mm',
-      'dd/MM/yyyy HH:mm',
-      'dd-MM-yy HH:mm',
-      'dd/MM/yy HH:mm',
-      'yyyy-MM-dd HH:mm:ss',
-      'yyyy/MM/dd HH:mm:ss',
-      'MM/dd/yyyy, hh:mm:ss a',
-    ];
-
-    for (const fmt of formats) {
-      try {
-        const parsedDate = parse(cleanDateString, fmt, new Date());
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate;
-        }
-      } catch (e) {
-      }
-    }
-    
-    const nativeParsed = new Date(cleanDateString);
-    if (!isNaN(nativeParsed.getTime())) {
-        return nativeParsed;
-    }
-
-    return null;
-  }
-
-
   const handleParse = () => {
     if (!file) {
       toast({ title: "File belum dipilih", description: "Pilih file laporan penjualan terlebih dahulu.", variant: "destructive" });
@@ -229,11 +192,8 @@ export default function ImportMarketplacePage() {
                         net_total = subtotal - fee - discount;
                     }
 
-                    const parsedDate = parseDate(tanggal_order_raw);
-                    if (!parsedDate) {
-                        console.warn(`Could not parse date for order ${nomor_order}: ${tanggal_order_raw}`);
-                    }
-                    const tanggal_order_formatted = parsedDate ? format(parsedDate, 'yyyy-MM-dd HH:mm:ss') : 'Invalid Date';
+                    const parsedDate = new Date(tanggal_order_raw);
+                    const tanggal_order_formatted = !isNaN(parsedDate.getTime()) ? format(parsedDate, 'yyyy-MM-dd HH:mm:ss') : 'Invalid Date';
                     
                     if (sku && initialSkuMap[sku] === undefined) {
                         initialSkuMap[sku] = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
@@ -480,4 +440,3 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
-
