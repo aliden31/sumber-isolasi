@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { collection, onSnapshot, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Account, Journal } from '@/lib/types';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfDay } from 'date-fns';
 import { Loader2, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { id } from 'date-fns/locale';
@@ -16,6 +16,8 @@ import jsPDF from 'jspdf';
 import { getCompanySettings } from '@/app/(app)/settings/actions';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DateRange } from 'react-day-picker';
+
 
 type ReportRow = {
   accountId: string;
@@ -90,41 +92,43 @@ export default function BalanceSheetPage() {
 
     if (!dateRange?.from || accounts.length === 0) return report;
     
-    const toDate = dateRange.to || dateRange.from;
-    const endOfDayToDate = new Date(toDate);
-    endOfDayToDate.setHours(23, 59, 59, 999);
-
-    const journalsForPeriod = allTimeJournals.filter(j => j.date >= dateRange.from! && j.date <= endOfDayToDate);
-    const journalsBeforePeriod = allTimeJournals.filter(j => j.date < dateRange.from!);
-
-    const calculateBalances = (journalList: Journal[]) => {
-        const balances: { [key: string]: number } = {};
-        accounts.forEach(acc => { balances[acc.id] = 0; });
-        journalList.forEach(journal => {
-            journal.entries.forEach(entry => {
-                const account = accounts.find(a => a.id === entry.accountId);
-                if (account) {
-                   const balanceEffect = (isAsset(account.type) || isExpense(account.type)) && !isContraAsset(account.type)
-                        ? entry.debit - entry.credit
-                        : entry.credit - entry.debit;
-                   balances[entry.accountId] += balanceEffect;
-                }
-            })
-        });
-        return balances;
-    }
+    const reportEndDate = dateRange.to || dateRange.from;
+    reportEndDate.setHours(23, 59, 59, 999);
     
-    const endingBalances = calculateBalances(allTimeJournals.filter(j => j.date <= endOfDayToDate));
-    const periodBalances = calculateBalances(journalsForPeriod);
+    const periodStartDate = startOfDay(dateRange.from);
 
+    const journalsUptoEndDate = allTimeJournals.filter(j => j.date <= reportEndDate);
+    const journalsForPeriod = journalsUptoEndDate.filter(j => j.date >= periodStartDate);
+    
+    const endingBalances: { [key: string]: number } = {};
+    accounts.forEach(acc => { endingBalances[acc.id] = 0; });
+
+    journalsUptoEndDate.forEach(journal => {
+        journal.entries.forEach(entry => {
+            const account = accounts.find(a => a.id === entry.accountId);
+            if (account && endingBalances[entry.accountId] !== undefined) {
+               const isDebitNormalAcc = isAsset(account.type) || isExpense(account.type);
+               const balanceEffect = isDebitNormalAcc
+                    ? entry.debit - entry.credit
+                    : entry.credit - entry.debit;
+               endingBalances[entry.accountId] += balanceEffect;
+            }
+        });
+    });
+    
     let netIncomeForPeriod = 0;
-    accounts.forEach(account => {
-        if (isRevenue(account.type)) netIncomeForPeriod += periodBalances[account.id] || 0;
-        if (isExpense(account.type)) netIncomeForPeriod -= periodBalances[account.id] || 0;
+    journalsForPeriod.forEach(journal => {
+        journal.entries.forEach(entry => {
+            const account = accounts.find(a => a.id === entry.accountId);
+            if (account) {
+                if(isRevenue(account.type)) netIncomeForPeriod += (entry.credit - entry.debit);
+                if(isExpense(account.type)) netIncomeForPeriod -= (entry.debit - entry.credit);
+            }
+        });
     });
 
     accounts.forEach(account => {
-        const balance = endingBalances[account.id];
+        let balance = endingBalances[account.id] || 0;
         if (balance === 0) return;
         
         const row = { accountId: account.id, accountName: account.name, amount: balance };
@@ -132,17 +136,25 @@ export default function BalanceSheetPage() {
         if (isAsset(account.type)) {
             if (account.type === 'Aset Lancar' || account.type === 'Kas & Bank') report.currentAssets.push(row);
             else if (account.type === 'Aset Tetap') report.fixedAssets.push(row);
-            else if (isContraAsset(account.type)) report.fixedAssets.push({ ...row, amount: -balance });
+            else if (isContraAsset(account.type)) report.fixedAssets.push({ ...row, amount: -balance }); // Show as negative
             else report.otherAssets.push(row);
         } else if (isLiability(account.type)) {
             if (account.type === 'Kewajiban Jangka Pendek') report.shortTermLiabilities.push(row);
             else report.longTermLiabilities.push(row);
-        } else if (isEquity(account.type) && !isRevenue(account.type) && !isExpense(account.type)) {
+        } else if (isEquity(account.type)) {
              if (account.name.toLowerCase().includes('ikhtisar')) return;
              if (account.name.toLowerCase().includes('laba ditahan')) {
-                // Balance in Retained Earnings is calculated up to the beginning of the period, then add this period's net income.
-                const beginningBalance = calculateBalances(journalsBeforePeriod)[account.id] || 0;
-                report.retainedEarnings = beginningBalance + netIncomeForPeriod;
+                // The balance from endingBalances already includes previous RE. We just need to add this period's net income.
+                const beginningJournals = allTimeJournals.filter(j => j.date < periodStartDate);
+                let beginningRE = 0;
+                beginningJournals.forEach(j => {
+                  j.entries.forEach(e => {
+                    if (e.accountId === account.id) {
+                      beginningRE += e.credit - e.debit;
+                    }
+                  });
+                });
+                report.retainedEarnings = beginningRE + netIncomeForPeriod;
              } else {
                  report.equity.push(row);
              }

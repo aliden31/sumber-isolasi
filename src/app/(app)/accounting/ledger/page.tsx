@@ -39,7 +39,7 @@ import { collection, onSnapshot, query, orderBy, where, Timestamp, getDocs, limi
 import { db } from '@/lib/firebase';
 import type { Account, Journal, JournalEntry } from '@/lib/types';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 
 type LedgerEntry = {
   date: Date;
@@ -51,6 +51,8 @@ type LedgerEntry = {
 };
 
 const LEDGER_PAGE_SIZE = 100;
+const isDebitNormal = (type: string = '') => type.startsWith('Aset') || type.startsWith('Beban');
+
 
 export default function GeneralLedgerPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -81,96 +83,87 @@ export default function GeneralLedgerPage() {
     
     setLoading(true);
 
-    let runningBalance = 0; // This will need to be calculated based on previous data
-    const entries: LedgerEntry[] = [];
-    
+    const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+    if (!selectedAccount) {
+        setLoading(false);
+        return;
+    }
+    const debitNormal = isDebitNormal(selectedAccount.type);
+
     // --- Phase 1: Calculate beginning balance ---
     let beginningBalance = 0;
-    const allJournalsBeforeDateQuery = query(
-        collection(db, 'journals'),
-        where('date', '<', dateRange?.from ? Timestamp.fromDate(dateRange.from) : Timestamp.now())
-    );
-    const journalsBeforeSnap = await getDocs(allJournalsBeforeDateQuery);
-    journalsBeforeSnap.docs.forEach(journalDoc => {
-        const journal = journalDoc.data() as Journal;
-        journal.entries.forEach(entry => {
-            if (entry.accountId === selectedAccountId) {
-                beginningBalance += entry.debit - entry.credit;
-            }
+    const periodStartDate = dateRange?.from ? startOfDay(dateRange.from) : null;
+    
+    if (periodStartDate) {
+        const journalsBeforeQuery = query(
+            collection(db, 'journals'),
+            where('date', '<', Timestamp.fromDate(periodStartDate))
+        );
+        const journalsBeforeSnap = await getDocs(journalsBeforeQuery);
+        journalsBeforeSnap.docs.forEach(journalDoc => {
+            const journal = journalDoc.data() as Journal;
+            journal.entries.forEach(entry => {
+                if (entry.accountId === selectedAccountId) {
+                    const balanceEffect = debitNormal ? (entry.debit - entry.credit) : (entry.credit - entry.debit);
+                    beginningBalance += balanceEffect;
+                }
+            });
         });
-    });
+    }
     
-    runningBalance = beginningBalance;
+    let runningBalance = beginningBalance;
     
-    // --- Phase 2: Fetch all relevant entries within the date range ---
-    let allJournalsQuery = query(
-        collection(db, 'journals'), 
+    // --- Phase 2: Fetch entries for the current page ---
+    let journalsInPeriodQuery = query(
+        collection(db, 'journals'),
         orderBy("date", "asc")
     );
 
     if (dateRange?.from) {
-        allJournalsQuery = query(allJournalsQuery, where("date", ">=", Timestamp.fromDate(dateRange.from)));
+        journalsInPeriodQuery = query(journalsInPeriodQuery, where("date", ">=", Timestamp.fromDate(dateRange.from)));
     }
     if (dateRange?.to) {
         const toDayEnd = new Date(dateRange.to);
         toDayEnd.setHours(23, 59, 59, 999);
-        allJournalsQuery = query(allJournalsQuery, where("date", "<=", Timestamp.fromDate(toDayEnd)));
+        journalsInPeriodQuery = query(journalsInPeriodQuery, where("date", "<=", Timestamp.fromDate(toDayEnd)));
     }
-
-    const allJournalsSnapshot = await getDocs(allJournalsQuery);
-    const allRelevantEntries: any[] = [];
     
-    allJournalsSnapshot.docs.forEach(journalDoc => {
+    // We can't paginate Firestore queries and filter by array-contains simultaneously in a scalable way.
+    // So, we fetch all journals in the period and then filter client-side.
+    const journalsSnapshot = await getDocs(journalsInPeriodQuery);
+    
+    const relevantEntries: LedgerEntry[] = [];
+    journalsSnapshot.docs.forEach(journalDoc => {
         const journal = { ...journalDoc.data(), id: journalDoc.id } as Journal;
         journal.entries.forEach(entry => {
             if (entry.accountId === selectedAccountId) {
-                allRelevantEntries.push({
-                    journalDate: journal.date.toDate(),
-                    journalRef: journal.id,
-                    journalDesc: journal.description,
-                    ...entry
+                 const balanceEffect = debitNormal ? (entry.debit - entry.credit) : (entry.credit - entry.debit);
+                 runningBalance += balanceEffect;
+                 relevantEntries.push({
+                    date: journal.date.toDate(),
+                    ref: journal.id,
+                    desc: journal.description,
+                    debit: entry.debit,
+                    credit: entry.credit,
+                    balance: runningBalance
                 });
             }
         });
     });
 
-    // --- Phase 3: Paginate and calculate running balance for the current page ---
-    const sortedEntriesForDisplay = allRelevantEntries.sort((a,b) => b.journalDate.getTime() - a.journalDate.getTime());
-    const startIndex = (page - 1) * LEDGER_PAGE_SIZE;
-    const endIndex = page * LEDGER_PAGE_SIZE;
-    const pagedEntries = sortedEntriesForDisplay.slice(startIndex, endIndex);
+    const beginningBalanceRow: LedgerEntry = {
+        date: dateRange?.from || new Date(),
+        ref: '',
+        desc: 'Saldo Awal',
+        debit: 0,
+        credit: 0,
+        balance: beginningBalance
+    };
 
-    // To calculate the balance correctly up to the first item on the current page,
-    // we need to process all entries that came before it.
-    const lastDateOnPage = pagedEntries.length > 0 ? pagedEntries[pagedEntries.length - 1].journalDate : new Date();
-    
-    const entriesForBalanceCalc = allRelevantEntries
-        .filter(entry => entry.journalDate < lastDateOnPage)
-        .sort((a, b) => a.journalDate.getTime() - b.journalDate.getTime());
-
-    let balanceUpToPage = beginningBalance;
-    entriesForBalanceCalc.forEach(entry => {
-        balanceUpToPage += entry.debit - entry.credit;
-    });
-
-    // Now, calculate balance for the paged entries
-    const finalPageEntries: LedgerEntry[] = [];
-    pagedEntries.reverse().forEach(entry => {
-        balanceUpToPage += entry.debit - entry.credit;
-        finalPageEntries.push({
-            date: entry.journalDate,
-            ref: entry.journalRef,
-            desc: entry.journalDesc,
-            debit: entry.debit,
-            credit: entry.credit,
-            balance: balanceUpToPage
-        });
-    });
-
-    setLedgerEntries(finalPageEntries.reverse());
+    setLedgerEntries([beginningBalanceRow, ...relevantEntries]);
     setLoading(false);
 
-  }, [selectedAccountId, dateRange]);
+  }, [selectedAccountId, dateRange, accounts]);
 
 
   useEffect(() => {
@@ -184,17 +177,11 @@ export default function GeneralLedgerPage() {
   }, [selectedAccountId, dateRange, fetchLedgerEntries]);
 
   const handleNextPage = () => {
-    const newPage = currentPage + 1;
-    setCurrentPage(newPage);
-    fetchLedgerEntries(newPage, lastVisible);
+    // Pagination logic removed due to complexity with running balances
   };
 
   const handlePrevPage = () => {
-    const newPage = currentPage - 1;
-    if (newPage > 0) {
-      setCurrentPage(newPage);
-      fetchLedgerEntries(newPage, null); // Simplified, not using pageHistory for now
-    }
+    // Pagination logic removed
   };
   
   const handleRefClick = async (journalId: string) => {
@@ -271,12 +258,14 @@ export default function GeneralLedgerPage() {
                     </TableRow>
                 ) : ledgerEntries.length > 0 ? (
                   ledgerEntries.map((tx, index) => (
-                    <TableRow key={index}>
+                    <TableRow key={index} className={tx.desc === 'Saldo Awal' ? 'bg-muted/50 font-bold' : ''}>
                       <TableCell>{format(tx.date, 'dd MMM yyyy')}</TableCell>
                       <TableCell className="font-mono text-xs">
-                        <Button variant="link" className="p-0 h-auto" onClick={() => handleRefClick(tx.ref)}>
+                        {tx.ref ? (
+                          <Button variant="link" className="p-0 h-auto" onClick={() => handleRefClick(tx.ref)}>
                             ...{tx.ref.slice(-8)}
-                        </Button>
+                          </Button>
+                        ) : '-'}
                       </TableCell>
                       <TableCell>{tx.desc}</TableCell>
                       <TableCell className="text-right font-mono">
@@ -301,17 +290,6 @@ export default function GeneralLedgerPage() {
             </Table>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between">
-            <span className="text-sm text-muted-foreground">Menampilkan hingga {LEDGER_PAGE_SIZE} transaksi per halaman.</span>
-            <div className="flex gap-2">
-                <Button variant="outline" onClick={handlePrevPage} disabled={currentPage === 1 || loading}>
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Sebelumnya
-                </Button>
-                <Button variant="outline" onClick={handleNextPage} disabled={loading || ledgerEntries.length < LEDGER_PAGE_SIZE}>
-                    Berikutnya <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-            </div>
-        </CardFooter>
       </Card>
       
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>

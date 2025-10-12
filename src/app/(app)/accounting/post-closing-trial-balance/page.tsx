@@ -68,7 +68,7 @@ export default function PostClosingTrialBalancePage() {
           const account = permanentAccounts.find(a => a.id === entry.accountId);
           if (!account) return;
 
-          const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Kas & Bank');
+          const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Kas');
           const balanceEffect = isDebitNormal ? entry.debit - entry.credit : entry.credit - entry.debit;
           
           balances[entry.accountId] += balanceEffect;
@@ -78,17 +78,17 @@ export default function PostClosingTrialBalancePage() {
 
     return permanentAccounts.map(account => {
       const balance = balances[account.id] || 0;
-      const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Kas & Bank');
+      const isDebitNormal = account.type.startsWith('Aset') || account.type.startsWith('Kas');
       
       let debit = 0;
       let credit = 0;
 
       if (isDebitNormal) {
-        if (balance > 0) debit = balance;
-        else credit = -balance; // Show abnormal balance on credit side
+        debit = balance > 0 ? balance : 0;
+        credit = balance < 0 ? -balance : 0;
       } else { // Credit normal
-        if (balance > 0) credit = balance;
-        else debit = -balance; // Show abnormal balance on debit side
+        credit = balance > 0 ? balance : 0;
+        debit = balance < 0 ? -balance : 0;
       }
 
       return {

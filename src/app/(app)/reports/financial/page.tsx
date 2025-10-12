@@ -92,18 +92,19 @@ export default function FinancialReportsPage() {
     const expenseAccountTypes = ['Beban Operasional', 'Beban Lainnya'];
 
     const accountBalances: { [key: string]: number } = {};
+    accounts.forEach(acc => {
+        if ([...revenueAccountTypes, ...cogsAccountTypes, ...expenseAccountTypes].includes(acc.type)) {
+            accountBalances[acc.id] = 0;
+        }
+    });
 
     journals.forEach(journal => {
       journal.entries.forEach(entry => {
         const account = accounts.find(a => a.id === entry.accountId);
-        if (account && [...revenueAccountTypes, ...cogsAccountTypes, ...expenseAccountTypes].includes(account.type)) {
-           if (!accountBalances[entry.accountId]) {
-             accountBalances[entry.accountId] = 0;
-           }
+        if (account && accountBalances[entry.accountId] !== undefined) {
            const balanceEffect = (revenueAccountTypes.includes(account.type)) 
                 ? entry.credit - entry.debit
                 : entry.debit - entry.credit;
-
             accountBalances[entry.accountId] += balanceEffect;
         }
       });
