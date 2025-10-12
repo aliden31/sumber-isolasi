@@ -154,11 +154,19 @@ export default function ImportMarketplacePage() {
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
                     const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
-                    const harga_satuan = normalizeNumber(getVal(['harga setelah diskon penjual', 'harga jual (rp)', 'harga jual']));
+                    let harga_satuan = normalizeNumber(getVal(['harga setelah diskon penjual', 'harga jual (rp)', 'harga jual']));
+                    let subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)']));
+
+                    if (harga_satuan <= 0 && subtotal > 0 && qty > 0) {
+                        harga_satuan = subtotal / qty;
+                    }
+
                     const unit_price = harga_satuan > 0 ? harga_satuan : harga_awal;
+                    if (subtotal === 0 && unit_price > 0 && qty > 0) {
+                        subtotal = unit_price * qty;
+                    }
 
                     const cost = normalizeNumber(getVal(['harga modal', 'harga pokok']));
-                    let subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)'])) || (unit_price * qty);
 
                     let fee = 0;
                     let discount = 0;
@@ -192,7 +200,14 @@ export default function ImportMarketplacePage() {
                         net_total = subtotal - fee - discount;
                     }
                     
-                    const parsedDate = tanggal_order_raw ? new Date(tanggal_order_raw) : new Date();
+                    let parsedDate;
+                    if (tanggal_order_raw instanceof Date) {
+                      parsedDate = tanggal_order_raw;
+                    } else if (typeof tanggal_order_raw === 'string') {
+                      parsedDate = new Date(tanggal_order_raw.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'));
+                    } else {
+                      parsedDate = new Date();
+                    }
                     const tanggal_order_formatted = !isNaN(parsedDate.getTime()) ? format(parsedDate, 'yyyy-MM-dd HH:mm:ss') : format(new Date(), 'yyyy-MM-dd HH:mm:ss');
                     
                     if (sku && initialSkuMap[sku] === undefined) {
