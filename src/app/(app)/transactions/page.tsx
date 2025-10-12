@@ -44,7 +44,7 @@ import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const TRANSACTIONS_PER_PAGE = 10;
+const TRANSACTIONS_PER_PAGE = 300;
 type SortOption = "date_desc" | "total_desc" | "total_asc";
 
 
