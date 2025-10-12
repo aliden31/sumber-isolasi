@@ -154,7 +154,7 @@ export default function ImportMarketplacePage() {
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
                     const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
-                    const harga_satuan = normalizeNumber(getVal(['harga setelah diskon penjual', 'harga jual (rp)']));
+                    const harga_satuan = normalizeNumber(getVal(['harga setelah diskon penjual', 'harga jual (rp)', 'harga jual']));
                     const unit_price = harga_satuan > 0 ? harga_satuan : harga_awal;
 
                     const cost = normalizeNumber(getVal(['harga modal', 'harga pokok']));
@@ -440,3 +440,4 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
