@@ -191,9 +191,9 @@ export default function ImportMarketplacePage() {
                         
                         net_total = subtotal - fee - discount;
                     }
-
-                    const parsedDate = new Date(tanggal_order_raw);
-                    const tanggal_order_formatted = !isNaN(parsedDate.getTime()) ? format(parsedDate, 'yyyy-MM-dd HH:mm:ss') : 'Invalid Date';
+                    
+                    const parsedDate = tanggal_order_raw ? new Date(tanggal_order_raw) : new Date();
+                    const tanggal_order_formatted = !isNaN(parsedDate.getTime()) ? format(parsedDate, 'yyyy-MM-dd HH:mm:ss') : format(new Date(), 'yyyy-MM-dd HH:mm:ss');
                     
                     if (sku && initialSkuMap[sku] === undefined) {
                         initialSkuMap[sku] = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
