@@ -38,13 +38,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { collection, onSnapshot, query, where, Timestamp, orderBy, limit, startAfter, DocumentData, getDocs, Query, endBefore, limitToLast } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, Timestamp, orderBy, limit, startAfter, DocumentData, getDocs, Query, endBefore, limitToLast,getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const TRANSACTIONS_PER_PAGE = 500;
+const TRANSACTIONS_PER_PAGE = 10;
 type SortOption = "date_desc" | "total_desc" | "total_asc";
 
 
@@ -60,52 +60,51 @@ function TransactionsPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState(initialSearchId);
   const [sortOption, setSortOption] = useState<SortOption>('date_desc');
+  const [totalTransactionsCount, setTotalTransactionsCount] = useState(0);
 
 
   useEffect(() => {
     fetchTransactions('initial');
   }, [date, sortOption]);
 
+  const getBaseQuery = () => {
+    const transactionsCol = collection(db, "transactions");
+    let baseQuery: Query<DocumentData> = query(transactionsCol);
+
+    // Apply date filter first if it exists
+    if (date?.from) {
+      const from = Timestamp.fromDate(date.from);
+      let to;
+      if (date.to) {
+        const toDayEnd = new Date(date.to);
+        toDayEnd.setHours(23, 59, 59, 999);
+        to = Timestamp.fromDate(toDayEnd);
+      } else {
+        const fromDayEnd = new Date(date.from);
+        fromDayEnd.setHours(23, 59, 59, 999);
+        to = Timestamp.fromDate(fromDayEnd);
+      }
+      baseQuery = query(baseQuery, where("date", ">=", from), where("date", "<=", to));
+    }
+    
+    // Apply sorting
+    const [sortField, sortDirection] = sortOption.split('_');
+    baseQuery = query(baseQuery, orderBy(sortField, sortDirection as "desc" | "asc"));
+
+    return baseQuery;
+  };
+
   const fetchTransactions = async (direction: 'next' | 'prev' | 'initial' = 'initial') => {
     setLoading(true);
-    const transactionsCol = collection(db, "transactions");
     
-    let baseQuery: Query<DocumentData>;
+    const baseQuery = getBaseQuery();
 
-    const [sortField, sortDirection] = sortOption.split('_');
-
-    if (sortField === 'date') {
-      baseQuery = query(transactionsCol, orderBy("date", sortDirection as "desc" | "asc"));
-    } else {
-      // For price sort, we must have a date filter for composite index
-      // Default to last 30 days if no date is selected
-      const fromDate = date?.from || new Date(new Date().setDate(new Date().getDate() - 30));
-      const toDate = date?.to || new Date();
-      toDate.setHours(23, 59, 59, 999);
-      
-      baseQuery = query(transactionsCol, 
-        where("date", ">=", fromDate),
-        where("date", "<=", toDate),
-        orderBy("total", sortDirection as "desc" | "asc")
-      );
+    // Get total count for numbering
+    if (direction === 'initial') {
+        const countSnapshot = await getCountFromServer(baseQuery);
+        setTotalTransactionsCount(countSnapshot.data().count);
     }
     
-    if (date?.from && sortField === 'date') { // Only apply date filter if sorting by date
-        const from = Timestamp.fromDate(date.from);
-        let to;
-        if (date.to) {
-            const toDayEnd = new Date(date.to);
-            toDayEnd.setHours(23, 59, 59, 999);
-            to = Timestamp.fromDate(toDayEnd);
-        } else {
-            const fromDayEnd = new Date(date.from);
-            fromDayEnd.setHours(23, 59, 59, 999);
-            to = Timestamp.fromDate(fromDayEnd);
-        }
-        baseQuery = query(baseQuery, where("date", ">=", from), where("date", "<=", to));
-    }
-
-
     let q: Query<DocumentData>;
     if (direction === 'next' && lastVisible) {
         q = query(baseQuery, startAfter(lastVisible), limit(TRANSACTIONS_PER_PAGE));
@@ -131,7 +130,7 @@ function TransactionsPageContent() {
     setFirstVisible(snapshot.docs[0]);
     
     // Check for next page
-    if (snapshot.docs.length < TRANSACTIONS_PER_PAGE) {
+    if (snapshot.docs.length < TRANSACTIONS_PER_PAGE && direction !== 'prev') {
         setHasNextPage(false);
     } else {
         const nextQuery = query(baseQuery, startAfter(snapshot.docs[snapshot.docs.length - 1]), limit(1));
@@ -252,80 +251,82 @@ function TransactionsPageContent() {
                     {searchQuery ? `Tidak ada transaksi yang cocok dengan "${searchQuery}".` : "Tidak ada transaksi pada periode ini."}
                 </div>
             ) : (
-                filteredTransactions.map((tx, index) => (
-                <AccordionItem value={tx.id} key={tx.id}>
-                    <AccordionTrigger>
-                    <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
-                        <div className="mb-2 sm:mb-0">
-                            <p className="font-semibold text-sm sm:text-base font-mono">
-                              #{(currentPage - 1) * TRANSACTIONS_PER_PAGE + index + 1}. {tx.id}
-                            </p>
-                            <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyyy 'pukul' HH:mm", { locale: id })}</p>
-                            {tx.customerName && (
-                                <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1"><User size={12}/>{tx.customerName}</p>
-                            )}
+                filteredTransactions.map((tx, index) => {
+                  const rowNumber = totalTransactionsCount - ((currentPage - 1) * TRANSACTIONS_PER_PAGE) - index;
+                  return (
+                    <AccordionItem value={tx.id} key={tx.id}>
+                        <AccordionTrigger>
+                        <div className="flex flex-col sm:flex-row justify-between w-full sm:pr-4 text-left sm:items-center">
+                            <div className="mb-2 sm:mb-0">
+                                <p className="font-semibold text-sm sm:text-base font-mono">
+                                  #{rowNumber}. {tx.id}
+                                </p>
+                                <p className="text-xs sm:text-sm text-muted-foreground">{format(tx.date, "eeee, dd MMM yyyy 'pukul' HH:mm", { locale: id })}</p>
+                                {tx.customerName && (
+                                    <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1"><User size={12}/>{tx.customerName}</p>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 sm:gap-4 justify-between">
+                                {getPaymentBadge(tx)}
+                                <p className="font-bold text-md sm:text-lg text-primary">Rp {(tx.netTotal ?? tx.total).toLocaleString('id-ID')}</p>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-4 justify-between">
-                            {getPaymentBadge(tx)}
-                            <p className="font-bold text-md sm:text-lg text-primary">Rp {(tx.netTotal ?? tx.total).toLocaleString('id-ID')}</p>
-                        </div>
-                    </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                    <div className="overflow-x-auto">
-                         <Table>
-                            <TableHeader>
-                                <TableRow>
-                                <TableHead>Produk</TableHead>
-                                <TableHead>Jumlah</TableHead>
-                                <TableHead>Harga</TableHead>
-                                <TableHead className="text-right">Subtotal</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {tx.items.map((item, index) => (
-                                <TableRow key={`${item.productId}-${index}`}>
-                                    <TableCell>{item.productName || item.productId}</TableCell>
-                                    <TableCell>{item.quantity}</TableCell>
-                                    <TableCell>Rp {item.price.toLocaleString('id-ID')}</TableCell>
-                                    <TableCell className="text-right">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</TableCell>
-                                </TableRow>
-                                ))}
-                            </TableBody>
-                            {tx.discount || tx.fee ? (
-                                <TableFooter>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
-                                        <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
+                                    <TableHead>Produk</TableHead>
+                                    <TableHead>Jumlah</TableHead>
+                                    <TableHead>Harga</TableHead>
+                                    <TableHead className="text-right">Subtotal</TableHead>
                                     </TableRow>
-                                    {tx.discount ? (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-right">Diskon</TableCell>
-                                        <TableCell className="text-right text-destructive">- Rp {tx.discount.toLocaleString('id-ID')}</TableCell>
+                                </TableHeader>
+                                <TableBody>
+                                    {tx.items.map((item, index) => (
+                                    <TableRow key={`${item.productId}-${index}`}>
+                                        <TableCell>{item.productName || item.productId}</TableCell>
+                                        <TableCell>{item.quantity}</TableCell>
+                                        <TableCell>Rp {item.price.toLocaleString('id-ID')}</TableCell>
+                                        <TableCell className="text-right">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</TableCell>
                                     </TableRow>
-                                    ) : null}
-                                    {tx.fee ? (
+                                    ))}
+                                </TableBody>
+                                {tx.discount || tx.fee ? (
+                                    <TableFooter>
                                         <TableRow>
-                                            <TableCell colSpan={3} className="text-right">Biaya Marketplace</TableCell>
-                                            <TableCell className="text-right text-destructive">- Rp {tx.fee.toLocaleString('id-ID')}</TableCell>
+                                            <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
+                                            <TableCell className="text-right font-medium">Rp {tx.total.toLocaleString('id-ID')}</TableCell>
                                         </TableRow>
-                                    ) : null}
-                                    <TableRow className="font-bold">
-                                        <TableCell colSpan={3} className="text-right">Total Bersih</TableCell>
-                                        <TableCell className="text-right">Rp {tx.netTotal?.toLocaleString('id-ID')}</TableCell>
-                                    </TableRow>
-                                </TableFooter>
-                            ) : null}
-                        </Table>
-                    </div>
-                    </AccordionContent>
-                </AccordionItem>
-                ))
+                                        {tx.discount ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="text-right">Diskon</TableCell>
+                                            <TableCell className="text-right text-destructive">- Rp {tx.discount.toLocaleString('id-ID')}</TableCell>
+                                        </TableRow>
+                                        ) : null}
+                                        {tx.fee ? (
+                                            <TableRow>
+                                                <TableCell colSpan={3} className="text-right">Biaya Marketplace</TableCell>
+                                                <TableCell className="text-right text-destructive">- Rp {tx.fee.toLocaleString('id-ID')}</TableCell>
+                                            </TableRow>
+                                        ) : null}
+                                        <TableRow className="font-bold">
+                                            <TableCell colSpan={3} className="text-right">Total Bersih</TableCell>
+                                            <TableCell className="text-right">Rp {tx.netTotal?.toLocaleString('id-ID')}</TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                ) : null}
+                            </Table>
+                        </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                )})
             )}
           </Accordion>
         </CardContent>
         <CardFooter className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Halaman {currentPage}</span>
+            <span className="text-sm text-muted-foreground">Halaman {currentPage} dari {Math.ceil(totalTransactionsCount / TRANSACTIONS_PER_PAGE)}</span>
             <div className="flex gap-2">
                 <Button variant="outline" onClick={handlePrevPage} disabled={currentPage === 1 || loading}>
                     <ArrowLeft className="mr-2 h-4 w-4"/> Sebelumnya
