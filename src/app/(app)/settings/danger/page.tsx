@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -15,8 +16,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { deleteSingleCollection } from './actions';
-import { Loader2, Trash2, AlertTriangle, KeyRound } from 'lucide-react';
+import { deleteSingleCollection, resetAllProductStock } from './actions';
+import { Loader2, Trash2, AlertTriangle, KeyRound, RefreshCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -99,6 +100,55 @@ function DeleteAction({ collection }: DeleteActionProps) {
   );
 }
 
+function ResetStockAction() {
+    const [isPending, startTransition] = useTransition();
+    const { toast } = useToast();
+
+    const handleConfirm = () => {
+        startTransition(async () => {
+            const result = await resetAllProductStock();
+            if (result.error) {
+                toast({ title: 'Gagal Mereset Stok', description: result.error, variant: 'destructive' });
+            } else {
+                toast({ title: 'Berhasil', description: 'Stok semua produk telah direset menjadi 0.' });
+            }
+        });
+    }
+
+    return (
+        <TableRow>
+            <TableCell><Badge variant="outline" className="font-mono">Stok Produk</Badge></TableCell>
+            <TableCell>Mengatur ulang (reset) jumlah stok semua produk menjadi 0 tanpa menghapus data produk.</TableCell>
+            <TableCell>
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                        <RefreshCcw className="mr-2 h-4 w-4" />
+                        Reset Stok
+                    </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Reset Semua Stok Produk?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tindakan ini akan mengubah jumlah stok SEMUA produk Anda menjadi 0.
+                            Data produk itu sendiri (nama, harga, dll) tidak akan dihapus. Lanjutkan?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirm} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+                        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Ya, Reset Stok
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </TableCell>
+        </TableRow>
+    );
+}
+
 
 export default function DangerZonePage() {
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -159,19 +209,20 @@ export default function DangerZonePage() {
             Zona Berbahaya
           </CardTitle>
           <CardDescription>
-            Hapus koleksi data secara individual dan permanen. Tindakan ini tidak dapat diurungkan. Lakukan dengan sangat hati-hati.
+            Tindakan di area ini bersifat permanen dan tidak dapat diurungkan. Lakukan dengan sangat hati-hati.
           </CardDescription>
         </CardHeader>
         <CardContent>
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Nama Koleksi</TableHead>
+                        <TableHead>Target Data</TableHead>
                         <TableHead>Deskripsi</TableHead>
                         <TableHead>Aksi</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
+                    <ResetStockAction />
                     {ALL_COLLECTIONS.map(collection => (
                         <DeleteAction key={collection.name} collection={collection} />
                     ))}

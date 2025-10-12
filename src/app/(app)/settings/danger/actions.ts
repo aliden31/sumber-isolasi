@@ -80,6 +80,28 @@ export async function deleteSingleCollection(collectionName: string) {
 }
 
 
+export async function resetAllProductStock() {
+    try {
+        const batch = writeBatch(db);
+        const productsSnapshot = await getDocs(collection(db, 'products'));
+
+        if (productsSnapshot.empty) {
+            return createResponse("Tidak ada produk untuk direset.");
+        }
+
+        productsSnapshot.forEach(doc => {
+            batch.update(doc.ref, { stock: 0 });
+        });
+
+        await batch.commit();
+        revalidateAllPaths();
+        return createResponse();
+    } catch (e) {
+        return createResponse(e instanceof Error ? e.message : "Gagal mereset stok produk.");
+    }
+}
+
+
 // Helper to revalidate all relevant paths after deletion
 function revalidateAllPaths() {
     const paths = [
