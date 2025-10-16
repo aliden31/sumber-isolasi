@@ -128,7 +128,7 @@ export default function ImportMarketplacePage() {
                 const header = json[0].map(h => String(h).toLowerCase().trim());
                 const dataRows = json.slice(1);
                 
-                const initialSkuMap: Record<string, Product | null> = {};
+                const currentSkuMap = { ...skuToProductMap };
                 const processedOrders = new Set<string>();
 
                 const mappedData: ImportRow[] = dataRows.map((row, rowIndex) => {
@@ -153,18 +153,10 @@ export default function ImportMarketplacePage() {
                     const nama_produk = String(getVal(['nama produk', 'product name']) || '');
                     const qty = normalizeNumber(getVal(['jumlah', 'jumlah produk dibeli', 'kuantitas']));
                     
-                    const harga_awal = normalizeNumber(getVal(['harga asli produk', 'harga awal']));
-                    let harga_satuan = normalizeNumber(getVal(['harga setelah diskon penjual', 'harga jual (rp)', 'harga jual']));
-                    let subtotal = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)']));
+                    const subtotal_produk = normalizeNumber(getVal(['subtotal produk', 'total penjualan (rp)', 'harga setelah diskon penjual']));
 
-                    if (harga_satuan <= 0 && subtotal > 0 && qty > 0) {
-                        harga_satuan = subtotal / qty;
-                    }
-
-                    const unit_price = harga_satuan > 0 ? harga_satuan : harga_awal;
-                    if (subtotal === 0 && unit_price > 0 && qty > 0) {
-                        subtotal = unit_price * qty;
-                    }
+                    const unit_price = qty > 0 ? subtotal_produk / qty : 0;
+                    const subtotal = subtotal_produk;
 
                     const cost = normalizeNumber(getVal(['harga modal', 'harga pokok']));
 
@@ -210,8 +202,8 @@ export default function ImportMarketplacePage() {
                     }
                     const tanggal_order_formatted = !isNaN(parsedDate.getTime()) ? format(parsedDate, 'yyyy-MM-dd HH:mm:ss') : format(new Date(), 'yyyy-MM-dd HH:mm:ss');
                     
-                    if (sku && initialSkuMap[sku] === undefined) {
-                        initialSkuMap[sku] = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
+                    if (sku && currentSkuMap[sku] === undefined) {
+                        currentSkuMap[sku] = products.find(p => p.sku && sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || null;
                     }
 
                     return {
@@ -224,7 +216,7 @@ export default function ImportMarketplacePage() {
                 }).filter(row => row.nomor_order && row.sku);
 
                 setParsedData(mappedData);
-                setSkuToProductMap(initialSkuMap);
+                setSkuToProductMap(currentSkuMap);
                 toast({ title: 'Berhasil', description: `${mappedData.length} baris berhasil di-parse.` });
 
             } catch (err) {
@@ -455,4 +447,5 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
 
