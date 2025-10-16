@@ -62,6 +62,7 @@ import {
   ArrowDownCircle,
   BookCheck,
   Palette,
+  PieChart,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -173,6 +174,7 @@ const navItems = [
       { href: "/reports", label: "Penjualan", icon: FileText },
       { href: "/reports/purchasing", label: "Pembelian", icon: FileText },
       { href: "/reports/stock", label: "Stok", icon: FileText },
+      { href: "/reports/expenses", label: "Pengeluaran", icon: PieChart },
       { href: "/reports/financial", label: "Laba Rugi", icon: FileText },
       { href: "/reports/balance-sheet", label: "Neraca", icon: Scale },
       { href: "/reports/cash-flow", label: "Arus Kas", icon: AreaChart },
