@@ -63,6 +63,7 @@ import {
   BookCheck,
   Palette,
   PieChart,
+  BookOpenCheck,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -200,6 +201,11 @@ const navItems = [
       { href: "/settings/theme", label: "Tema & Tampilan", icon: Palette },
       { href: "/settings/danger", label: "Data & Reset", icon: DatabaseZap },
     ],
+  },
+  {
+    href: "/panduan",
+    icon: BookOpenCheck,
+    label: "Panduan",
   },
 ];
 
