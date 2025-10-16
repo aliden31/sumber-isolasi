@@ -16,7 +16,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { deleteSingleCollection, resetAllProductStock } from './actions';
+import { deleteSingleCollection, resetAllProductStock, deleteCashInJournals, deleteCashOutJournals, deleteCashTransferJournals } from './actions';
 import { Loader2, Trash2, AlertTriangle, KeyRound, RefreshCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,20 +24,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const ALL_COLLECTIONS = [
-    { name: "transactions", group: 'Transaksional', description: 'Semua riwayat penjualan.' },
-    { name: "journals", group: 'Transaksional', description: 'Semua entri jurnal akuntansi.' },
-    { name: "salesReturns", group: 'Transaksional', description: 'Semua riwayat retur penjualan.' },
+    { name: "transactions", group: 'Transaksional', description: 'Semua riwayat penjualan. Menghapus ini akan mengembalikan stok produk yang terjual.' },
+    { name: "journals", group: 'Transaksional', description: 'SEMUA entri jurnal akuntansi. Hapus ini jika Anda ingin mengulang seluruh pembukuan.' },
+    { name: "salesReturns", group: 'Transaksional', description: 'Semua riwayat retur penjualan. Menghapus ini akan mengurangi stok produk yang diretur.' },
     { name: "parkedTransactions", group: 'Transaksional', description: 'Semua transaksi kasir yang diparkir.' },
     { name: "purchaseRequests", group: 'Transaksional', description: 'Semua permintaan pembelian.' },
     { name: "purchaseOrders", group: 'Transaksional', description: 'Semua pesanan pembelian (PO).' },
-    { name: "goodsReceipts", group: 'Transaksional', description: 'Semua penerimaan barang (GRN).' },
+    { name: "goodsReceipts", group: 'Transaksional', description: 'Semua penerimaan barang (GRN). Menghapus ini akan mengurangi stok produk yang diterima.' },
     { name: "supplierInvoices", group: 'Transaksional', description: 'Semua faktur dari pemasok.' },
     { name: "purchasePayments", group: 'Transaksional', description: 'Semua pembayaran utang.' },
-    { name: "purchaseReturns", group: 'Transaksional', description: 'Semua riwayat retur pembelian.' },
-    { name: "stockTransfers", group: 'Transaksional', description: 'Semua riwayat transfer stok.' },
+    { name: "purchaseReturns", group: 'Transaksional', description: 'Semua riwayat retur pembelian. Menghapus ini akan mengembalikan stok produk yang diretur.' },
+    { name: "stockTransfers", group: 'Transaksional', description: 'Semua riwayat transfer stok (tidak memengaruhi total stok).' },
     { name: "periodClosings", group: 'Transaksional', description: 'Semua riwayat tutup buku.' },
-    { name: "stockOpnames", group: 'Transaksional', description: 'Semua riwayat stock opname.' },
-    { name: "products", group: 'Master', description: 'Semua data produk.' },
+    { name: "stockOpnames", group: 'Transaksional', description: 'Semua riwayat stock opname. Menghapus ini akan mengembalikan stok ke sebelum opname.' },
+    { name: "products", group: 'Master', description: 'Semua data produk. Perhatian: Menghapus ini akan menyebabkan error pada data transaksi lama.' },
     { name: "customers", group: 'Master', description: 'Semua data pelanggan.' },
     { name: "suppliers", group: 'Master', description: 'Semua data pemasok.' },
     { name: "productCategories", group: 'Master', description: 'Semua kategori produk.' },
@@ -50,6 +50,53 @@ const ALL_COLLECTIONS = [
 
 interface DeleteActionProps {
   collection: { name: string; group: string; description: string };
+}
+
+function SpecificDeleteAction({ action, name, description }: { action: () => Promise<any>, name: string, description: string }) {
+    const [isPending, startTransition] = useTransition();
+    const { toast } = useToast();
+
+    const handleConfirm = () => {
+        startTransition(async () => {
+            const result = await action();
+            if (result.error) {
+                toast({ title: 'Gagal Menghapus Data', description: result.error, variant: 'destructive' });
+            } else {
+                toast({ title: 'Berhasil', description: `Data "${name}" telah berhasil dihapus.` });
+            }
+        });
+    };
+
+    return (
+        <TableRow>
+            <TableCell><Badge variant="secondary" className="font-mono">{name}</Badge></TableCell>
+            <TableCell>{description}</TableCell>
+            <TableCell>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm">
+                            <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Hapus Data "{name}"?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Tindakan ini tidak dapat diurungkan. Ini akan menghapus semua data terkait <code className="bg-muted px-1 rounded-sm">{name}</code> secara permanen.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleConfirm} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+                                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Ya, Hapus Data
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </TableCell>
+        </TableRow>
+    )
 }
 
 function DeleteAction({ collection }: DeleteActionProps) {
@@ -223,6 +270,9 @@ export default function DangerZonePage() {
                 </TableHeader>
                 <TableBody>
                     <ResetStockAction />
+                    <SpecificDeleteAction name="Kas Masuk" description="Menghapus semua jurnal dari menu Kas Masuk." action={deleteCashInJournals} />
+                    <SpecificDeleteAction name="Kas Keluar" description="Menghapus semua jurnal dari menu Kas Keluar." action={deleteCashOutJournals} />
+                    <SpecificDeleteAction name="Transfer Kas" description="Menghapus semua jurnal dari menu Transfer Antar Kas." action={deleteCashTransferJournals} />
                     {ALL_COLLECTIONS.map(collection => (
                         <DeleteAction key={collection.name} collection={collection} />
                     ))}

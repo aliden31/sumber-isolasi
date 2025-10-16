@@ -2,11 +2,55 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collection, writeBatch, getDocs, query, doc, getDoc } from "firebase/firestore";
+import { collection, writeBatch, getDocs, query, doc, getDoc, where, Query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Transaction, SalesReturn, GoodsReceipt, PurchaseReturn, StockOpname, Product } from "@/lib/types";
 
 const createResponse = (error: string | null = null) => ({ error });
+
+async function deleteDocuments(q: Query) {
+    const batch = writeBatch(db);
+    const snapshot = await getDocs(q);
+    snapshot.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+}
+
+
+export async function deleteCashInJournals() {
+    try {
+        const q = query(collection(db, "journals"), where('description', '>=', 'Kas Masuk:'), where('description', '<', 'Kas Masuk:' + '\uf8ff'));
+        await deleteDocuments(q);
+        revalidateAllPaths();
+        return createResponse();
+    } catch(e) {
+        return createResponse(e instanceof Error ? e.message : `Gagal menghapus jurnal Kas Masuk.`);
+    }
+}
+
+export async function deleteCashOutJournals() {
+    try {
+        const q = query(collection(db, "journals"), where('description', '>=', 'Kas Keluar:'), where('description', '<', 'Kas Keluar:' + '\uf8ff'));
+        await deleteDocuments(q);
+        revalidateAllPaths();
+        return createResponse();
+    } catch(e) {
+        return createResponse(e instanceof Error ? e.message : `Gagal menghapus jurnal Kas Keluar.`);
+    }
+}
+
+export async function deleteCashTransferJournals() {
+    try {
+        const q = query(collection(db, "journals"), where('description', '>=', 'Transfer:'), where('description', '<', 'Transfer:' + '\uf8ff'));
+        await deleteDocuments(q);
+        revalidateAllPaths();
+        return createResponse();
+    } catch(e) {
+        return createResponse(e instanceof Error ? e.message : `Gagal menghapus jurnal Transfer Kas.`);
+    }
+}
+
 
 export async function deleteSingleCollection(collectionName: string) {
     try {
@@ -47,7 +91,6 @@ export async function deleteSingleCollection(collectionName: string) {
                     case 'stockOpnames':
                         const so = data as StockOpname;
                         so.items.forEach(item => {
-                            // Revert the stock opname adjustment
                             stockAdjustments[item.productId] = (stockAdjustments[item.productId] || 0) - item.difference;
                         });
                         break;
@@ -55,13 +98,8 @@ export async function deleteSingleCollection(collectionName: string) {
                 batch.delete(docSnap.ref);
             }
 
-            // Apply all stock adjustments
             for (const productId in stockAdjustments) {
                 const productRef = doc(db, 'products', productId);
-                // We need to get the current stock within the batch logic if possible, but Firestore batch doesn't support reads.
-                // A transaction would be better here, but let's assume we can read before batching for simplicity, though this can have race conditions.
-                // For a more robust solution, one would use Cloud Functions or a more complex transaction flow.
-                // For this context, we will read before writing to the batch.
                 const productSnap = await getDoc(productRef);
                 if (productSnap.exists()) {
                     const productData = productSnap.data() as Product;
