@@ -17,25 +17,38 @@ function SimpleMarkdown({ content }: { content: string }) {
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   let inList = false;
+  let listType: 'ul' | 'ol' = 'ul';
 
   lines.forEach((line, index) => {
     if (line.startsWith('## ')) {
       elements.push(<h2 key={index} className="text-2xl font-headline font-semibold mt-8 mb-4 border-b pb-2">{line.substring(3)}</h2>);
+      inList = false;
     } else if (line.startsWith('### ')) {
       elements.push(<h3 key={index} className="text-xl font-headline font-semibold mt-6 mb-3">{line.substring(4)}</h3>);
-    } else if (line.startsWith('*   ')) {
-        elements.push(<li key={index} className="ml-8 list-disc">{line.substring(4)}</li>);
-    } else if (line.startsWith('1.  ')) {
-      elements.push(<li key={index} className="ml-8 list-decimal">{line.substring(4)}</li>);
+      inList = false;
+    } else if (line.startsWith('1.  ') || line.startsWith('*   ')) {
+        const isOrdered = line.startsWith('1.  ');
+        if (!inList || (isOrdered && listType === 'ul') || (!isOrdered && listType === 'ol')) {
+            inList = true;
+            listType = isOrdered ? 'ol' : 'ul';
+            elements.push(React.createElement(listType, { key: `list-${index}`, className: `ml-6 space-y-2 list-${isOrdered ? 'decimal' : 'disc'}` }));
+        }
+        const listElement = elements[elements.length - 1] as React.ReactElement;
+        const newChildren = [...(listElement.props.children || []), <li key={index}>{line.substring(4)}</li>];
+        elements[elements.length - 1] = React.cloneElement(listElement, {}, newChildren);
+
     } else if (line.startsWith('> ')) {
        elements.push(<blockquote key={index} className="mt-6 border-l-2 pl-6 italic">{line.substring(2)}</blockquote>);
+       inList = false;
     } else if (line.trim() === '---') {
         elements.push(<hr key={index} className="my-8" />);
+        inList = false;
     } else if (line.trim() === '') {
         elements.push(<div key={index} className="h-4"></div>);
+        inList = false;
     }
     else {
-      // Basic emphasis support
+      inList = false;
       const parts = line.split(/(\*\*.*?\*\*|`.*?`)/g);
       elements.push(
         <p key={index} className="text-muted-foreground leading-relaxed">
@@ -58,7 +71,6 @@ function SimpleMarkdown({ content }: { content: string }) {
 
 
 export default async function PanduanPage() {
-  // Read the content from blueprint.md
   const blueprintPath = path.join(process.cwd(), 'src/app/blueprint.md');
   let blueprintContent = '';
   try {
@@ -68,12 +80,12 @@ export default async function PanduanPage() {
     blueprintContent = "# Gagal memuat panduan\nTidak dapat menemukan file `blueprint.md`.";
   }
 
-  // Split content by the main sections for the accordion
   const sections = blueprintContent.split('---');
   const finishedFeaturesSection = sections[0];
   const inDevelopmentFeaturesSection = sections[1];
   const flutterPromptSection = sections[2];
-  const accountingFlowSection = sections[3];
+  const usageGuideSection = sections[3];
+  const accountingFlowSection = sections[4];
 
 
   return (
@@ -89,19 +101,25 @@ export default async function PanduanPage() {
         <CardContent>
             <Accordion type="single" collapsible defaultValue="item-1">
                 <AccordionItem value="item-1">
+                    <AccordionTrigger className="text-lg font-semibold">Panduan Penggunaan Aplikasi</AccordionTrigger>
+                    <AccordionContent className="prose prose-sm max-w-none">
+                         <SimpleMarkdown content={usageGuideSection} />
+                    </AccordionContent>
+                </AccordionItem>
+                 <AccordionItem value="item-2">
                     <AccordionTrigger className="text-lg font-semibold">Status Pengembangan Fitur</AccordionTrigger>
                     <AccordionContent className="prose prose-sm max-w-none">
                          <SimpleMarkdown content={finishedFeaturesSection} />
                          <SimpleMarkdown content={inDevelopmentFeaturesSection} />
                     </AccordionContent>
                 </AccordionItem>
-                <AccordionItem value="item-2">
+                <AccordionItem value="item-3">
                     <AccordionTrigger className="text-lg font-semibold">Alur Integrasi Akuntansi</AccordionTrigger>
                     <AccordionContent className="prose prose-sm max-w-none">
                        <SimpleMarkdown content={accountingFlowSection} />
                     </AccordionContent>
                 </AccordionItem>
-                 <AccordionItem value="item-3">
+                 <AccordionItem value="item-4">
                     <AccordionTrigger className="text-lg font-semibold">Prompt Generate Aplikasi Mobile (Flutter)</AccordionTrigger>
                     <AccordionContent className="prose prose-sm max-w-none">
                        <SimpleMarkdown content={flutterPromptSection} />

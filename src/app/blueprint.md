@@ -187,6 +187,72 @@ Buat struktur navigasi yang logis (misalnya menggunakan `BottomNavigationBar` at
 ### **Kesimpulan:**
 Tujuan utamanya adalah membuat aplikasi mobile yang menjadi perpanjangan tangan dari aplikasi web, dengan berbagi database yang sama dan mereplikasi semua logika bisnis penting untuk memastikan integritas data di seluruh ekosistem. Fokus pada UX yang dioptimalkan untuk perangkat mobile.
 ---
+## 💡 Panduan Penggunaan Aplikasi
+
+Berikut adalah panduan langkah demi langkah untuk menggunakan aplikasi ini dari awal.
+
+### Tahap 1: Pengaturan Awal (Saat Pertama Kali)
+
+Saat Anda pertama kali menjalankan aplikasi, Anda akan disambut oleh halaman *setup*.
+
+1.  **Mulai Pengaturan**: Klik tombol **"Mulai Pengaturan & Impor Data"**. Tindakan ini akan secara otomatis:
+    *   Mengimpor **Bagan Akun (COA)** standar yang sesuai dengan PSAK.
+    *   Menambahkan beberapa **data contoh** untuk Pelanggan dan Pemasok.
+    *   Mengatur **pemetaan akun otomatis** di menu Pengaturan Akuntansi.
+    *   Mengarahkan Anda ke halaman Dashboard.
+
+2.  **Tinjau Pengaturan**: Setelah masuk, luangkan waktu sejenak untuk memeriksa menu **Pengaturan**:
+    *   Masuk ke **Pengaturan > Profil Perusahaan**, lalu isi nama, alamat, dan kontak usaha Anda.
+    *   Masuk ke **Pengaturan > Akuntansi**. Periksa kembali apakah semua akun sudah terpetakan dengan benar. Anda bisa mengubahnya jika memiliki preferensi akun yang berbeda.
+
+### Tahap 2: Melengkapi Data Master
+
+Data master adalah jantung dari aplikasi ini. Pastikan data ini lengkap sebelum Anda mulai bertransaksi.
+
+1.  **Produk & Stok**:
+    *   Masuk ke **Produk & Stok > Daftar Produk**. Hapus produk contoh yang tidak relevan.
+    *   Gunakan tombol **"Tambah Produk"** untuk memasukkan produk Anda satu per satu, atau gunakan fitur **"Impor Produk"** untuk mengunggah data secara massal dari file Excel.
+    *   Masuk ke **Produk & Stok > Kategori Produk** untuk menyesuaikan kategori sesuai jenis produk Anda.
+
+2.  **Master Data Lainnya**:
+    *   Masuk ke **Master Data > Pelanggan** untuk menambah atau mengedit daftar pelanggan Anda.
+    *   Masuk ke **Master Data > Pemasok** untuk menambah atau mengedit daftar pemasok Anda.
+
+### Tahap 3: Transaksi Harian
+
+Setelah data master siap, Anda bisa mulai mencatat aktivitas bisnis sehari-hari.
+
+- **Untuk Penjualan Langsung/Tunai**:
+  - Gunakan menu **Kasir (POS)**. Cukup klik produk untuk menambahkannya ke keranjang dan selesaikan transaksi dengan pembayaran tunai atau transfer.
+
+- **Untuk Penjualan Kredit/Invoice**:
+  - Masuk ke **Penjualan > Buat Invoice**. Pilih pelanggan, tambahkan produk, dan simpan. Transaksi ini akan otomatis tercatat sebagai piutang.
+
+- **Untuk Mencatat Pembelian Barang**:
+  - Ikuti alur lengkap di menu **Pembelian**:
+    1.  **Permintaan Pembelian**: Buat permintaan internal (opsional).
+    2.  **Pesanan Pembelian (PO)**: Buat pesanan resmi ke pemasok.
+    3.  **Penerimaan Barang**: Saat barang tiba, catat penerimaannya di menu ini. Stok produk akan otomatis bertambah.
+    4.  **Faktur Pemasok**: Saat tagihan dari pemasok tiba, catat di menu ini untuk mengakui utang usaha.
+
+- **Untuk Mencatat Pengeluaran Operasional**:
+  - Masuk ke **Kas & Bank > Kas Keluar**. Gunakan menu ini untuk mencatat biaya-biaya seperti bayar listrik, gaji, internet, dll.
+
+### Tahap 4: Memantau dan Menganalisis Laporan
+
+Setiap transaksi yang Anda catat akan secara otomatis memengaruhi laporan keuangan dan operasional.
+
+- **Dashboard**: Halaman ini memberikan ringkasan cepat kondisi bisnis Anda secara *real-time*.
+- **Laporan**: Gunakan menu **Laporan** untuk analisis lebih mendalam.
+  - **Laporan Penjualan**: Untuk melihat produk terlaris dan tren penjualan.
+  - **Laporan Stok**: Untuk melihat nilai valuasi persediaan Anda.
+  - **Laporan Laba Rugi, Neraca, Arus Kas**: Tiga laporan keuangan utama yang menunjukkan performa dan posisi keuangan bisnis Anda.
+- **Akuntansi**: Jika Anda ingin melacak jejak audit, gunakan menu **Akuntansi**.
+  - **Jurnal Umum**: Menampilkan semua entri jurnal yang dibuat oleh sistem.
+  - **Buku Besar**: Merinci semua transaksi yang terjadi pada satu akun spesifik.
+
+Dengan mengikuti alur ini, Anda dapat memanfaatkan semua fitur aplikasi untuk mengelola operasional dan keuangan bisnis Anda secara efisien.
+---
 ## 💡 Penjelasan Alur Integrasi Akuntansi
 
 Setiap transaksi bisnis yang dicatat dalam aplikasi ini secara otomatis menghasilkan entri jurnal akuntansi di latar belakang. Ini memastikan bahwa laporan keuangan Anda (Laba Rugi, Neraca, Arus Kas) selalu sinkron dan *up-to-date*. Berikut adalah rincian alur kerjanya per modul.
