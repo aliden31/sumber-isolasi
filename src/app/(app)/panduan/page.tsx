@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -31,7 +32,7 @@ function SimpleMarkdown({ content }: { content: string }) {
         if (!inList || (isOrdered && listType === 'ul') || (!isOrdered && listType === 'ol')) {
             inList = true;
             listType = isOrdered ? 'ol' : 'ul';
-            elements.push(React.createElement(listType, { key: `list-${index}`, className: `ml-6 space-y-2 list-${isOrdered ? 'decimal' : 'disc'}` }));
+            elements.push(React.createElement(listType, { key: `list-${index}`, className: `ml-6 space-y-2 list-${isOrdered ? 'decimal' : 'disc'}` }, []));
         }
         const listElement = elements[elements.length - 1] as React.ReactElement;
         const newChildren = [...(listElement.props.children || []), <li key={index}>{line.substring(4)}</li>];
