@@ -113,7 +113,7 @@ const navItems = [
       { href: "/sales/manual-input", label: "Buat Invoice", icon: FileDigit },
       { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
       { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
-      { href: "/sales/import", label: "Import Marketplace", icon: Download, isDev: false },
+      { href: "/sales/import", label: "Import Marketplace", icon: Download, isDev: true },
     ],
   },
   {
