@@ -167,9 +167,12 @@ export default function ImportMarketplacePage() {
                     const channelLower = channel.toLowerCase();
                     
                     if (channelLower.includes('tiktok')) {
-                        fee = (subtotal * 0.15) + 1250;
+                        const dynamicFee = subtotal * 0.055;
+                        const cappedFee = Math.min(dynamicFee, 40000);
+                        const processingFee = 1250;
+                        fee = cappedFee + processingFee;
+                        discount = 0; // TikTok discount handled differently if any
                         net_total = subtotal - fee;
-                        discount = 0; 
                     } else { // Shopee and others
                         const commissionFee = normalizeNumber(getVal(['biaya komisi']));
                         const transactionFee = normalizeNumber(getVal(['biaya transaksi']));
@@ -447,5 +450,6 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
         </Popover>
     );
 }
+
 
 
