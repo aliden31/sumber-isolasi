@@ -115,6 +115,7 @@ const navItems = [
       { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
       { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
       { href: "/sales/import", label: "Import Marketplace", icon: Download },
+      { href: "/settings/mapping", label: "Pemetaan Produk", icon: GitBranch, isDev: true },
     ],
   },
   {
@@ -190,12 +191,6 @@ const navItems = [
       { href: "/taxes", label: "Pajak", icon: Percent },
       { href: "/currencies", label: "Mata Uang", icon: Coins },
     ],
-  },
-  {
-    href: "/settings/mapping",
-    label: "Pemetaan Database",
-    icon: GitBranch,
-    isDev: true,
   },
   {
     label: "Pengaturan",
