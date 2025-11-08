@@ -379,7 +379,8 @@ export type MarketplaceStore = {
 };
 export type NewMarketplaceStore = Omit<MarketplaceStore, 'id'>;
 
-export type ParsedRow = {
+
+export type ImportRow = {
   id: string;
   tanggal_order: string;
   nomor_order: string;
@@ -396,10 +397,5 @@ export type ParsedRow = {
   fee: number;
   discount: number;
   net_total: number;
-};
-
-export type MappedRow = Omit<ParsedRow, 'id'> & { id: string };
-
-export type ImportRow = MappedRow & {
-    mappedProduct: Product | null;
+  mappedProduct: Product | null;
 };
