@@ -1,0 +1,297 @@
+
+
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  BarChart2,
+  Book,
+  ChevronDown,
+  CircleDollarSign,
+  Contact,
+  FileText,
+  History,
+  LayoutDashboard,
+  Package,
+  Receipt,
+  Settings,
+  ShoppingCart,
+  Truck,
+  Users,
+  Wallet,
+  Landmark,
+  BrainCircuit,
+  PackageSearch,
+  Warehouse,
+  ArrowRightLeft,
+  ClipboardCheck,
+  Bell,
+  Banknote,
+  LogOut,
+  RefreshCcw,
+  BookUser,
+  FileDigit,
+  FileSpreadsheet,
+  Handshake,
+  FilePlus,
+  PackagePlus,
+  PackageCheck,
+  FileKey2,
+  ReceiptText,
+  Factory,
+  CreditCard,
+  FileBox,
+  FileClock,
+  Printer,
+  FileUp,
+  Download,
+  BookCopy,
+  BookLock,
+  Archive,
+  Building,
+  UserCheck,
+  Percent,
+  Coins,
+  SlidersHorizontal,
+  DatabaseZap,
+  Wrench,
+  Scale,
+  AreaChart,
+  Store,
+  ArrowDownCircle,
+  BookCheck,
+  Palette,
+  PieChart,
+  GitBranch,
+} from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarTrigger,
+  useSidebar,
+  SidebarFooter,
+  SidebarMenuSubItem,
+} from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { ThemeToggle } from "./theme-toggle";
+import { TokoKilatLogo } from "../icons/logo";
+
+const navItems = [
+  {
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    label: "Dashboard",
+  },
+  {
+    label: "Kasir (POS)",
+    icon: ShoppingCart,
+    subItems: [
+      { href: "/pos", label: "Transaksi Baru", icon: FilePlus },
+      { href: "/pos/parked", label: "Transaksi Terparkir", icon: FileClock },
+      { href: "/pos/returns", label: "Retur Kasir", icon: ArrowRightLeft },
+      { href: "/pos/print", label: "Cetak Ulang Struk", icon: Printer },
+    ],
+  },
+  {
+    label: "Penjualan",
+    icon: CircleDollarSign,
+    subItems: [
+      { href: "/transactions", label: "Riwayat Penjualan", icon: History },
+      { href: "/sales/manual-input", label: "Buat Invoice", icon: FileDigit },
+      { href: "/sales/receivables", label: "Piutang Usaha", icon: Handshake },
+      { href: "/sales/returns", label: "Retur Penjualan", icon: ArrowRightLeft },
+      { href: "/sales/import", label: "Import Marketplace", icon: Download },
+    ],
+  },
+  {
+    label: "Pembelian",
+    icon: Truck,
+    subItems: [
+      { href: "/purchasing/request", label: "Permintaan Pembelian", icon: FilePlus },
+      { href: "/purchasing/order", label: "Pesanan Pembelian", icon: PackagePlus },
+      { href: "/purchasing/goods-receipt", label: "Penerimaan Barang", icon: PackageCheck },
+      { href: "/purchasing/invoice", label: "Faktur Pemasok", icon: FileKey2 },
+      { href: "/purchasing/returns", label: "Retur Pembelian", icon: ArrowRightLeft },
+      { href: "/purchasing/payables", label: "Utang Usaha", icon: Handshake },
+    ],
+  },
+  {
+    label: "Produk & Stok",
+    icon: Package,
+    subItems: [
+      { href: "/products", label: "Daftar Produk", icon: Package },
+      { href: "/products/categories", label: "Kategori Produk", icon: BookUser },
+      { href: "/products/import", label: "Impor Produk", icon: FileUp },
+      { href: "/stock/warehouses", label: "Gudang", icon: Warehouse },
+      { href: "/stock/notifications", label: "Stok Menipis", icon: Bell },
+      { href: "/stock-estimation", label: "Estimasi Stok (AI)", icon: BrainCircuit },
+      { href: "/stock/transfer", label: "Transfer Stok", icon: ArrowRightLeft },
+      { href: "/stock/opname", label: "Stock Opname", icon: ClipboardCheck },
+    ],
+  },
+  {
+    href: "/cash/out",
+    label: "Pengeluaran",
+    icon: ArrowDownCircle,
+  },
+  {
+    label: "Kas & Bank",
+    icon: Landmark,
+    subItems: [
+      { href: "/cash/in", label: "Kas Masuk", icon: Banknote },
+      { href: "/cash/transfer", label: "Transfer Antar Kas", icon: ArrowRightLeft },
+      { href: "/cash/reconciliation", label: "Rekonsiliasi Bank", icon: RefreshCcw, isDev: true },
+    ],
+  },
+  {
+    label: "Akuntansi",
+    icon: Book,
+    subItems: [
+      { href: "/accounting/coa", label: "Bagan Akun (COA)", icon: FileSpreadsheet },
+      { href: "/accounting/journal", label: "Jurnal Umum", icon: FileDigit },
+      { href: "/accounting/ledger", label: "Buku Besar", icon: BookCopy },
+      { href: "/accounting/closing", label: "Tutup Buku", icon: BookLock },
+      { href: "/accounting/post-closing-trial-balance", label: "Neraca Saldo Stlh Penutupan", icon: BookCheck },
+    ],
+  },
+  {
+    label: "Laporan",
+    icon: BarChart2,
+    subItems: [
+      { href: "/reports", label: "Penjualan", icon: FileText },
+      { href: "/reports/purchasing", label: "Pembelian", icon: FileText },
+      { href: "/reports/stock", label: "Stok", icon: FileText },
+      { href: "/reports/expenses", label: "Pengeluaran", icon: PieChart },
+      { href: "/reports/financial", label: "Laba Rugi", icon: FileText },
+      { href: "/reports/balance-sheet", label: "Neraca", icon: Scale },
+      { href: "/reports/cash-flow", label: "Arus Kas", icon: AreaChart },
+    ],
+  },
+    {
+    label: "Master Data",
+    icon: Archive,
+    subItems: [
+      { href: "/customers", label: "Pelanggan", icon: Users },
+      { href: "/suppliers", label: "Pemasok", icon: Factory },
+      { href: "/taxes", label: "Pajak", icon: Percent },
+      { href: "/currencies", label: "Mata Uang", icon: Coins },
+    ],
+  },
+  {
+    label: "Pengaturan",
+    icon: Settings,
+    subItems: [
+      { href: "/settings", label: "Profil Perusahaan", icon: Building },
+      { href: "/settings/accounting", label: "Akuntansi", icon: SlidersHorizontal },
+      { href: "/settings/marketplace", label: "Marketplace", icon: Store },
+      { href: "/settings/mapping", label: "Pemetaan Database", icon: GitBranch, isDev: true },
+      { href: "/settings/theme", label: "Tema & Tampilan", icon: Palette },
+      { href: "/settings/danger", label: "Data & Reset", icon: DatabaseZap },
+    ],
+  },
+];
+
+export function AppSidebar({ companyName }: { companyName: string }) {
+  const pathname = usePathname();
+
+  const isActive = (href: string) => pathname === href;
+  const isSubActive = (subItems: any[]) =>
+    subItems.some((item) => item.href && isActive(item.href));
+
+  return (
+    <Sidebar
+      className="border-r"
+    >
+       <SidebarHeader className="flex items-center gap-2">
+        <TokoKilatLogo />
+        <span className="text-lg font-headline font-semibold text-primary">
+          {companyName}
+        </span>
+      </SidebarHeader>
+        <SidebarContent>
+        <SidebarMenu>
+          {navItems.map((item, index) =>
+            item.subItems ? (
+              <SidebarMenuItem key={`${item.label}-${index}`}>
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      className="w-full justify-between font-headline"
+                      isActive={isSubActive(item.subItems)}
+                       tooltip={{
+                        children: item.label,
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </div>
+                      <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {item.subItems.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.href}>
+                           <SidebarMenuSubButton
+                              href={subItem.href || "#"}
+                              isActive={isActive(subItem.href || "#")}
+                            >
+                              {subItem.icon && <subItem.icon />}
+                              <span>{subItem.label}</span>
+                              {subItem.isDev && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Wrench className="ml-auto h-3 w-3 text-muted-foreground" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" align="center">
+                                    <p>Dalam Pengembangan</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </Collapsible>
+              </SidebarMenuItem>
+            ) : (
+              <SidebarMenuItem key={item.href}>
+                <Link href={item.href || "#"}>
+                  <SidebarMenuButton
+                    isActive={isActive(item.href || "#")}
+                    tooltip={{
+                      children: item.label,
+                    }}
+                    className="font-headline"
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            )
+          )}
+        </SidebarMenu>
+      </SidebarContent>
+       <SidebarFooter>
+        <ThemeToggle />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
