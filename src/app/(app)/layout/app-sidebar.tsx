@@ -181,7 +181,7 @@ const navItems = [
       { href: "/reports/cash-flow", label: "Arus Kas", icon: AreaChart },
     ],
   },
-    {
+  {
     label: "Master Data",
     icon: Archive,
     subItems: [
@@ -192,13 +192,18 @@ const navItems = [
     ],
   },
   {
+    href: "/settings/mapping",
+    label: "Pemetaan Database",
+    icon: GitBranch,
+    isDev: true,
+  },
+  {
     label: "Pengaturan",
     icon: Settings,
     subItems: [
       { href: "/settings", label: "Profil Perusahaan", icon: Building },
       { href: "/settings/accounting", label: "Akuntansi", icon: SlidersHorizontal },
       { href: "/settings/marketplace", label: "Marketplace", icon: Store },
-      { href: "/settings/mapping", label: "Pemetaan Database", icon: GitBranch, isDev: true },
       { href: "/settings/theme", label: "Tema & Tampilan", icon: Palette },
       { href: "/settings/danger", label: "Data & Reset", icon: DatabaseZap },
     ],
@@ -282,6 +287,16 @@ export function AppSidebar({ companyName }: { companyName: string }) {
                   >
                     <item.icon />
                     <span>{item.label}</span>
+                     { (item as any).isDev && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Wrench className="ml-auto h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" align="center">
+                            <p>Dalam Pengembangan</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
