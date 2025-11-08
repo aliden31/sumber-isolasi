@@ -22,6 +22,10 @@ import {
   XCircle,
   ChevronsUpDown,
   Check,
+  DollarSign,
+  TrendingDown,
+  Receipt,
+  Wallet,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -65,9 +69,9 @@ export default function ImportMarketplacePage() {
     return () => unsub();
   }, []);
 
-  const { allProductsMapped, uniqueOrderCount, totalItems, unmappedSkus } = useMemo(() => {
+  const { allProductsMapped, uniqueOrderCount, totalItems, unmappedSkus, summary } = useMemo(() => {
     if (parsedData.length === 0) {
-      return { allProductsMapped: false, uniqueOrderCount: 0, totalItems: 0, unmappedSkus: [] };
+      return { allProductsMapped: false, uniqueOrderCount: 0, totalItems: 0, unmappedSkus: [], summary: { grossSales: 0, totalDiscount: 0, totalFee: 0, netRevenue: 0 } };
     }
     
     const uniqueSkus = [...new Set(parsedData.map(row => row.sku))];
@@ -76,11 +80,20 @@ export default function ImportMarketplacePage() {
     const uniqueOrders = new Set(parsedData.map(row => row.nomor_order));
     const totalItems = parsedData.reduce((sum, row) => sum + row.qty, 0);
 
+    const summaryData = parsedData.reduce((acc, row) => {
+        acc.grossSales += row.subtotal;
+        acc.totalDiscount += row.discount;
+        acc.totalFee += row.fee;
+        acc.netRevenue += row.net_total;
+        return acc;
+    }, { grossSales: 0, totalDiscount: 0, totalFee: 0, netRevenue: 0 });
+
     return { 
       allProductsMapped: unmapped.length === 0, 
       uniqueOrderCount: uniqueOrders.size,
       totalItems,
-      unmappedSkus: unmapped
+      unmappedSkus: unmapped,
+      summary: summaryData,
     };
   }, [parsedData, skuToProductMap]);
 
@@ -294,7 +307,7 @@ export default function ImportMarketplacePage() {
       {parsedData.length > 0 && (
         <Card>
             <CardHeader>
-                <CardTitle>Langkah 2: Pratinjau & Pemetaan</CardTitle>
+                <CardTitle>Langkah 2: Pratinjau, Ringkasan & Pemetaan</CardTitle>
                 <CardDescription>
                   Periksa data yang berhasil di-parse dan petakan produk yang belum ditemukan. SKU di laporan harus cocok dengan SKU Gudang di data produk.
                   <br />
@@ -303,7 +316,13 @@ export default function ImportMarketplacePage() {
                   </span>
                 </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <MetricCard title="Penjualan Kotor" value={summary.grossSales} icon={DollarSign} />
+                    <MetricCard title="Total Diskon" value={summary.totalDiscount} icon={TrendingDown} isNegative/>
+                    <MetricCard title="Total Biaya" value={summary.totalFee} icon={Receipt} isNegative/>
+                    <MetricCard title="Pendapatan Bersih" value={summary.netRevenue} icon={Wallet} />
+                </div>
                 {unmappedSkus.length > 0 && (
                     <div className="mb-6">
                         <Alert variant="destructive" className="mb-4">
@@ -451,5 +470,18 @@ function ProductMappingCell({ sku, mappedProduct, allProducts, onMap }: { sku: s
     );
 }
 
-
-
+function MetricCard({ title, value, icon: Icon, isNegative = false }: { title: string; value: number; icon: React.ElementType, isNegative?: boolean }) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className={cn("text-2xl font-bold", isNegative && "text-destructive")}>
+                   {isNegative && '- '} Rp {value.toLocaleString('id-ID')}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
